@@ -135,17 +135,16 @@ The only escaping local loan is a shared view into one statically named borrowed
 The [ownership library contract](first-release.md#ownership-libraries) supplies
 the practical presentation: bounded iteration and spans, fixed `out`
 initialization on every normal return, named `invariant Clause: ...` conjuncts
-with selective `open (ref ...) lifts Clause, ... { ... }` invariant lifting
-(opening only the named conjuncts into a linear `CloseDebt` in `Delta`, keeping
-unlifted conjuncts active across disjoint or non-invalidating field writes,
-refusing early exits, suspension or whole-receiver calls while the debt is open,
-and re-proving only the lifted clauses at block exit), two-step
-`CopyRepresentation`/`TransferType<T>` bulk relocation over vacant-slot storage,
-and distinct fallible-builder protocols
-with explicit partial initialization and rollback. The simple receiver-loan
-order remains selected, with footprint diagnostics and a checked snapshot
-suggestion where valid. These clients qualify ordinary use of the rules; no
-two-phase receiver analysis or unchecked initialization escape is assumed.
+with selective `open (ref ...) lifts Clause, ... { ... }` lifting (tracked as a
+linear `CloseDebt` in `Delta` that forbids early exits, suspension or
+whole-receiver calls while open and re-proves only the lifted conjuncts at block
+exit), two-step `CopyRepresentation`/`TransferType<T>` bulk relocation over
+vacant-slot storage (see [Dependency and joins](#dependency-and-joins)), and
+distinct fallible-builder protocols with explicit partial initialization and
+rollback. The simple receiver-loan order remains selected, with footprint
+diagnostics and a checked snapshot suggestion where valid. These clients qualify
+ordinary use of the rules; no two-phase receiver analysis or unchecked
+initialization escape is assumed.
 
 ### Borrow-analysis promotion
 

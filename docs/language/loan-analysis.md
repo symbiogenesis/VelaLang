@@ -42,8 +42,10 @@ scalability nor a choice of production algorithm; the
 
 ## Inference and obligations
 
-Analyze complete reachable paths separately so a join never unions mutually
-exclusive loans into one resource state. Backward demand follows transitive
+Abstract states along the control-flow graph track their own capture
+environments, active/suspended loans and per-conjunct invariant debt sets,
+merging compatible states at join points and loop headers without unioning
+mutually exclusive branch loans into a single unconditional grant. Backward demand follows transitive
 captures and loan ancestry; forward analysis detects competing access, use before
 creation, use after move and invalid reborrows. Loan ends are inferred at last
 use, with descendants ended before ancestors. Each inferred end records a
@@ -75,7 +77,7 @@ with `python tools/run.py test --only test_vela_loans --jobs 1` on Windows.
 An explicit result split can be modeled as follows:
 
 ```python
-from vela.loans import Access, Borrow, Graph, Loan, Node, Owner, Place, Return, analyze
+from toolchain.loans import Access, Borrow, Graph, Loan, Node, Owner, Place, Return, analyze
 
 input_place = Place("input")
 report = analyze((Owner("input", borrowed=True),), Graph("lend", (
@@ -98,8 +100,10 @@ without accessing their contents; `Move` transfers a descriptor's availability.
 `Drop` removes availability without running resource disposal or extending a
 dead loan's demand. Moving an owner root is an explicit `Access(..., "move")`;
 partial owner moves remain unsupported. Array projections use `"*"` and retain
-explicit overlap/containment obligations. The graph is a supplied model, not an
-extraction from the Menhir tree.
+explicit overlap/containment obligations. Whether a `Graph` is constructed
+directly or lowered from a schema-2 surface AST via `lower_function` /
+`lower_module`, its owner and projection facts remain explicit inputs rather
+than proved source semantics.
 
 ## Acceptance
 
@@ -146,7 +150,7 @@ exclusive alternatives. It uses no analyzer internals to calculate expectations.
 
 | Reviewed obligation | Decisive evidence and judgment |
 | --- | --- |
-| Complete input and exploration | Validation rejects malformed nested facts, missing references, duplicate edges, cycles and unreachable nodes before returning any report. Node, path, capture and work exhaustion raise structural refusals, including exhaustion after exploration starts. |
+| Complete input and exploration | Validation rejects malformed nested facts, missing references, duplicate edges, irreducible or non-terminating cycles and unreachable nodes before returning any report. Node, path, capture and work exhaustion raise structural refusals, including exhaustion after exploration starts. |
 | Path-local demand | Complete paths have distinct capture environments and loan states. The generated oracle varies each sibling's reads and writes independently and checks exact conflict locations and restoration locations; a sibling's demand cannot delay the other's end. |
 | Capture and move accounting | Retained captures are flattened transitively to canonical loan identities. Existing moved-wrapper and dropped-descriptor controls check retained ancestry and unavailable old names separately. A drop performs no disposal and does not prolong dead demand. |
 | Footprint and grant restrictions | Declared sibling fields support disjoint access; unknown indices and undeclared separation retain explicit obligations. Rejected exclusive-from-shared and out-of-footprint children receive no active grant. Their uses and returned wrappers retain their intended invalidity diagnostics. |

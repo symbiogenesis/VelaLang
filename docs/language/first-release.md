@@ -303,11 +303,9 @@ and restores the promised storage state. Failure must return storage and
 unconsumed inputs or discharge them through an explicit proved operation.
 Boundary-mandated whole-buffer initialization and zeroization are unchanged.
 `TextBuilder<capacity>` and `Format.Write(ref builder, $"...")` (or
-`Format.Write(ref span, $"...")` over `ref Span<byte>`) follow the same
-bounded-storage contract: each literal segment and `{hole}` appends deterministic
-UTF-8 bytes through the hole's coherent static `Format<T>` instance without
-heap allocation, reflection or ambient locale, evaluates hole arguments
-left-to-right under the active receiver loan, and returns
+`Format.Write(ref span, $"...")` over `ref Span<byte>`) follow the bounded
+buffer-writing contract in [Bytes and text](#bytes-and-text), evaluating hole
+arguments left-to-right under the active receiver loan and returning
 `Result<usize, CapacityError>` with the declared prefix/rollback state on
 `Err(CapacityError)`.
 
@@ -354,26 +352,26 @@ the type is inferred or explicit. These familiar spellings retain Vela's rules:
 
 | Surface | Vela meaning to explain |
 | --- | --- |
-| `let T value` | Immutable binding (bare `T value = ...;` is refused, directing authors to `let` or `var`); writing through an eligible exclusive loan is a separate operation |
+| `let T value` | Immutable binding (bare `T value = ...;` is refused; use `let` or `var`); writing through an eligible exclusive loan is a separate operation |
 | `var T value` | Mutable binding, with no implicit shared-write permission |
-| `in`, `ref`, `out` | Explicit shared-read, initialized-exclusive and initialization-exclusive loans; ordinary calls repeat their mode, and [assist-don't-coerce tooling](../tooling/authoring-tools.md#compiler-verified-assist-dont-coerce-tooling) offers a checked insertion of `in`/`ref`/`out` (such as `ref buffer`) when omitted |
+| `in`, `ref`, `out` | Explicit shared-read, initialized-exclusive and initialization-exclusive loans; ordinary calls repeat their mode, and [assist-don't-coerce tooling](../tooling/authoring-tools.md#compiler-verified-assist-dont-coerce-tooling) offers a checked insertion when omitted |
 | `out T` with a fallible result | `T` is initialized on every normal return, including errors; partial construction uses outcome-indexed owned storage |
-| Labeled arguments | Labels name the next declared parameter, preserving dependent substitution and left-to-right evaluation; no reordering or defaults |
-| `int` and ordinary arithmetic | Explicitly imported exact alias; representability obligations and checked-result alternatives retain the primitive contract, and conversion diagnostics suggest `long.From(x)` when infallibly wider or `usize.TryFrom(x)` when range-checked |
-| `Option<T>`, `None` and propagation | Absence is an explicit case (`None => ...` in both expression and statement `match`, with nullary constructors written bare without `()`); `?` is early-return propagation rather than C# `?.`, so member access after propagation writes `(Read()?).Value` or a local `match` |
-| Explicit `effects(...)` on public functions | Public signatures declare a closed read/write/call footprint; when omitted or under-specified, the compiler computes the body's closed footprint and offers a checked source-preserving `effects(...)` preview |
-| `if (cond) a else b` (instead of `cond ? a : b`) | Conflict-free conditional expression with mandatory `else` (avoiding ternary `?` ambiguity with postfix propagation and prefix holes), desugaring to the same exhaustive Boolean elimination and resource join as a two-arm `match` |
-| `Accepted(packet: p, receipt: r)` | Optional declaration-order field labels in constructor patterns, symmetric with labeled call arguments and requiring no symbol-table lookup during parsing |
-| `base with { Field = value }` / `move base with { ... }` | Postfix record/model update evaluated left-to-right in declaration order; linear or affine records require `move base with { ... }` so unreplaced resources transfer cleanly and replaced fields are accounted for |
-| `let Some(v) = expr else { return ...; }` and `if (x is Some(v))` | Scoped early-exit extraction where `else` must exit the enclosing scope and discharge non-matching resources, or flow-refined conditional pattern matching binding `v` in `then` and refining the complement in `else` |
-| `public usize Length => ...;` / `public ghost Seq<T> Model => ...;` | Get-only, total, effect-free expression properties (`a.B` is always a pure, allocation-free read of `a`); property `set` accessors and effectful or fallible getters remain permanently excluded |
-| `"""..."""` (raw string literals) | Exact UTF-8 bytes without escape processing; multi-line forms strip the closing delimiter line's indentation prefix and normalize interior line breaks to LF (`\n`) in the read-only image |
-| `Format.Write(ref builder, $"...")` (instead of heap `$"..."` / `ToString()`) | Allocation-free checked formatting into an explicit `ref TextBuilder<capacity>` or `ref Span<byte>`, resolving a coherent static `Format<T>` instance per `{hole}` (no heap allocation, runtime reflection or ambient locale) and returning `Result<usize, CapacityError>` |
-| `.Model.All(x => ...)`, `.Any(x => ...)`, `.Contains(x)`, `.Take(n)`, `.Skip(n)`, `.Slice(a, b)`, `.Count` | Pure mathematical `Seq<T>` predicates and slices in contracts, backed by standard-library lemmas and discharged in the finite-sequence refinement/domain tier instead of raw `forall`/`exists` index quantifiers |
-| `ISequenceModel<T>`, `IBoundedIterable<T>` (instead of `IEnumerable<T>` / `IQueryable<T>`) | Law-carrying interfaces projecting containers to canonical `Model : Seq<T>` and linking bounded `foreach` steps to `Model.At(k)`, `Model.Take(k)` and `Model.Skip(k)` with explicit element loans, zero enumerator allocation and static contract-lambda inspection instead of runtime expression-tree reflection |
-| `invariant Clause: P` and `open (ref this) lifts Clause, ... { ... }` | Named declaration invariant conjuncts and lexical selective invariant lifting; opens only the named conjuncts as a linear `CloseDebt`, keeps unlifted conjuncts active across disjoint/non-invalidating field writes, forbids early exits (`return`/`break`/`continue`/`?`), suspension or whole-receiver calls while open, and re-proves only the lifted clauses at block exit |
-| `CopyRepresentation(in src, ref dst, count)` then `TransferType<T>(ref src, ref dst, count)` | Two-step bulk relocation over vacant-slot storage (`Slots<T, capacity>`): physical tag-preserving representation copy into vacant destination storage (leaving destination vacant/unowned and recording revision-bound representation equality) followed by erased linear ownership transfer transitioning source `[0..count)` to vacant and destination `[0..count)` to live `T` without a per-element proof loop |
-| `interface I...` and `impl I... for Type`, `where I...(type T)` | Law-carrying interfaces with explicit nonoverlapping `impl` instances (decided by structural unification without blanket-impl overlap, priority or dynamic vtables); required `lemma`/`theorem` laws are proved fields of the static witness dictionary passed at `where I...(type T)` bounds |
+| Labeled arguments | Labels name the next declared parameter in declaration order, preserving dependent substitution and left-to-right evaluation; no reordering or defaults |
+| `int` and ordinary arithmetic | Explicitly imported exact alias; representability obligations and checked-result alternatives follow [primitive semantics](#primitive-semantics), and conversion diagnostics suggest `long.From(x)` or `usize.TryFrom(x)` |
+| `Option<T>`, `None` and propagation | Absence is an explicit case (`None => ...` in `match`, written bare without `()`); `?` is early-return propagation rather than C# `?.`, so member access writes `(Read()?).Value` or a local `match` |
+| Explicit `effects(...)` on public functions | Public signatures declare a closed read/write/call footprint; when omitted or under-specified, the compiler offers a checked `effects(...)` preview |
+| `if (cond) a else b` (instead of `cond ? a : b`) | Conflict-free conditional expression with mandatory `else`, desugaring to the same exhaustive Boolean elimination and resource join as a two-arm `match` |
+| `Accepted(packet: p, receipt: r)` | Optional declaration-order field labels in constructor patterns, symmetric with labeled call arguments |
+| `base with { Field = value }` / `move base with { ... }` | Postfix record/model update evaluated left-to-right in declaration order; linear or affine records require `move base with { ... }` |
+| `let Some(v) = expr else { return ...; }` and `if (x is Some(v))` | Scoped early-exit guard where `else` must exit the enclosing scope, or flow-refined conditional pattern matching binding `v` in `then` |
+| `public usize Length => ...;` / `public ghost Seq<T> Model => ...;` | Get-only, total, effect-free expression properties (`a.B` is always a pure, allocation-free read); `set` accessors and effectful or fallible getters are excluded |
+| `"""..."""` (raw string literals) | Exact UTF-8 bytes without escape processing; multi-line forms strip the closing delimiter line's indentation prefix and normalize interior line breaks to LF (`\n`) |
+| `Format.Write(ref builder, $"...")` (instead of heap `$"..."` / `ToString()`) | Allocation-free checked formatting into an explicit `ref TextBuilder<capacity>` or `ref Span<byte>` via static `Format<T>` instances, returning `Result<usize, CapacityError>` |
+| `.Model.All(x => ...)`, `.Any(x => ...)`, `.Contains(x)`, `.Take(n)`, `.Skip(n)`, `.Slice(a, b)`, `.Count` | Pure mathematical `Seq<T>` predicates and slices in contracts, discharged in the finite-sequence refinement/domain tier instead of raw `forall`/`exists` index quantifiers |
+| `ISequenceModel<T>`, `IBoundedIterable<T>` (instead of `IEnumerable<T>` / `IQueryable<T>`) | Law-carrying interfaces projecting containers to `Model : Seq<T>` and linking bounded `foreach` steps to `Model.At(k)`, `Model.Take(k)` and `Model.Skip(k)` with explicit element loans and zero enumerator allocation |
+| `invariant Clause: P` and `open (ref this) lifts Clause, ... { ... }` | Named invariant conjuncts and lexical selective lifting; keeps unlifted conjuncts active, forbids early exits or whole-receiver calls while open, and re-proves only the lifted clauses at block exit |
+| `CopyRepresentation(in src, ref dst, count)` then `TransferType<T>(ref src, ref dst, count)` | Two-step bulk relocation over `Slots<T, capacity>`: tag-preserving representation copy into vacant storage followed by erased linear ownership transfer in one capacity-independent range step |
+| `interface I...` and `impl I... for Type`, `where I...(type T)` | Law-carrying interfaces with explicit nonoverlapping `impl` instances and proved `lemma`/`theorem` law fields in the static witness dictionary |
 
 Receiver signature help shows the selected mode and named view. A conflict names
 both accesses and may offer a preceding immutable snapshot only when evaluation,

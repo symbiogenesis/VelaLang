@@ -174,13 +174,14 @@ definition Vec<byte, packet.Length> Contents(Packed<byte> packet) =>
     };
 ```
 
-Both expression matches and the existing statement matches accept the optional
+Both expression matches and statement matches accept the optional
 `as NAME : TYPE` motive. The name binds the scrutinee in the result type; branch
 substitution and resource compatibility remain checking obligations. A located
 `match_motive` node records its `name` and `type`. A match without an annotation
 has a null `motive`. Expression matches use `match_expression` and
-`expression_case` nodes with `pattern` and `value` fields; statement matches keep
-their `match` and `case` nodes and colon-delimited statement arms. Incomplete
+`expression_case` nodes with `pattern` and `value` fields; statement matches use
+`match` and `case` nodes with `PATTERN => { ... }` or `PATTERN => STMT` arms
+(`case PATTERN:` is refused as syntax). Incomplete
 motives and mixed arm delimiters are refused. Expression
 matches compose with calls, operators, lambdas, proofs and nested matches.
 
@@ -339,7 +340,7 @@ loan escape and per-call resource transitions require elaboration.
 Union, inductive and coinductive declarations accept ordinary declaration contracts
 between their generic telescope and body. Constructors accept them after the
 optional result type. Pure `definition` and `predicate` declarations accept them
-after their parameter telescope and before `=` (or a predicate's terminating
+after their parameter telescope and before `=>` (or a predicate's terminating
 semicolon). Associated types accept them before an optional `=` definition.
 Each of these nodes exposes a `contracts` array, empty when omitted. Thus domain
 laws, graded storage, indexed outcomes and type families share the existing
@@ -358,8 +359,9 @@ case. These forms establish no type-system, borrow-checker or erasure theorem.
 ### Local grades, domain members and disposal clauses
 
 Local value bindings reuse the parameter and field use-grade annotation:
-`let value @ q = Make();`, `var T value @ q = Make();` and
-`T value @ q = Make();`. The existing `let`, `var` and `typed_local` nodes
+`let value @ q = Make();`, `let T value @ q = Make();` and
+`var T value @ q = Make();` (bare `T value @ q = Make();` without `let` or `var`
+is refused as syntax). The `let` and `var` nodes
 expose a nullable `grade` field alongside `type` and `value`. Both inferred and
 explicitly typed bindings accept the same grade expression. Product-pattern
 bindings retain their existing form; component modalities belong in their data
@@ -742,40 +744,21 @@ The pure prototype also accepts typed immutable `Nat`/`bool` locals, retaining
 its mathematical scalar types and unsupported mutation boundary. Exact-version
 hosted parser, kernel and production qualification retain their existing owners.
 
-**Bindings and aliases.** Documentation, diagnostics and editor examples present
-`let [T] name = value` and `var [T] name = value`, where `[T]` here means an
-optional type annotation, not literal source brackets. Bare `T name = value;`
-local declarations without `let` or `var` are refused as syntax (`VELA104` is
-permanently retired under `Q25ah` and never reused). Preserve existing local AST kinds, annotations,
-grades, destructuring and the distinction between rebinding and writing through
-an exclusive loan. The [primitive contract](first-release.md#primitive-semantics)
-owns the exact integer aliases exported by `Vela.Numerics`. They require ordinary
-explicit import or qualification; there is no implicit prelude. They use
-ordinary type-name syntax and alias resolution, without new keyword tokens,
-implicit conversions, numeric suffixes, default integer types or changes to
-arithmetic. Alias identity, range, layout and operator selection must agree
-with the underlying fixed-width type.
+**Bindings and aliases.** Local declarations use `let [T] name = value` and
+`var [T] name = value` (where `[T]` denotes an optional type annotation), and bare
+`T name = value;` declarations are refused (`VELA104` is permanently retired
+under `Q25ah`). The [primitive contract](first-release.md#primitive-semantics)
+owns the exact integer aliases exported by `Vela.Numerics`: they require explicit
+import or qualification, use ordinary type-name syntax without new keywords,
+implicit conversions, suffixes or default integer types, and agree with their
+underlying fixed-width types in identity, range, layout and operator selection.
 
-**Match arms and mathematical bodies.** Nonempty expression and statement matches
-both use `PATTERN => ...` arms without a `case` keyword (`PATTERN => EXPR`
-separated by commas with an optional trailing comma in expression matches, and
-`PATTERN => { ... }` or `PATTERN => STMT` with optional trailing commas in
-statement matches; `case PATTERN:` is refused as syntax). Empty matches retain
-their existing rules; `{,}`, doubled commas, missing separators and legacy `case`
-arms are refused. Preserve located `match`, `case`, `match_expression`,
-`expression_case`, `match_motive`, `pattern` and `value` roles, scrutinee
-evaluation once, branch order, exhaustive elimination, dependent substitution
-and resource accounting. An incomplete match or a branch that discards a
-required resource still parses for semantic diagnosis.
-
-Mathematical function definitions use `definition ... => EXPR;`, including
-declaration contracts before the arrow. Retain the `definition` node and its
-interpretation; the marker does not turn a mathematical definition into an
-effectful operation or establish runtime representation. Ordinary function
-expression bodies keep their existing meaning. Value initializers, constants,
-type aliases, associated-type definitions and grade-domain equations keep `=`.
-The existing clause-root grouping rules separate a contract's lambda or
-quantifier from the function-body arrow.
+**Match arms and mathematical bodies.** As specified in [Concise authoring syntax](#concise-authoring-syntax),
+nonempty expression and statement matches use `PATTERN => ...` arms without
+`case` (`case PATTERN:`, `{,}`, doubled commas and missing separators are
+refused), and mathematical definitions use `definition ... => EXPR;` while
+value initializers, constants, type aliases, associated-type definitions and
+grade-domain equations retain `=`.
 
 **Ordinary generic calls.** At a postfix expression followed by `<`, perform a
 bounded token-only probe for one complete nonempty generic-argument list ending
