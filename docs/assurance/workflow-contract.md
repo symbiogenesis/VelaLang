@@ -223,7 +223,7 @@ Apply [Q1's limits](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/i
 
 ## Contract acceptance and remaining gates
 
-Q20a contract acceptance requires a consistent executable protocol for its clients, baseline freeze, composed/negative cases, behavior/weakening probes, source/evidence identities, sampling, cost allocation and thresholds, conditional on the stated prerequisites. `python tools/check.py` checks document consistency, not protocol execution or semantics.
+Q20a contract acceptance requires a consistent executable protocol for its clients, baseline freeze, composed/negative cases, behavior/weakening probes, source/evidence identities, sampling, cost allocation and thresholds, conditional on the stated prerequisites. `python tools/run.py gate` checks document consistency, not protocol execution or semantics.
 
 Review must establish that independent expected-byte checks detect the weakening, negatives reach their intended obligations from well-formed inputs, and entries inhabit their theorem premises. Check all exits together and reconcile source/IR boundaries with Q21 and foundation owners. A reasoned rejection identifying an unresolved interaction is an acceptable design outcome.
 

@@ -977,7 +977,7 @@ retain their qualified parser/frontend prerequisites.
 
 | Spelling | Meaning |
 | --- | --- |
-| `let name = value`, `let T name = value` | Immutable locals with inferred or explicit type. The explicit `let` is the introductory and example convention; the accepted bare `T name = value` retains the same immutable binding. |
+| `let name = value`, `let T name = value` | Immutable locals with inferred or explicit type. The explicit `let` keyword is mandatory; bare `T name = value` local declarations are refused. |
 | `var name = value`, `var T name = value` | Mutable locals with inferred or explicit type. A typed literal such as `0usize` states a representation independently of binding mutability. |
 | `int`, `uint`, `long`, `ulong` | Familiar ordinary aliases from the [standard numeric module](../language/first-release.md#primitive-semantics), with the same type identity, arithmetic and proof obligations as their width-named targets. |
 | `const T Name = expression;` | An explicitly typed immutable value evaluated during compilation from admitted static inputs; unavailable inputs or exhausted evaluation refuse compilation. |
@@ -1395,7 +1395,7 @@ public PublishResult<id> TryPublish<ghost Identity id>(
     ensures PublicationProtocol.Step(old(slot.Model), slot.Model, result.Model);
 ```
 
-`PublicationSlot` supplies runtime storage, and `PublishPermit` is a module-protected protocol resource tied to its stable identity. The caller writes `TryPublish(ref slot, move permit)` and matches the result; the retained runtime tag selects a case, whose erased evidence records the state it establishes. Both cases return a token, an exit obligation stronger than non-duplication that an affine logic's weakening rule does not supply. `Retry` restores the populated state; an operation that can partially publish needs a distinct recovery state and case. Pure snapshots are copyable, as in `ghost Seq<byte> before = target.Model` where the current resource justifies the observation, but permission evidence cannot be duplicated or manufactured from an identifier. This sequential example claims no concurrency, eventual publication, crash recovery or device ordering. The lower-level split and restore mechanism stays inside the [resource-law explanation](#concrete-package-shape), so ordinary clients cannot inspect a parent whose permission is suspended.
+`PublicationSlot` supplies runtime storage, and `PublishPermit` is a module-protected protocol resource tied to its stable identity. The caller writes `TryPublish(ref slot, move permit)` and matches the result; the retained runtime tag selects a case, whose erased evidence records the state it establishes. Both cases return a token, an exit obligation stronger than non-duplication that an affine logic's weakening rule does not supply. `Retry` restores the populated state; an operation that can partially publish needs a distinct recovery state and case. Pure snapshots are copyable, as in `let ghost Seq<byte> before = target.Model` where the current resource justifies the observation, but permission evidence cannot be duplicated or manufactured from an identifier. This sequential example claims no concurrency, eventual publication, crash recovery or device ordering. The lower-level split and restore mechanism stays inside the [resource-law explanation](#concrete-package-shape), so ordinary clients cannot inspect a parent whose permission is suspended.
 
 #### Captures and Graded Use
 
@@ -1457,7 +1457,7 @@ Inside a caller:
 
 ```text
 let header = packet.Header;                              // a value copy, so duplicable
-Fn() -> usize effects(Choose) score = () => Score(header, Choose());
+let Fn() -> usize effects(Choose) score = () => Score(header, Choose());
 let best = BestScore(in score);
 ```
 
@@ -1497,7 +1497,7 @@ Inside a caller:
 let checked = handle (Validate(ref packet))
 {
     Reject(error) with k => { dispose k; return Err(error); },   // ends k's loans, erases, examines verdicts
-    return _ => Ok(),
+    return _ => Ok(()),
 };
 ```
 
@@ -1521,7 +1521,7 @@ public async Delivery<n> Accept<ghost Nat n>(
     effects reads(packet), calls(Forward, counter.Add, counter.Retire)
 {
     let header = packet.Header;
-    Fn() -> usize effects(Choose) score = () => Score(header, Choose());
+    let Fn() -> usize effects(Choose) score = () => Score(header, Choose());
     let best = BestScore(in score);
     await Forward(in packet, best);                                    // a checkpoint even when already complete
     let receipt = commit counter.Add(move allowance, packet.Length);   // last checkpoint, then one AMOADD
@@ -1562,7 +1562,7 @@ Cells expose only their proved operations:
 ```text
 stats.Update((ref Stats s) => { s.Accepted += 1; });       // local: the view cannot escape, suspend or reenter
 
-if (settings.TryWrite((ref Settings s) => { s.Retries = 3; }) is Err(BorrowConflict()))
+if (settings.TryWrite((ref Settings s) => { s.Retries = 3; }) is Err(BorrowConflict))
     Defer();                                                // a live reader is an examined result, not a panic
 
 let seen = counter.Load();                                  // a historical sample, never a current fact
