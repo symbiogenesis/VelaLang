@@ -1069,4 +1069,3 @@ class _Protocol:
                 or trivia_end(self.source, end, block_comments=True) != len(self.source)):
             raise self.error("protocol", "module omits nontrivial source outside its span", root)
         return root
-

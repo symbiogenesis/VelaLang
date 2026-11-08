@@ -1934,7 +1934,7 @@ def evaluate(source: bytes, parsed: object, expression: str, value_type: ValueTy
              *, parse: Callable[[bytes], object]) -> StaticEvaluation:
     """Reduce one source-bound console constant in the checked module's environment.
 
-    The [mathematical console contract](../../../docs/elaboration-prototype.md#commands-and-acceptance)
+    The [mathematical console contract](../../docs/elaboration-prototype.md#commands-and-acceptance)
     retains the native parser and existing bounded constant reducer.
     """
     _, elaborator = _checked_elaboration(source, parsed)
@@ -1967,5 +1967,3 @@ def evaluate(source: bytes, parsed: object, expression: str, value_type: ValueTy
         raise VelaError(error.kind, 1, 1, f"expression: {error.message}") from error
     except RecursionError as error:
         raise VelaError("limit", 1, 1, "expression: elaboration nesting exceeds the host stack bound") from error
-
-

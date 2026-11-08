@@ -16,22 +16,22 @@ from vela.lsp import Server
 INDEPENDENT_CASES = True
 
 _URI = "untitled:independent-navigation.vela"
-_SCOPE = "\n".join((
-    "module Scope;",
-    "public Nat Earlier(Nat value) {",
-    "  return value;",
-    "}",
-    "public Nat Later(Nat value, bool flag) {",
-    "  let Earlier = value;",
-    "  if (flag) {",
-    "    let local = Earlier;",
-    "    return Earlier(local);",
-    "  } else {",
-    "    let local = value;",
-    "    return local;",
-    "  }",
-    "}",
-))
+_SCOPE = (
+    "module Scope;\n"
+    "public Nat Earlier(Nat value) {\n"
+    "  return value;\n"
+    "}\n"
+    "public Nat Later(Nat value, bool flag) {\n"
+    "  let Earlier = value;\n"
+    "  if (flag) {\n"
+    "    let local = Earlier;\n"
+    "    return Earlier(local);\n"
+    "  } else {\n"
+    "    let local = value;\n"
+    "    return local;\n"
+    "  }\n"
+    "}"
+)
 
 
 def _object(value: object) -> dict[str, object]:

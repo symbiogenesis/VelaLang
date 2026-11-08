@@ -690,7 +690,7 @@ class _StringsMixin:
         self: _Elaborator, node: Node, arguments: list[Node], environment: dict[str, _Binding]
     ) -> _Binding:
         if len(arguments) != 2:
-            raise self.fail("type", "Format.Write requires (ref builder, $\"...\") arguments", node)
+            raise self.fail("type", 'Format.Write requires (ref builder, $"...") arguments', node)
         labeled = False
         for idx, arg_node in enumerate(arguments):
             self.node(arg_node, "argument")
@@ -730,7 +730,7 @@ class _StringsMixin:
         if template_arg["kind"] != "interpolated_string":
             raise self.fail(
                 "type",
-                "Format.Write requires an interpolated $\"...\" format template",
+                'Format.Write requires an interpolated $"..." format template',
                 arguments[1],
             )
         spelling = cast("str", template_arg["value"])

@@ -614,7 +614,7 @@ class Pseudo(Protocol):
     the position `dialect.KINDS` was in.
     """
 
-    def __call__(self, asm: Assembler, item: Item, pc: int) -> list[Instr]: ...
+    def __call__(self, asm: Assembler, item: Item, pc: int, /) -> list[Instr]: ...
 
 
 def _sign12(value: int) -> int:
@@ -693,36 +693,36 @@ def _arity(asm: Assembler, item: Item, count: int) -> None:
                          f"{item.text} takes {count} operands, given {len(item.args)}")
 
 
-def _p_nop(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_nop(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     _arity(asm, item, 0)
     return [("addi", [0, 0, 0])]
 
 
-def _p_mv(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_mv(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     _arity(asm, item, 2)
     return [("addi", [asm._register(item.args[0], item),
                       asm._register(item.args[1], item), 0])]
 
 
-def _p_not(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_not(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     _arity(asm, item, 2)
     return [("xori", [asm._register(item.args[0], item),
                       asm._register(item.args[1], item), -1])]
 
 
-def _p_neg(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_neg(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     _arity(asm, item, 2)
     return [("sub", [asm._register(item.args[0], item), 0,
                      asm._register(item.args[1], item)])]
 
 
-def _p_seqz(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_seqz(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     _arity(asm, item, 2)
     return [("sltiu", [asm._register(item.args[0], item),
                        asm._register(item.args[1], item), 1])]
 
 
-def _p_snez(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_snez(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     _arity(asm, item, 2)
     return [("sltu", [asm._register(item.args[0], item), 0,
                       asm._register(item.args[1], item)])]
@@ -743,7 +743,7 @@ def _fence_set(asm: Assembler, item: Item, text: str) -> int:
     return asm._eval(text, item, item.address)
 
 
-def _p_fence(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_fence(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     if len(item.args) not in (0, 2):
         raise asm._error(item.line, "fence takes two ordering sets, or none")
     pred, succ = [*item.args, "", ""][:2]
@@ -791,14 +791,14 @@ def _p_call(asm: Assembler, item: Item, pc: int) -> list[Instr]:
     return [("cjal", [1, asm._eval(item.args[0], item, pc)])]
 
 
-def _p_ret(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_ret(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     """`ret` is a jump that writes no link, which is the only role a
     backward-edge sentry is reachable in (R-15-071, extensions/CHERI)."""
     _arity(asm, item, 0)
     return [("cjalr", [0, 1, 0])]
 
 
-def _p_cjr(asm: Assembler, item: Item, pc: int) -> list[Instr]:
+def _p_cjr(asm: Assembler, item: Item, _pc: int) -> list[Instr]:
     """`cjr` rather than `jr`, beside `cjal` and `cjalr`: the jump is the
     capability form, there being no integer one to distinguish it from."""
     _arity(asm, item, 1)

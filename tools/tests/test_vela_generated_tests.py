@@ -79,14 +79,14 @@ def _coordinate_oracle_and_utf16_controls() -> None:
 
 def _overlay_and_supported_requests_without_subprocess() -> None:
     doc_a = "untitled:doc-a.vela"
-    valid_text = "\r\n".join((
-        "// 😀 header",
-        "module Overlay;",
-        "public Nat Entry(Nat input) {",
-        "  let local = input;",
-        "  return local;",
-        "}",
-    )) + "\r\n"
+    valid_text = (
+        "// 😀 header\r\n"
+        "module Overlay;\r\n"
+        "public Nat Entry(Nat input) {\r\n"
+        "  let local = input;\r\n"
+        "  return local;\r\n"
+        "}\r\n"
+    )
     error_text = valid_text.replace("return local;", "return SYNTAX_ERROR;")
 
     trace: list[dict[str, object]] = [

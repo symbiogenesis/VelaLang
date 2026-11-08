@@ -564,19 +564,18 @@ class _IntrinsicsMixin:
                         raise self.fail("type", "Slots.VacantRange expects (start, end) arguments", node)
                     start_t = self._slots_usize_arg(arg_nodes[0], environment)
                     end_t = self._slots_usize_arg(arg_nodes[1], environment)
+            elif member_name == "VacantSuffix":
+                if len(arg_nodes) != 2:
+                    raise self.fail("type", "VacantSuffix expects (slots, start) arguments", node)
+                s_b, elem_t, cap_t = self._require_slots_binding(arg_nodes[0], environment)
+                start_t = self._slots_usize_arg(arg_nodes[1], environment)
+                end_t = self._slots_cap_usize_term(cap_t)
             else:
-                if member_name == "VacantSuffix":
-                    if len(arg_nodes) != 2:
-                        raise self.fail("type", "VacantSuffix expects (slots, start) arguments", node)
-                    s_b, elem_t, cap_t = self._require_slots_binding(arg_nodes[0], environment)
-                    start_t = self._slots_usize_arg(arg_nodes[1], environment)
-                    end_t = self._slots_cap_usize_term(cap_t)
-                else:
-                    if len(arg_nodes) != 3:
-                        raise self.fail("type", "VacantRange expects (slots, start, end) arguments", node)
-                    s_b, elem_t, cap_t = self._require_slots_binding(arg_nodes[0], environment)
-                    start_t = self._slots_usize_arg(arg_nodes[1], environment)
-                    end_t = self._slots_usize_arg(arg_nodes[2], environment)
+                if len(arg_nodes) != 3:
+                    raise self.fail("type", "VacantRange expects (slots, start, end) arguments", node)
+                s_b, elem_t, cap_t = self._require_slots_binding(arg_nodes[0], environment)
+                start_t = self._slots_usize_arg(arg_nodes[1], environment)
+                end_t = self._slots_usize_arg(arg_nodes[2], environment)
             return _Binding(
                 _apps(_constant("Slots_VacantRange"), elem_t, cap_t, s_b.term, start_t, end_t), _BOOL
             )

@@ -1467,7 +1467,7 @@ class _DeclarationsMixin:
         finally:
             self.metas = saved_metas
 
-    def _impl_declaration(self: _Elaborator, node: Node, first_meta: int) -> None:
+    def _impl_declaration(self: _Elaborator, node: Node, _first_meta: int) -> None:
         modifiers = node["modifiers"]
         allowed_modifiers = {"public", "private", "internal"}
         if (
@@ -3261,7 +3261,7 @@ class _DeclarationsMixin:
         return [term]
 
     def _entailed_by_theorem_facts(
-        self: _Elaborator, ens_prop: _Term, post_env: dict[str, _Binding]
+        self: _Elaborator, ens_prop: _Term, _post_env: dict[str, _Binding]
     ) -> bool:
         if not self.final_theorem_facts:
             return False
@@ -3338,5 +3338,3 @@ class _DeclarationsMixin:
             if match_eq(e_u, e_v):
                 return True
         return False
-
-

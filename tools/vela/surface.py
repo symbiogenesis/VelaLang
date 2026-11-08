@@ -2739,7 +2739,7 @@ def _computed_type_roles(source: bytes, result: dict[str, Json]) -> None:
         if computed.get("kind") != "computed_type" or match.get("kind") != "match_expression":
             raise ValueError("surface nested computed annotation lost its match")
         _exact_span(source, computed,
-                    ("type[match (" + scrutinee + ') { true => type Nat, false => type bool, }]').encode())
+                    ("type[match (" + scrutinee + ") { true => type Nat, false => type bool, }]").encode())
     application = next(node for node in nodes(function) if node.get("kind") == "generic_application")
     argument = _sequence(application.get("arguments"), "computed generic application arguments")[0]
     _computed_type(source, argument, b"type[CallType(value)]", "CallType")
@@ -2791,7 +2791,7 @@ def _literal_pattern_roles(source: bytes, result: dict[str, Json]) -> None:
     patterns = [node for node in nodes(result.get("ast"))
                 if node.get("kind") in {"character_pattern", "string_pattern"}]
     expected = (("character_pattern", b"'x'"), ("character_pattern", b"'\\n'"),
-                ("string_pattern", b'"ready"'), ("string_pattern", b'"// {\\\"}"'),
+                ("string_pattern", b'"ready"'), ("string_pattern", b'"// {\\"}"'),
                 ("string_pattern", b'""'), ("character_pattern", b"'\\\\'"),
                 ("character_pattern", b"'('"), ("string_pattern", b'"closed"'))
     if len(patterns) != len(expected):
@@ -4297,8 +4297,8 @@ def _recursive_local_roles(source: bytes, result: dict[str, Json]) -> None:
 def _literal_and_comment_boundaries(parse: Callable[[bytes], dict[str, Json]]) -> None:
     # Delimiter-looking bytes inside comments and strings are never nesting.
     source = (b"// " + b"{" * 300 + b"\r\n/* " + b"[" * 300
-              + " caf\u00e9 */\r\nmodule M; public Nat F() { let s = \"".encode()
-              + b"(" * 300 + " caf\u00e9\"; return 0001usize; }".encode())
+              + ' caf\u00e9 */\r\nmodule M; public Nat F() { let s = "'.encode()
+              + b"(" * 300 + ' caf\u00e9"; return 0001usize; }'.encode())
     result = parse(source)
     literals = [node for node in nodes(result.get("ast")) if node.get("kind") == "nat"]
     if len(literals) != 1 or literals[0].get("value") != "0001" or literals[0].get("suffix") != "usize":

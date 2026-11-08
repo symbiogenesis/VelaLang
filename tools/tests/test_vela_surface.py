@@ -127,7 +127,7 @@ def _shared_primitive_oracle_required() -> None:
             patch.object(surface, "_argument_roles"), \
             patch.object(surface, "_shared_primitive_roles", side_effect=ValueError("primitive role changed")) as oracle:
         try:
-            surface.qualify(lambda source: result)
+            surface.qualify(lambda _source: result)
         except ValueError as error:
             ensure(str(error) == "primitive role changed", "shared primitive oracle failure was replaced")
         else:
@@ -145,7 +145,7 @@ def _expression_binding_oracle_required() -> None:
             patch.object(surface, "_argument_roles"), \
             patch.object(surface, "_expression_binding_roles", side_effect=ValueError("binding scope changed")) as oracle:
         try:
-            surface.qualify(lambda source: result)
+            surface.qualify(lambda _source: result)
         except ValueError as error:
             ensure(str(error) == "binding scope changed", "binding oracle failure was replaced")
         else:
@@ -165,7 +165,7 @@ def _binder_initializer_oracles_required() -> None:
             patch.object(surface, "_argument_roles"), \
                 patch.object(surface, oracle_name, side_effect=ValueError("binder/initializer role changed")) as oracle:
             try:
-                surface.qualify(lambda source, result=result: result)
+                surface.qualify(lambda _source, result=result: result)
             except ValueError as error:
                 ensure(str(error) == "binder/initializer role changed", "binder/initializer oracle failure was replaced")
             else:
@@ -190,7 +190,7 @@ def _explicit_value_oracles_required() -> None:
             patch.object(surface, "_argument_roles"), \
                 patch.object(surface, oracle_name, side_effect=ValueError("explicit role changed")) as oracle:
             try:
-                surface.qualify(lambda source, result=result: result)
+                surface.qualify(lambda _source, result=result: result)
             except ValueError as error:
                 ensure(str(error) == "explicit role changed", "explicit-value oracle failure was replaced")
             else:
@@ -211,7 +211,7 @@ def _concise_authoring_oracle_required() -> None:
             patch.object(surface, "_argument_roles"), \
             patch.object(surface, "_concise_authoring_roles", side_effect=ValueError("concise role changed")) as oracle:
         try:
-            surface.qualify(lambda source: result)
+            surface.qualify(lambda _source: result)
         except ValueError as error:
             ensure(str(error) == "concise role changed", "concise oracle failure was replaced")
         else:
@@ -229,7 +229,7 @@ def _constant_oracle_required() -> None:
             patch.object(surface, "_argument_roles"), \
             patch.object(surface, "_required_static_roles", side_effect=ValueError("constant role changed")) as oracle:
         try:
-            surface.qualify(lambda source: result)
+            surface.qualify(lambda _source: result)
         except ValueError as error:
             ensure(str(error) == "constant role changed", "constant role oracle failure was replaced")
         else:
@@ -247,7 +247,7 @@ def _constant_callable_oracle_required() -> None:
             patch.object(surface, "_argument_roles"), \
             patch.object(surface, "_compositional_constant_roles", side_effect=ValueError("static callable changed")) as oracle:
         try:
-            surface.qualify(lambda source: result)
+            surface.qualify(lambda _source: result)
         except ValueError as error:
             ensure(str(error) == "static callable changed", "static callable oracle failure was replaced")
         else:
@@ -266,7 +266,7 @@ def _numeric_separator_oracle_required() -> None:
             patch.object(surface, "_argument_roles"), \
             patch.object(surface, "_numeric_separator_roles", side_effect=ValueError("separator role changed")) as oracle:
         try:
-            surface.qualify(lambda source: result)
+            surface.qualify(lambda _source: result)
         except ValueError as error:
             ensure(str(error) == "separator role changed", "numeric separator oracle failure was replaced")
         else:
@@ -279,7 +279,7 @@ def _numeric_separator_limits_required() -> None:
             patch.object(surface, "_literal_and_comment_boundaries"), \
             patch.object(surface, "_numeric_separator_limits", side_effect=ValueError("separator limit changed")) as oracle:
         try:
-            surface.qualify(lambda source: {})
+            surface.qualify(lambda _source: {})
         except ValueError as error:
             ensure(str(error) == "separator limit changed", "numeric limit oracle failure was replaced")
         else:
@@ -303,7 +303,7 @@ def _familiar_authoring_oracles_required() -> None:
                 patch.object(surface, "_argument_roles"), \
                 patch.object(surface, oracle_name, side_effect=ValueError("authoring role changed")) as oracle:
             try:
-                surface.qualify(lambda source, expected=result: expected)
+                surface.qualify(lambda _source, expected=result: expected)
             except ValueError as error:
                 ensure(str(error) == "authoring role changed", "authoring oracle failure was replaced")
             else:
@@ -318,7 +318,7 @@ def _generic_probe_limits_required() -> None:
             patch.object(surface, "_numeric_separator_limits"), \
             patch.object(surface, "_generic_probe_limits", side_effect=ValueError("probe budget changed")) as oracle:
         try:
-            surface.qualify(lambda source: {})
+            surface.qualify(lambda _source: {})
         except ValueError as error:
             ensure(str(error) == "probe budget changed", "probe budget refusal was replaced")
         else:

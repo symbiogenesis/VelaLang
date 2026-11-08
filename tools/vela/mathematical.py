@@ -34,7 +34,7 @@ class Compilation(Elaboration):
 def inspect_source(source: bytes, parsed: object) -> Compilation:
     """Inspect type binders only after complete exact-source semantic acceptance.
 
-    The [generic naming contract](../../../docs/authoring-tools.md#generic-type-parameter-naming)
+    The [generic naming contract](../../docs/authoring-tools.md#generic-type-parameter-naming)
     keeps this advisory inspection separate from mathematical acceptance.
     """
     translation = vela_elaborate.elaborate(source, parsed)

@@ -4,7 +4,7 @@
 Two dialects, and they answer different questions.
 
 The **commit trace** is the schema of M0.12, versioned in
-[docs/assurance/differential-corpus.md](../../docs/assurance/differential-corpus.md) and emitted by
+[docs/assurance/differential-corpus.md](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/differential-corpus.md) and emitted by
 the curated model under `--trace-commit`. It is capability-widened: a register
 write carries the tag beside the 64 data bits, a memory access carries the tag
 of the access, and the four capability registers outside the merged file get

@@ -237,7 +237,7 @@ public TextBuilder<48> FormatComputed(Nat id) {
 }
 public lemma ComputedWrites25Bytes() ensures Written(FormatComputed(5)) == 25 proof { assert Written(FormatComputed(5)) == 25; }
 '''),
-        ("ergonomic-expressions-patterns-updates-guards-and-properties", '''module ErgonomicsReplay;
+        ("ergonomic-expressions-patterns-updates-guards-and-properties", """module ErgonomicsReplay;
 public record Counter(Nat Value, Nat Limit) {
     public bool AtLimit => this.Value >= this.Limit;
     public Nat Remaining => this.Limit - this.Value;
@@ -292,8 +292,8 @@ public lemma ExprIfIsCheck()
 public lemma FormatCounterLength()
     ensures Written(FormatCounter(Counter(Value: 2, Limit: 5))) == 17
     proof { assert Written(FormatCounter(Counter(Value: 2, Limit: 5))) == 17; }
-'''),
-        ("tagged-union-declarations-and-elimination", '''module UnionReplay;
+"""),
+        ("tagged-union-declarations-and-elimination", """module UnionReplay;
 public union Option<TValue> {
     None();
     Some(TValue Value);
@@ -348,8 +348,8 @@ public lemma OptionRoundTrip(Option<Nat> item)
                 }) == Some<Nat>(value);
         }
     }
-'''),
-        ("structural-recursion-inductive-proofs-dependent-records-existentials-and-propagation", '''module Phase2Replay;
+"""),
+        ("structural-recursion-inductive-proofs-dependent-records-existentials-and-propagation", """module Phase2Replay;
 public definition Nat AddRec(Nat a, Nat b) decreases a =>
     match (a) {
         0 => b,
@@ -452,8 +452,8 @@ public lemma PropagateOk() ensures AddResults(Ok<Nat, bool>(2), Ok<Nat, bool>(5)
     proof { assert AddResults(Ok<Nat, bool>(2), Ok<Nat, bool>(5)) == Ok<Nat, bool>(7); }
 public lemma PropagateErr() ensures AddResults(Err<Nat, bool>(true), Ok<Nat, bool>(5)) == Err<Nat, bool>(true)
     proof { assert AddResults(Err<Nat, bool>(true), Ok<Nat, bool>(5)) == Err<Nat, bool>(true); }
-'''),
-        ("characters-represented-integers-and-sequences", '''module CharIntSeqReplay;
+"""),
+        ("characters-represented-integers-and-sequences", """module CharIntSeqReplay;
 public const char ColonChar = ':';
 public const u8 SmallByte = 65u8;
 public const u32 WordFromByte = u32.From(SmallByte);
@@ -490,8 +490,8 @@ public lemma CharIntAndSeqProofs()
         assert PairSeq()[1] == 20u32;
         assert PairSeq().Contains(10u32) == true;
     }
-'''),
-        ("mutable-locals-loops-invariants-slots-and-calc", '''module LoopsInvariantsSlotsReplay;
+"""),
+        ("mutable-locals-loops-invariants-slots-and-calc", """module LoopsInvariantsSlotsReplay;
 public usize SumPrefix(usize limit)
     requires limit <= 6usize
     ensures result == limit
@@ -549,8 +549,8 @@ public lemma CalcTransitive(Nat a, Nat b, Nat c)
         }
         assert a == c;
     }
-'''),
-        ("out-initialization-loans-interfaces-and-impls", '''module OutInterfacesImplsReplay;
+"""),
+        ("out-initialization-loans-interfaces-and-impls", """module OutInterfacesImplsReplay;
 public Unit InitPair(Nat x, out Nat first, out Nat second)
     ensures first == x + 1
     ensures second == x + 2
@@ -596,7 +596,7 @@ public T StepTwice<T>(T x)
 public lemma StepTwiceCheck()
     ensures StepTwice(5) == 7
     proof { assert StepTwice(5) == 7; }
-'''),
+"""),
     )
     negatives = (
         ("static-parameter-runtime-input", "Nat F(const Nat value) => value; Nat Wrong(Nat runtime) => F(runtime);", "type"),

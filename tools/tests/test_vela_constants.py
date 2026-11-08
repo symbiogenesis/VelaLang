@@ -96,8 +96,8 @@ def _bounded_evaluation() -> None:
 
 
 def _constant_facts() -> None:
-    source = b"module M; public const Nat Limit = 2 * 8; public const bool Ready = Limit == 16; " \
-             b"public Nat Read() { const Nat Local = Limit + 1; return Local; }"
+    source = (b"module M; public const Nat Limit = 2 * 8; public const bool Ready = Limit == 16; "
+              b"public Nat Read() { const Nat Local = Limit + 1; return Local; }")
     facts = vela.inspect_source(source)
     symbols = cast("list[dict[str, object]]", facts["symbols"])
     expected = {"Limit": "const Nat Limit = 16", "Ready": "const bool Ready = true", "Local": "const Nat Local = 17"}

@@ -112,8 +112,8 @@ public Nat Call(Nat first, Nat second) => Helper(2, first + 1, second + 3);
 
 
 def _bounded_specialization() -> None:
-    source = b"module M; public Nat F(const Nat n, Nat x) { const Nat N = n * n; return N + x; } " \
-             b"public Nat Use(Nat x) => F(4, x);"
+    source = (b"module M; public Nat F(const Nat n, Nat x) { const Nat N = n * n; return N + x; } "
+              b"public Nat Use(Nat x) => F(4, x);")
     with patch.object(vela, "MAX_STATIC_WORK", 4):
         _refuses(source.decode(), "limit", "budget")
     with patch.object(vela, "MAX_STATIC_DEPTH", 0):

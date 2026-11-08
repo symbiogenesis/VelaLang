@@ -148,9 +148,9 @@ def _preview_rejects_forged_sites_and_terms() -> None:
 
 
 def _assist_dont_coerce_bridges() -> None:
-    loan_source = b"module M;\npublic unit Use(TextBuilder<8> b) => Format.Write(b, \"ok\");\n"
+    loan_source = b'module M;\npublic unit Use(TextBuilder<8> b) => Format.Write(b, "ok");\n'
     rewritten_loan = assist_loan_argument(loan_source, 2, 51, "ref")
-    ensure(rewritten_loan == b"module M;\npublic unit Use(TextBuilder<8> b) => Format.Write(ref b, \"ok\");\n",
+    ensure(rewritten_loan == b'module M;\npublic unit Use(TextBuilder<8> b) => Format.Write(ref b, "ok");\n',
            "loan assist did not insert explicit ref at the checked argument boundary")
     ensure(assist_loan_argument(rewritten_loan, 2, 51, "ref") == rewritten_loan,
            "loan assist was not idempotent on an already explicit ref argument")

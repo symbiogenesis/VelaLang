@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from jsonschema.protocols import Validator
 
 
-def _is_integer(checker: object, value: object) -> bool:
+def _is_integer(_checker: object, value: object) -> bool:
     return type(value) is int
 
 

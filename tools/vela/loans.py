@@ -760,7 +760,7 @@ class _State:
     def _is_invariant_open(self, place_owner: str, invariant: str) -> bool:
         if (place_owner, invariant) in self.opened or (invariant, invariant) in self.opened:
             return True
-        return any(owner == invariant or clause == invariant for owner, clause in self.opened)
+        return any(invariant in {owner, clause} for owner, clause in self.opened)
 
     def ancestors(self, names: frozenset[str] | set[str]) -> frozenset[str]:
         result = set(names)

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Independent coordinate/overlay/formatter oracles and isolated Hypothesis qualification (Q25x).
 
-See [Generated development tests](../../../docs/tooling-protocols.md#generated-development-tests)
+See [Generated development tests](../../docs/tooling-protocols.md#generated-development-tests)
 for the campaign bounds, independent oracle rules, seeded defect controls, and adoption disposition.
 """
 

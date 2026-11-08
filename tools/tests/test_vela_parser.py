@@ -117,8 +117,8 @@ def _strict_response_json() -> None:
                "declarations": []}
         valid = json.dumps({"schema": 1, "ast": ast}).encode()
         ambiguous = (
-            b'{"schema":2,"schema":1,"ast":' + json.dumps(ast).encode() + b'}',
-            b'{"schema":2,"schem\\u0061":1,"ast":' + json.dumps(ast).encode() + b'}',
+            b'{"schema":2,"schema":1,"ast":' + json.dumps(ast).encode() + b"}",
+            b'{"schema":2,"schem\\u0061":1,"ast":' + json.dumps(ast).encode() + b"}",
             valid.replace(b'"declarations": []', b'"declarations": [1], "declarations": []'),
             valid.replace(b'"declarations": []', b'"declarations": [NaN]'),
             valid.replace(b'"declarations": []', b'"declarations": [Infinity]'),
@@ -129,12 +129,12 @@ def _strict_response_json() -> None:
         for raw in ambiguous:
             _expect_failure(compiled, subprocess.CompletedProcess([], 0, raw, b""), "malformed JSON")
         for depth in (parser.MAX_RESPONSE_DEPTH + 1, 10_000):
-            raw = b'{"schema":1,"ast":' + b'[' * depth + b'0' + b']' * depth + b'}'
+            raw = b'{"schema":1,"ast":' + b"[" * depth + b"0" + b"]" * depth + b"}"
             with patch.object(parser.json, "loads", side_effect=AssertionError("unbounded JSON decoding")):
                 _expect_failure(compiled, subprocess.CompletedProcess([], 0, raw, b""), "nesting bound")
         # Brackets, escaped quotes and escaped backslashes inside a JSON string
         # consume no container budget, regardless of their byte count.
-        spelling = '[{\\\"' * (parser.MAX_RESPONSE_DEPTH + 1)
+        spelling = '[{\\"' * (parser.MAX_RESPONSE_DEPTH + 1)
         escaped = {**ast, "description": spelling}
         with patch.object(parser.subprocess, "run", return_value=_response({"schema": 1, "ast": escaped})):
             actual = parser.parse_source(compiled, b"module M;")

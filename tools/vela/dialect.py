@@ -293,7 +293,7 @@ def signature(mnemonic: str) -> tuple[str, ...]:
     return TABLE[mnemonic].signature
 
 
-def _fit(slot: Slot, value: int, mnemonic: str) -> int:
+def _fit(slot: Slot, value: int, _mnemonic: str) -> int:
     """One operand's value as the bits that reach the word.
 
     The range and the alignment are the field's own, taken from the model: the width is

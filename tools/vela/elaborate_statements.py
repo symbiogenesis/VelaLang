@@ -879,7 +879,7 @@ class _StatementsMixin:
         self: _Elaborator,
         contracts: list[Node],
         env: dict[str, _Binding],
-        site: Node,
+        _site: Node,
         phase: str,
     ) -> list[_Term]:
         proved_bools: list[_Term] = []
@@ -1612,7 +1612,7 @@ class _StatementsMixin:
             saved_uninit = set(self.uninitialized_out_params)
             sym_env = dict(extended)
             for mname in list(self.mutable_locals):
-                if mname in sym_env and mname != var_name and mname != coll_name:
+                if mname in sym_env and mname not in {var_name, coll_name}:
                     m_ty = sym_env[mname].type
                     sym_env[mname] = _Binding(self.fresh(m_ty), m_ty)
             elem_var = self.fresh(elem_type)

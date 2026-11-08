@@ -44,7 +44,7 @@ def _locked_wheel_hash(root: Path, package_name: str, version: str, suffix: str)
     lock = tomllib.loads((root / LOCK).read_text(encoding="utf-8"))
     packages = lock.get("package")
     if not isinstance(packages, list):
-        raise ValueError(f"{LOCK} has no package list")
+        raise TypeError(f"{LOCK} has no package list")
     for pkg in packages:
         if not isinstance(pkg, dict):
             continue
@@ -96,8 +96,8 @@ def environment(root: Path, platform_name: str) -> Path:
         target = env.lane_root(env.lane_of(root)).resolve() / "venv-linux"
         if (target.is_relative_to(root.resolve())
                 # These are refused locations, never temporary-file destinations.
-                or target.is_relative_to(Path("/tmp"))
-                or target.is_relative_to(Path("/var/tmp"))
+                or target.is_relative_to(Path("/tmp"))  # noqa: S108
+                or target.is_relative_to(Path("/var/tmp"))  # noqa: S108
                 or env.filesystem(target) in env.CROSS_OS_FILESYSTEMS | env.VOLATILE_FILESYSTEMS):
             raise ValueError(f"the guest Python environment needs persistent native storage: {target}")
         return target

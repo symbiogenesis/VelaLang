@@ -1480,4 +1480,3 @@ Definition vela_PrefixModel (A : Type@{vela_u0}) (cap : nat) (s : vela_Slots A c
 
 Definition vela_LoopState (A : Type@{vela_u0}) (x : A) (_ : nat) : A := x.
 """
-
