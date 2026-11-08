@@ -1,9 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Reusable purecap compiler differential harness and finite comparison decisions.
-
-The compiler, assembler, image, trace and output-encoding operations live here.
-`vela.cli.compiler_diff` owns command parsing, orchestration and presentation.
-"""
+"""Purecap compiler differential harness, C test-program generator, and output comparator."""
 
 import functools
 import hashlib
@@ -18,23 +14,17 @@ from toolchain import asm, dialect, image, trace
 from toolchain.dialect import AsmError
 from toolchain.jsonc import Json
 
-# The harness's stack: a region of the data section sized for the small programs the
-# generator writes rather than for a component, derived to a capability off the store-side
-# root the way every corpus member derives its authority (R-15-001c).
+# Harness stack size in bytes in `.data`.
 STACK_BYTES: Final = 16384
 
-# Where a trap's cause lands in the HTIF exit code. `main`'s return occupies the byte below
-# it, so the two readings of one code cannot collide.
+# HTIF exit-code offset distinguishing traps (`TRAP_BASE | mcause`) from `main` return values (`0..255`).
 TRAP_BASE: Final = 0x100
 
-# The same bound `run.py model corpus` runs a member under.
 INST_LIMIT: Final = 1_000_000
 COMPILE_TIMEOUT: Final = 120
 RUN_TIMEOUT: Final = 60
 
-# The declared output encoding's name, carried by every record so that a comparator handed
-# a file from some other tool refuses it by name rather than reading a field that is not
-# there as a zero.
+# Schema tag for serialized component-output records.
 ENCODING: Final = "vos-component-output/1"
 
 MASK64: Final = (1 << 64) - 1

@@ -1,31 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The corpus assembler: dialect source in, position-fixed ELF out.
+"""In-tree assembler for the frozen purecap dialect.
 
-No upstream toolchain assembles the frozen dialect, so this one is the tree's own.
-M0.12 wrote it for the differential corpus, which could not wait on a toolchain
-that waits on it, and M1.4-prime extended it to the mix the purecap backend emits, so
-downstream executables are assembled here too. M1.4 re-homes LLVM's disassembly
-and object tooling beside it rather than its assembler or linker; another
-assembler or composer needs a reviewed replacement contract. What lands here is
-small enough to read: the encoder is [dialect.py](dialect.py), the container is
-[image.py](image.py), and this module is the parser, the layout, and the seven
-pseudo-instructions between them.
-
-**Three things it deliberately does not do.** There is no relocation output and
-no object file: layout is absolute at assembly time, which is the position-fixed
-image the profile already assumes (R-15-002b, R-15-036l). There is no linker
-script: two sections at two composed addresses is the whole model. And there is
-no macro processor, no `.if`, and no expression over a forward-declared external:
-a program that wants those needs that replacement contract rather than this
-assembler.
-
-**Purecap is the shape of the source, not a mode of it.** A load or store takes
-its authority from the base register it names (core/addr_checks.sail), so a test
-that touches memory derives a capability first, and the two idioms for that are
-in every corpus program: `la` off PCC for code and read-only data, and `li` plus
-`csetaddr` off the root data capability in `c1` for anything written. There is
-no default data capability to fall back to and no integer-addressed access to
-write by accident (R-15-001c).
+Parses assembly source, resolves `.text` and `.data` layout to a fixed point,
+expands pseudo-instructions, encodes canonical 32-bit words via
+[dialect.py](dialect.py), and writes a position-fixed ELF64 executable via
+[image.py](image.py).
 """
 
 import re
@@ -36,26 +15,21 @@ from typing import Final, Protocol
 from . import dialect, image
 from .dialect import AsmError
 
-# One instruction after expansion and before encoding: a mnemonic the dialect
-# table knows, and its operands already resolved to integers in source order. A
-# pseudo-instruction yields a list of these, which is the only reason it is a list
-# rather than a single instruction.
+# Expanded instruction ready for encoding: a mnemonic in `dialect.TABLE` and its
+# integer operands in source order.
 type Instr = tuple[str, list[int]]
 
-# A lexed token: the name of the group in `_TOKEN` that matched, and its text.
+# Lexed expression token: `(group_name, text)`.
 type Token = tuple[str, str]
 
-# Where the two sections are composed. Both are 16-aligned so that a section's
-# file offset and its address agree modulo the segment alignment, and both sit
-# in the RAM region the profile configuration declares (model/config).
+# Default 16-byte-aligned base addresses for `.text` and `.data`.
 TEXT_BASE = 0x8000_0000
 DATA_BASE = 0x8000_8000
 
 MASK64 = (1 << 64) - 1
 CANONICAL_BITS: Final[int] = 32
 
-# the data directives and the width each lays down, spelled once for the parse that
-# admits them and the encoder that sizes them
+# Data directives and their byte widths.
 _DATA_WIDTHS: Final[dict[str, int]] = {".byte": 1, ".half": 2, ".word": 4, ".dword": 8}
 
 _TOKEN = re.compile(r"""
@@ -74,23 +48,7 @@ _ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "0": "\0", "\\": "\\",
 
 @dataclass(frozen=True)
 class Site:
-    """One emitted instruction, as the freeze contract's §4 join keys on it.
-
-    **The composer mints the id, and that is a stopgap the contract does not authorize.**
-    §4 requires that every site join, and the join needs the sidecar stream's `site_id`
-    to be the id the link map carries. The sidecar's producer is M1.2's backend, which
-    does not exist, so nothing yet says whether an id minted here is the id that backend
-    will carry. What is minted is the narrowest thing that can be: the unit's own name
-    and the site's ordinal among the instructions that unit emits, in source order.
-    That is stable across runs and stable under any edit below it, which is the whole of
-    what "stable within a compilation unit" can mean with no backend to agree with.
-
-    `source` is the line the site came from, and it is here rather than in the link map
-    because the link map's fields are §4's and this is the assembler's own: a person
-    reading a per-site table wants to know which line of which program a site is.
-    `word` is the exact canonical integer emitted at `address`; dictionary identity
-    includes every resolved operand rather than the descriptive `opcode` mnemonic.
-    """
+    """Metadata for a single emitted 32-bit instruction word (`site_id`, address, mnemonic, word, 1-based source line, and section)."""
 
     site_id: str
     address: int
@@ -106,9 +64,9 @@ class Site:
 
 @dataclass
 class Item:
-    """One assembled thing: an instruction, some bytes, or a gap."""
+    """One parsed assembly item (`insn`, `data`, `align`, `space`, `label`, or `equ`)."""
 
-    kind: str                       # insn | data | align | space | label
+    kind: str                       # insn | data | align | space | label | equ
     line: int
     section: str
     text: str = ""
@@ -121,26 +79,19 @@ class Assembler:
     def __init__(self, source: str, name: str = "<source>", *,
                  text_base: int = TEXT_BASE, data_base: int = DATA_BASE,
                  externals: dict[str, int] | None = None) -> None:
-        """`text_base`, `data_base` and `externals` are a composer's placement of one
-        unit among several: where its two sections land and the absolute addresses of
-        the names it imports from its neighbours. A lone program takes the defaults and
-        imports nothing, which is every caller before the boot harness."""
+        """Parse `source` for unit `name` with the given section bases and imported `externals`."""
         self.name = name
         self.text_base = text_base
         self.data_base = data_base
         self.externals = dict(externals or {})
         self.items: list[Item] = []
-        # One record per emitted instruction, filled by `assemble` and read by the
-        # composer. Empty until then, and rebuilt from scratch by each `assemble`, so a
-        # second run over one assembler cannot leave two runs' sites in one list.
         self.sites: list[Site] = []
         self.symbols: dict[str, int] = {}
         self.symbol_section: dict[str, str] = {}
         self.constants: dict[str, tuple[int, str]] = {}   # .equ, with its section
         self.section = ".text"
-        # An unplaced symbol reads as zero while the layout settles and is an
-        # error once it has, which is what keeps a typo from assembling to a
-        # branch to the start of the image.
+        # During layout passes (`strict=False`), forward references evaluate to 0;
+        # during final encoding (`strict=True`), undefined symbols raise `AsmError`.
         self.strict = False
         self._parse(source)
 
@@ -598,21 +549,11 @@ def _string(text: str, line: int, asm: Assembler) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Pseudo-instructions. Seven of them, and the two that matter are the purecap
-# ones: `la` materializes a capability off PCC, and `li` materializes an
-# integer, which is how a program names a *data* address before deriving the
-# capability for it off `c1`.
+# Pseudo-instructions
 
 
 class Pseudo(Protocol):
-    """What every pseudo-instruction expander is, stated once for `PSEUDOS`.
-
-    The table at the bottom of this module maps a name to one of these, and two of
-    its entries are closures built by a factory rather than functions written out.
-    Without a declared shape the table is `dict[str, object]` and nothing checks
-    that a member takes the arguments the expander is called with, which is exactly
-    the position `dialect.KINDS` was in.
-    """
+    """Callable signature for a pseudo-instruction expander in `PSEUDOS`."""
 
     def __call__(self, asm: Assembler, item: Item, pc: int, /) -> list[Instr]: ...
 
@@ -622,25 +563,13 @@ def _sign12(value: int) -> int:
 
 
 def _materialize(rd: int, value: int, out: list[Instr]) -> None:
-    """The shortest `lui`/`addiw`/`slli`/`addi` sequence for a 64-bit constant.
-
-    This is the RISC-V materialization every backend implements; it is here
-    because the corpus has no backend. `addiw` rather than `addi` in the 32-bit
-    case is not a stylistic choice: `lui` sign-extends its result to XLEN, so
-    the low half has to be added at 32 bits and re-extended or a constant just
-    below 2^31 comes out with its high half set.
-    """
+    """Append the shortest `lui`/`addiw`/`slli`/`addi` sequence materializing 64-bit `value` into `rd`."""
     value = ((value & MASK64) ^ (1 << 63)) - (1 << 63)     # to signed 64
     if -(1 << 31) <= value < (1 << 31):
         hi20 = ((value + 0x800) >> 12) & 0xFFFFF
         lo12 = _sign12(value)
         if hi20:
-            # Handed over signed, because the model prints `lui`'s upper immediate
-            # `hex_bits_signed_20` and the encoder takes the field's reading from the
-            # model. The bits are the same either way, `lui` masking its operand into
-            # twenty bits; what changes is which values the encoder admits, and a
-            # materialization of an address at or above 2^31 lands above the unsigned
-            # half of that field every time.
+            # Pass `lui`'s 20-bit immediate as signed to match the model's `hex_bits_signed_20` slot.
             out.append(("lui", [rd, hi20 - (1 << 20) if hi20 >> 19 else hi20]))
         if lo12 or not hi20:
             out.append(("addiw", [rd, rd if hi20 else 0, lo12]))
@@ -667,21 +596,11 @@ def _p_li(asm: Assembler, item: Item, pc: int) -> list[Instr]:
 
 
 def _p_la(asm: Assembler, item: Item, pc: int) -> list[Instr]:
-    """`la cd, symbol`: a capability for `symbol` derived from PCC.
-
-    The pair is the profile's own PC-relative materialization (§1.1,
-    R-15-036k), and what it yields carries PCC's authority: read and execute,
-    never store, W+X being unrepresentable (R-15-007l). A program that writes
-    through the result would fault at the store, which is the intended answer.
-    """
+    """Expand `la cd, symbol` into PC-relative `auipcc` + `cincoffsetimm`."""
     if len(item.args) != 2:
         raise asm._error(item.line, "la takes a register and a symbol")
     cd = asm._register(item.args[0], item)
     delta = asm._eval(item.args[1], item, pc) - pc
-    # Handed over signed, for `_materialize`'s reason: `auipcc`'s upper immediate is
-    # read `sign_extend(imm @ 0x000)` by the model's own execute clause, and a backward
-    # `la` is a negative displacement whose top twenty bits land above the unsigned half
-    # of that field every time.
     hi20 = ((delta + 0x800) >> 12) & 0xFFFFF
     return [("auipcc", [cd, hi20 - (1 << 20) if hi20 >> 19 else hi20]),
             ("cincoffsetimm", [cd, cd, _sign12(delta)])]
@@ -820,14 +739,7 @@ PSEUDOS: Final[dict[str, Pseudo]] = {
 
 
 def assemble_file(source: Path, elf: Path, sites: list[Site] | None = None) -> int:
-    """Assemble one program and write its image. Returns the byte count.
-
-    `sites` is filled with one record per emitted instruction where a caller supplies a
-    list, and left alone where it does not. An out-parameter rather than a second return
-    value, because every caller of this function today wants the byte count and only the
-    composer wants the sites: widening the return would make three callers unpack a
-    field they have no use for.
-    """
+    """Assemble `source` into `elf`, optionally appending emitted `Site` records to `sites`, and return the section byte count."""
     asm = Assembler(source.read_text(encoding="utf-8"), source.name)
     sections, symbols, entry = asm.assemble()
     image.write_elf(elf, sections, symbols, entry)

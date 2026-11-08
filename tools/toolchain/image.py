@@ -1,25 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The image the emulator loads: a position-fixed ELF64 with nothing in it.
+"""Minimal position-fixed ELF64 RISC-V executable writer and section reader.
 
-The curated emulator loads `PT_LOAD` segments at their **physical** addresses
-and reads `.symtab` for three names, `tohost`, `begin_signature`, and
-`end_signature` (c_emulator/elf_loader.cpp, c_emulator/riscv_sim.cpp). That is
-the whole contract this writer has to meet, so it emits exactly that and no
-more: no dynamic table, no relocation section, no note, no interpreter, no
-program headers past the ones that carry the two loadable sections.
-
-The image is **position-fixed** by construction, which is the profile's own
-composition-time-absolute reading rather than a simplification made here: the
-physical space is 36 bits and dense, `satp` is Bare, and there is no loader to
-relocate anything (R-15-002, R-15-002b, R-15-036l). So a section's address is
-decided at layout and every symbol is an absolute number by the time this module
-sees it.
-
-M0.12 wrote this writer so that hand-written corpus programs had something to run.
-Since M1.4-prime the backend's emitted mix is assembled into the same container, and
-[compose.py](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/compose.py) composes images from it; M1.4 re-homes only LLVM's
-disassembly and object tooling beside them, so another composer needs a reviewed
-replacement contract.
+Emits `PT_LOAD` segments at their physical addresses along with `.symtab`,
+`.strtab`, and `.shstrtab` sections (`tohost`, `begin_signature`, `end_signature`,
+and program symbols) for the simulator's ELF loader.
 """
 
 import struct
