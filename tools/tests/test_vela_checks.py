@@ -165,6 +165,131 @@ def _prepare_selection_controls() -> None:
         raise AssertionError(f"invalid prepare selection accepted: {scope} {bad!r}")
 
 
+def _javascript_and_playground_controls() -> None:
+    repo_root = corpus.find_root()
+    repo_corpus = corpus.load(repo_root)
+    ensure(
+        checks.javascript_findings(repo_root, repo_corpus) == [],
+        "committed JavaScript modules and playground assets must pass javascript_findings",
+    )
+
+    with tempfile.TemporaryDirectory(prefix="vela-js-check-") as td:
+        root = Path(td)
+        app_dir = root / "tools" / "toolchain" / "playground"
+        docs_dir = root / "docs"
+        app_dir.mkdir(parents=True)
+        docs_dir.mkdir(parents=True)
+
+        clean_js = (
+            'export const EXAMPLES = {\n'
+            '  squares: { source: "module Playground;" },\n'
+            '};\n'
+            'const VELA_GRAMMAR_TYPE_KEYWORD_SET = new Set(["byte"]);\n'
+            'const VELA_GRAMMAR_CONSTANT_SET = new Set(["true"]);\n'
+            'export function highlight(word = "byte") {\n'
+            '  const $ = (id) => document.getElementById(id);\n'
+            '  const selectTab = (tab) => $(`${tab}-panel`);\n'
+            '  selectTab("problems");\n'
+            '  $("editor");\n'
+            '  return VELA_GRAMMAR_TYPE_KEYWORD_SET.has(word) || VELA_GRAMMAR_CONSTANT_SET.has(word);\n'
+            '}\n'
+        )
+        clean_html = (
+            '<!doctype html>\n'
+            '<div id="editor"></div>\n'
+            '<button data-tab="problems" aria-controls="problems-panel"></button>\n'
+            '<section id="problems-panel"></section>\n'
+            '<details id="guide-card"></details>\n'
+            '<a data-expand-target="guide-card"></a>\n'
+            '<button data-load-example="squares"></button>\n'
+            '<select id="examples"><option value="squares">Squares</option></select>\n'
+        )
+        tracked = [
+            "docs/app.mjs",
+            "docs/index.html",
+            "tools/toolchain/playground/app.mjs",
+            "tools/toolchain/playground/index.html",
+        ]
+        for rel, content in (
+            ("tools/toolchain/playground/app.mjs", clean_js),
+            ("docs/app.mjs", clean_js),
+            ("tools/toolchain/playground/index.html", clean_html),
+            ("docs/index.html", clean_html),
+        ):
+            (root / rel).write_text(content, encoding="utf-8", newline="\n")
+
+        clean_corpus = corpus.Corpus(root, [], {}, tracked, set(tracked))
+        ensure(
+            checks.javascript_findings(root, clean_corpus) == [],
+            "clean JavaScript module and synchronized playground DOM bindings must pass",
+        )
+
+        undeclared_js = clean_js.replace(
+            'const VELA_GRAMMAR_TYPE_KEYWORD_SET = new Set(["byte"]);\n',
+            'const VELA_GRAMMAR_TYPE_SET = new Set(["byte"]);\n',
+        )
+        (root / "tools/toolchain/playground/app.mjs").write_text(
+            undeclared_js, encoding="utf-8", newline="\n"
+        )
+        (root / "docs/app.mjs").write_text(undeclared_js, encoding="utf-8", newline="\n")
+        undeclared_found = checks.javascript_findings(root, clean_corpus)
+        ensure(
+            any("VELA_GRAMMAR_TYPE_KEYWORD_SET" in item for item in undeclared_found),
+            f"undeclared VELA_GRAMMAR_TYPE_KEYWORD_SET must be refused: {undeclared_found!r}",
+        )
+
+        tpl_undeclared_js = clean_js.replace(
+            '$("editor");', '$("editor");\n  const msg = `${MISSING_TPL_VAR}`;'
+        )
+        (root / "tools/toolchain/playground/app.mjs").write_text(
+            tpl_undeclared_js, encoding="utf-8", newline="\n"
+        )
+        (root / "docs/app.mjs").write_text(tpl_undeclared_js, encoding="utf-8", newline="\n")
+        tpl_found = checks.javascript_findings(root, clean_corpus)
+        ensure(
+            any("MISSING_TPL_VAR" in item for item in tpl_found),
+            f"undeclared identifier inside template expression must be refused: {tpl_found!r}",
+        )
+
+        (root / "tools/toolchain/playground/app.mjs").write_text(
+            clean_js, encoding="utf-8", newline="\n"
+        )
+        (root / "docs/app.mjs").write_text(
+            clean_js + "// drift\n", encoding="utf-8", newline="\n"
+        )
+        drift_found = checks.javascript_findings(root, clean_corpus)
+        ensure(
+            any("out of sync" in item for item in drift_found),
+            f"out-of-sync docs/app.mjs mirror must be refused: {drift_found!r}",
+        )
+
+        (root / "docs/app.mjs").write_text(clean_js, encoding="utf-8", newline="\n")
+        bad_html = (
+            '<!doctype html>\n'
+            '<button data-tab="problems" aria-controls="missing-aria"></button>\n'
+            '<a data-expand-target="missing-card"></a>\n'
+            '<button data-load-example="unknown_example"></button>\n'
+            '<select id="examples"><option value="unknown_option">Bad</option></select>\n'
+        )
+        (root / "tools/toolchain/playground/index.html").write_text(
+            bad_html, encoding="utf-8", newline="\n"
+        )
+        (root / "docs/index.html").write_text(bad_html, encoding="utf-8", newline="\n")
+        dom_found = checks.javascript_findings(root, clean_corpus)
+        for expected in (
+            "$('editor')",
+            "id='problems-panel'",
+            "missing-card",
+            "missing-aria",
+            "unknown_example",
+            "unknown_option",
+        ):
+            ensure(
+                any(expected in item for item in dom_found),
+                f"expected DOM/example binding finding {expected!r} in {dom_found!r}",
+            )
+
+
 def cases() -> list[Case]:
     return [
         Case("rumdl-settings-schema-and-policy", _rumdl_settings_policy),
@@ -173,4 +298,5 @@ def cases() -> list[Case]:
         Case("editorconfig-and-glyph-hygiene", _editorconfig_and_glyph_controls),
         Case("source-comment-and-docstring-references", _source_reference_controls),
         Case("prepare-python-and-markdown-selection", _prepare_selection_controls),
+        Case("javascript-and-playground-asset-bindings", _javascript_and_playground_controls),
     ]

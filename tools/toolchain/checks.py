@@ -66,6 +66,76 @@ _MOJIBAKE_TOKENS = (
     "\u00c2\u00b7",
 )
 
+_JS_KEYWORDS = frozenset({
+    "async", "await", "break", "case", "catch", "class", "const", "continue",
+    "debugger", "default", "delete", "do", "else", "export", "extends", "false",
+    "finally", "for", "from", "function", "if", "import", "in", "instanceof",
+    "let", "new", "null", "of", "return", "static", "super", "switch", "this",
+    "throw", "true", "try", "typeof", "undefined", "var", "void", "while",
+    "with", "yield",
+})
+
+_JS_GLOBALS = frozenset({
+    "AbortController", "Array", "Blob", "Boolean", "BigInt", "Console",
+    "CustomEvent", "DataView", "Date", "Document", "Element", "Error", "Event",
+    "EventSource", "FileReader", "Float32Array", "Float64Array", "FormData",
+    "Function", "HTMLElement", "Headers", "History", "Image", "Infinity",
+    "Int8Array", "Int16Array", "Int32Array", "Intl", "JSON", "KeyboardEvent",
+    "Map", "Math", "MouseEvent", "MutationObserver", "NaN", "Node", "NodeList",
+    "Number", "Object", "Promise", "Proxy", "RangeError", "ReferenceError",
+    "Reflect", "RegExp", "ResizeObserver", "Request", "Response", "Set",
+    "SharedArrayBuffer", "String", "Symbol", "SyntaxError", "TextDecoder",
+    "TextEncoder", "TypeError", "URIError", "URL", "URLSearchParams",
+    "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "WeakMap",
+    "WeakSet", "WebSocket", "Window", "Worker", "alert", "atob", "btoa",
+    "cancelAnimationFrame", "clearInterval", "clearTimeout", "confirm",
+    "console", "crypto", "decodeURI", "decodeURIComponent", "document",
+    "encodeURI", "encodeURIComponent", "eval", "fetch", "getComputedStyle",
+    "globalThis", "history", "isFinite", "isNaN", "localStorage", "location",
+    "navigator", "parseFloat", "parseInt", "performance", "process",
+    "queueMicrotask", "requestAnimationFrame", "self", "sessionStorage",
+    "setInterval", "setTimeout", "structuredClone", "window",
+})
+
+_JS_REGEX_PREV_PUNC = frozenset({
+    "(", ",", "=", ":", "[", "!", "&", "|", "?", "{", "}", ";", "${",
+    "+", "-", "*", "/", "%", "~", "^", "<", ">", "<=", ">=", "==", "!=",
+    "===", "!==", "&&", "||", "??", "=>", "...", "+=", "-=", "*=", "/=",
+    "%=", "&&=", "||=", "??=",
+})
+
+_JS_REGEX_PREV_KW = frozenset({
+    "return", "throw", "case", "in", "of", "typeof", "void", "delete",
+    "new", "instanceof", "yield", "await", "else", "do",
+})
+
+_JS_NON_METHOD_HEADS = frozenset({
+    "if", "for", "while", "switch", "catch", "with", "return", "throw",
+    "typeof", "delete", "void", "new", "await", "yield", "case", "in",
+    "of", "instanceof", "else",
+})
+
+_JS_MULTI_OPS = (
+    "===", "!==", ">>>", "<<=", ">>=", "&&=", "||=", "??=", "...",
+    "<=", ">=", "==", "!=", "&&", "||", "??", "=>", "++", "--",
+    "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<", ">>", "?.",
+)
+
+_PLAYGROUND_SYNC_PAIRS = (
+    ("tools/toolchain/playground/index.html", "docs/index.html"),
+    ("tools/toolchain/playground/app.mjs", "docs/app.mjs"),
+    ("tools/toolchain/playground/style.css", "docs/style.css"),
+)
+_HTML_ID_RE = re.compile(r'\bid="([^"]+)"')
+_HTML_TAB_RE = re.compile(r'\bdata-tab="([^"]+)"')
+_HTML_LOAD_EXAMPLE_RE = re.compile(r'\bdata-load-example="([^"]+)"')
+_HTML_EXPAND_TARGET_RE = re.compile(r'\bdata-expand-target="([^"]+)"')
+_HTML_ARIA_CONTROLS_RE = re.compile(r'\baria-controls="([^"]+)"')
+_HTML_EXAMPLES_SELECT_RE = re.compile(r'<select[^>]*\bid="examples"[^>]*>(.*?)</select>', re.DOTALL)
+_HTML_OPTION_VALUE_RE = re.compile(r'<option[^>]*\bvalue="([^"]+)"')
+_JS_DOLLAR_ID_RE = re.compile(r'\$\(\s*"([A-Za-z0-9_-]+)"\s*\)')
+_JS_SELECT_TAB_RE = re.compile(r'\bselectTab\(\s*"([A-Za-z0-9_-]+)"\s*\)')
+
 
 def _reuse_executable() -> Path | None:
     scripts = Path(sysconfig.get_path("scripts"))
@@ -362,6 +432,517 @@ def vela_example_findings(root: Path, tracked: Sequence[str]) -> list[str]:
     return findings
 
 
+def _tokenize_js(rel: str, src: str) -> tuple[list[tuple[str, str, int, int]], list[str]]:
+    tokens: list[tuple[str, str, int, int]] = []
+    findings: list[str] = []
+    delim_stack: list[tuple[str, int, int, bool]] = []
+    n = len(src)
+    i = 0
+    line = 1
+    col = 1
+
+    def scan_template(pos: int, ln: int, cl: int) -> tuple[int, int, int]:
+        seg_ln, seg_cl = ln, cl
+        while pos < n:
+            c = src[pos]
+            if c == "\\":
+                if pos + 1 < n and src[pos + 1] == "\n":
+                    ln += 1
+                    cl = 1
+                else:
+                    cl += 2
+                pos += 2
+                continue
+            if c == "`":
+                tokens.append(("tpl", "``", seg_ln, seg_cl))
+                return pos + 1, ln, cl + 1
+            if c == "$" and pos + 1 < n and src[pos + 1] == "{":
+                tokens.append(("tpl", "``", seg_ln, seg_cl))
+                tokens.append(("punc", "${", ln, cl))
+                delim_stack.append(("}", ln, cl, True))
+                return pos + 2, ln, cl + 2
+            if c == "\n":
+                ln += 1
+                cl = 1
+            else:
+                cl += 1
+            pos += 1
+        findings.append(f"{rel}:{seg_ln}:{seg_cl}: unterminated template literal")
+        return pos, ln, cl
+
+    while i < n:
+        ch = src[i]
+        if ch == "\n":
+            line += 1
+            col = 1
+            i += 1
+            continue
+        if ch in " \t\r":
+            col += 1
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "*":
+            s_ln, s_cl = line, col
+            i += 2
+            col += 2
+            closed = False
+            while i < n:
+                if src[i] == "*" and i + 1 < n and src[i + 1] == "/":
+                    i += 2
+                    col += 2
+                    closed = True
+                    break
+                if src[i] == "\n":
+                    line += 1
+                    col = 1
+                else:
+                    col += 1
+                i += 1
+            if not closed:
+                findings.append(f"{rel}:{s_ln}:{s_cl}: unterminated block comment")
+            continue
+        if ch in ('"', "'"):
+            quote = ch
+            s_ln, s_cl = line, col
+            i += 1
+            col += 1
+            buf: list[str] = []
+            closed = False
+            while i < n:
+                c = src[i]
+                if c == "\\":
+                    if i + 1 < n:
+                        buf.append(src[i : i + 2])
+                    i += 2
+                    col += 2
+                    continue
+                if c == quote:
+                    i += 1
+                    col += 1
+                    closed = True
+                    break
+                if c == "\n":
+                    break
+                buf.append(c)
+                i += 1
+                col += 1
+            if not closed:
+                findings.append(f"{rel}:{s_ln}:{s_cl}: unterminated string literal")
+            tokens.append(("str", "".join(buf), s_ln, s_cl))
+            continue
+        if ch == "`":
+            i, line, col = scan_template(i + 1, line, col + 1)
+            continue
+        if ch == "/":
+            prev = tokens[-1] if tokens else None
+            is_regex = (
+                prev is None
+                or (prev[0] == "punc" and prev[1] in _JS_REGEX_PREV_PUNC)
+                or (prev[0] == "id" and prev[1] in _JS_REGEX_PREV_KW)
+            )
+            if is_regex and not (
+                i + 1 < n and src[i + 1] == "=" and prev is not None and prev[0] in {"id", "num"}
+            ):
+                s_ln, s_cl = line, col
+                i += 1
+                col += 1
+                in_class = False
+                closed = False
+                while i < n:
+                    c = src[i]
+                    if c == "\\":
+                        i += 2
+                        col += 2
+                        continue
+                    if c == "[":
+                        in_class = True
+                    elif c == "]":
+                        in_class = False
+                    elif c == "/" and not in_class:
+                        i += 1
+                        col += 1
+                        while i < n and src[i].isalpha():
+                            i += 1
+                            col += 1
+                        closed = True
+                        break
+                    elif c == "\n":
+                        break
+                    i += 1
+                    col += 1
+                if not closed:
+                    findings.append(f"{rel}:{s_ln}:{s_cl}: unterminated regular expression literal")
+                tokens.append(("rx", "//", s_ln, s_cl))
+                continue
+        if ch.isalpha() or ch in "_$":
+            s_ln, s_cl = line, col
+            start = i
+            i += 1
+            col += 1
+            while i < n and (src[i].isalnum() or src[i] in "_$"):
+                i += 1
+                col += 1
+            tokens.append(("id", src[start:i], s_ln, s_cl))
+            continue
+        if ch.isdigit():
+            s_ln, s_cl = line, col
+            start = i
+            i += 1
+            col += 1
+            while i < n and (src[i].isalnum() or src[i] in "_."):
+                i += 1
+                col += 1
+            tokens.append(("num", src[start:i], s_ln, s_cl))
+            continue
+        matched_op = next((op for op in _JS_MULTI_OPS if src.startswith(op, i)), None)
+        if matched_op is not None:
+            tokens.append(("punc", matched_op, line, col))
+            i += len(matched_op)
+            col += len(matched_op)
+            continue
+        if ch in "({[":
+            close = {"(": ")", "{": "}", "[": "]"}[ch]
+            delim_stack.append((close, line, col, False))
+            tokens.append(("punc", ch, line, col))
+            i += 1
+            col += 1
+            continue
+        if ch in ")}]":
+            if not delim_stack or delim_stack[-1][0] != ch:
+                findings.append(f"{rel}:{line}:{col}: unmatched delimiter {ch!r}")
+                tokens.append(("punc", ch, line, col))
+                i += 1
+                col += 1
+                continue
+            _, _, _, is_tpl = delim_stack.pop()
+            tokens.append(("punc", ch, line, col))
+            i += 1
+            col += 1
+            if is_tpl:
+                i, line, col = scan_template(i, line, col)
+            continue
+        tokens.append(("punc", ch, line, col))
+        i += 1
+        col += 1
+
+    findings.extend(
+        f"{rel}:{ln}:{cl}: unclosed delimiter expecting {expected!r}"
+        for expected, ln, cl, _ in delim_stack
+    )
+    return tokens, findings
+
+
+def _collect_js_pattern_ids(
+    tokens: Sequence[tuple[str, str, int, int]],
+    start: int,
+    stop_tokens: frozenset[str],
+) -> tuple[set[str], int]:
+    declared: set[str] = set()
+    j = start
+    m = len(tokens)
+    depth = 0
+    skip_default_depth: int | None = None
+    while j < m:
+        tk, tv, _, _ = tokens[j]
+        if skip_default_depth is not None:
+            if tk == "punc" and tv in {"(", "[", "{", "${"}:
+                depth += 1
+            elif tk == "punc" and tv in {")", "]", "}"}:
+                if depth == skip_default_depth:
+                    skip_default_depth = None
+                    continue
+                depth -= 1
+            elif tk == "punc" and tv == "," and depth == skip_default_depth:
+                skip_default_depth = None
+                j += 1
+                continue
+            j += 1
+            continue
+        if depth == 0 and tk in {"punc", "id"} and tv in stop_tokens:
+            break
+        if tk == "punc" and tv in {"(", "[", "{", "${"}:
+            depth += 1
+        elif tk == "punc" and tv in {")", "]", "}"}:
+            if depth == 0:
+                break
+            depth -= 1
+        elif tk == "punc" and tv == "=":
+            if "=" in stop_tokens and depth == 0:
+                break
+            skip_default_depth = depth
+        elif tk == "id" and tv not in _JS_KEYWORDS:
+            nxt = tokens[j + 1] if j + 1 < m else None
+            if nxt is not None and nxt[0] == "punc" and nxt[1] == ":":
+                j += 1
+            else:
+                declared.add(tv)
+        j += 1
+    return declared, j
+
+
+def _collect_js_declarations(tokens: Sequence[tuple[str, str, int, int]]) -> set[str]:
+    declared: set[str] = set()
+    m = len(tokens)
+    decl_stops = frozenset({"=", ";", "in", "of", ","})
+    paren_stops = frozenset({")"})
+    for idx, (kind, val, _, _) in enumerate(tokens):
+        if kind == "id" and val in {"const", "let", "var"}:
+            j = idx + 1
+            while j < m:
+                ids, j = _collect_js_pattern_ids(tokens, j, decl_stops)
+                declared.update(ids)
+                if j < m and tokens[j][0] == "punc" and tokens[j][1] == "=":
+                    j += 1
+                    d = 0
+                    while j < m:
+                        tk, tv, _, _ = tokens[j]
+                        if tk == "punc" and tv in {"(", "[", "{", "${"}:
+                            d += 1
+                        elif tk == "punc" and tv in {")", "]", "}"}:
+                            if d == 0:
+                                break
+                            d -= 1
+                        elif d == 0 and tk == "punc" and tv in {",", ";"}:
+                            break
+                        j += 1
+                if j < m and tokens[j][0] == "punc" and tokens[j][1] == ",":
+                    j += 1
+                    continue
+                break
+        elif kind == "id" and val in {"function", "class"}:
+            j = idx + 1
+            if j < m and tokens[j][0] == "punc" and tokens[j][1] == "*":
+                j += 1
+            if j < m and tokens[j][0] == "id" and tokens[j][1] not in _JS_KEYWORDS:
+                declared.add(tokens[j][1])
+                j += 1
+            if val == "function" and j < m and tokens[j][0] == "punc" and tokens[j][1] == "(":
+                ids, _ = _collect_js_pattern_ids(tokens, j + 1, paren_stops)
+                declared.update(ids)
+        elif (
+            kind == "id"
+            and val == "catch"
+            and idx + 1 < m
+            and tokens[idx + 1][0] == "punc"
+            and tokens[idx + 1][1] == "("
+        ):
+            ids, _ = _collect_js_pattern_ids(tokens, idx + 2, paren_stops)
+            declared.update(ids)
+        elif kind == "id" and val == "import":
+            j = idx + 1
+            while (
+                j < m
+                and not (tokens[j][0] == "id" and tokens[j][1] == "from")
+                and not (tokens[j][0] == "punc" and tokens[j][1] == ";")
+            ):
+                if tokens[j][0] == "id" and tokens[j][1] not in _JS_KEYWORDS and tokens[j][1] != "as":
+                    if j + 1 < m and tokens[j + 1][0] == "id" and tokens[j + 1][1] == "as":
+                        j += 2
+                        if j < m and tokens[j][0] == "id":
+                            declared.add(tokens[j][1])
+                    else:
+                        declared.add(tokens[j][1])
+                j += 1
+        elif kind == "punc" and val == "=>":
+            if idx - 1 >= 0:
+                prev_k, prev_v, _, _ = tokens[idx - 1]
+                if prev_k == "id" and prev_v not in _JS_KEYWORDS:
+                    declared.add(prev_v)
+                elif prev_k == "punc" and prev_v == ")":
+                    d = 1
+                    j = idx - 2
+                    while j >= 0 and d > 0:
+                        tk, tv, _, _ = tokens[j]
+                        if tk == "punc" and tv == ")":
+                            d += 1
+                        elif tk == "punc" and tv == "(":
+                            d -= 1
+                        j -= 1
+                    ids, _ = _collect_js_pattern_ids(tokens, j + 2, paren_stops)
+                    declared.update(ids)
+        elif (
+            kind == "punc"
+            and val == "("
+            and idx - 1 >= 0
+            and tokens[idx - 1][0] == "id"
+            and tokens[idx - 1][1] not in _JS_NON_METHOD_HEADS
+        ):
+            ids, end_j = _collect_js_pattern_ids(tokens, idx + 1, paren_stops)
+            if end_j + 1 < m and tokens[end_j + 1][0] == "punc" and tokens[end_j + 1][1] == "{":
+                declared.update(ids)
+    return declared
+
+
+def _js_module_findings(rel: str, text: str) -> list[str]:
+    tokens, findings = _tokenize_js(rel, text)
+    if findings:
+        return findings
+    declared = _collect_js_declarations(tokens)
+    known = declared | _JS_GLOBALS | _JS_KEYWORDS
+    paren_stops = frozenset({")"})
+    m = len(tokens)
+    for idx, (kind, val, ln, cl) in enumerate(tokens):
+        if kind != "id" or val in known:
+            continue
+        prev = tokens[idx - 1] if idx > 0 else None
+        nxt = tokens[idx + 1] if idx + 1 < m else None
+        if prev is not None and prev[0] == "punc" and prev[1] in {".", "?."}:
+            continue
+        if (
+            nxt is not None
+            and nxt[0] == "punc"
+            and nxt[1] == ":"
+            and prev is not None
+            and prev[0] == "punc"
+            and prev[1] in {"{", ","}
+        ):
+            continue
+        if (
+            val in {"get", "set"}
+            and nxt is not None
+            and nxt[0] == "id"
+            and idx + 2 < m
+            and tokens[idx + 2][0] == "punc"
+            and tokens[idx + 2][1] == "("
+        ):
+            continue
+        if nxt is not None and nxt[0] == "punc" and nxt[1] == "(":
+            _, end_j = _collect_js_pattern_ids(tokens, idx + 2, paren_stops)
+            if end_j + 1 < m and tokens[end_j + 1][0] == "punc" and tokens[end_j + 1][1] == "{":
+                continue
+        findings.append(f"{rel}:{ln}:{cl}: reference to undeclared JavaScript identifier {val!r}")
+    return findings
+
+
+def _extract_js_object_keys(
+    tokens: Sequence[tuple[str, str, int, int]],
+    const_name: str,
+) -> set[str] | None:
+    m = len(tokens)
+    for idx in range(m - 2):
+        if (
+            tokens[idx][0] == "id"
+            and tokens[idx][1] == const_name
+            and tokens[idx + 1][0] == "punc"
+            and tokens[idx + 1][1] == "="
+            and tokens[idx + 2][0] == "punc"
+            and tokens[idx + 2][1] == "{"
+        ):
+            keys: set[str] = set()
+            depth = 1
+            j = idx + 3
+            while j < m and depth > 0:
+                tk, tv, _, _ = tokens[j]
+                if tk == "punc" and tv in {"{", "(", "[", "${"}:
+                    depth += 1
+                elif tk == "punc" and tv in {"}", ")", "]"}:
+                    depth -= 1
+                elif (
+                    depth == 1
+                    and tk == "id"
+                    and j + 1 < m
+                    and tokens[j + 1][0] == "punc"
+                    and tokens[j + 1][1] == ":"
+                    and tokens[j - 1][0] == "punc"
+                    and tokens[j - 1][1] in {"{", ","}
+                ):
+                    keys.add(tv)
+                j += 1
+            return keys
+    return None
+
+
+def _playground_asset_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
+    findings: list[str] = []
+    indexed = loaded.indexed
+    for src_rel, dst_rel in _PLAYGROUND_SYNC_PAIRS:
+        if src_rel not in indexed or dst_rel not in indexed:
+            continue
+        try:
+            src_bytes = (root / src_rel).read_bytes()
+            dst_bytes = (root / dst_rel).read_bytes()
+        except OSError as err:
+            findings.append(f"{dst_rel}: cannot read playground mirror asset: {err}")
+            continue
+        if src_bytes != dst_bytes:
+            findings.append(f"{dst_rel}: playground asset is out of sync with {src_rel}")
+
+    app_rel = "tools/toolchain/playground/app.mjs"
+    html_rel = "tools/toolchain/playground/index.html"
+    if app_rel not in indexed or html_rel not in indexed:
+        return findings
+    try:
+        app_text = (root / app_rel).read_text(encoding="utf-8")
+        html_text = (root / html_rel).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as err:
+        findings.append(f"{app_rel}: cannot read playground assets: {err}")
+        return findings
+
+    html_ids = set(_HTML_ID_RE.findall(html_text))
+    html_tabs = set(_HTML_TAB_RE.findall(html_text))
+    findings.extend(
+        f"{app_rel}: DOM lookup $({dom_id!r}) has no matching id in {html_rel}"
+        for dom_id in sorted(set(_JS_DOLLAR_ID_RE.findall(app_text)) - html_ids)
+    )
+    findings.extend(
+        f"{html_rel}: [data-tab={tab!r}] has no matching id='{tab}-panel'"
+        for tab in sorted(html_tabs)
+        if f"{tab}-panel" not in html_ids
+    )
+    findings.extend(
+        f"{app_rel}: selectTab({tab!r}) has no matching [data-tab={tab!r}] in {html_rel}"
+        for tab in sorted(set(_JS_SELECT_TAB_RE.findall(app_text)) - html_tabs)
+    )
+    findings.extend(
+        f"{html_rel}: data-expand-target={target!r} has no matching id in {html_rel}"
+        for target in sorted(set(_HTML_EXPAND_TARGET_RE.findall(html_text)) - html_ids)
+    )
+    findings.extend(
+        f"{html_rel}: aria-controls={target!r} has no matching id in {html_rel}"
+        for target in sorted(set(_HTML_ARIA_CONTROLS_RE.findall(html_text)) - html_ids)
+    )
+
+    app_tokens, _ = _tokenize_js(app_rel, app_text)
+    example_keys = _extract_js_object_keys(app_tokens, "EXAMPLES")
+    if example_keys is None:
+        findings.append(f"{app_rel}: missing EXAMPLES catalog definition")
+        return findings
+    findings.extend(
+        f"{html_rel}: data-load-example={key!r} is not defined in {app_rel} EXAMPLES"
+        for key in sorted(set(_HTML_LOAD_EXAMPLE_RE.findall(html_text)) - example_keys)
+    )
+    select_match = _HTML_EXAMPLES_SELECT_RE.search(html_text)
+    if select_match is None:
+        findings.append(f"{html_rel}: missing #examples <select> element")
+    else:
+        option_keys = set(_HTML_OPTION_VALUE_RE.findall(select_match.group(1)))
+        findings.extend(
+            f"{html_rel}: #examples option value={key!r} is not defined in {app_rel} EXAMPLES"
+            for key in sorted(option_keys - example_keys)
+        )
+    return findings
+
+
+def javascript_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
+    """Check tracked JavaScript modules for lexical/identifier integrity and playground DOM bindings."""
+    findings: list[str] = []
+    for rel in loaded.tracked:
+        if not rel.endswith((".mjs", ".js")):
+            continue
+        try:
+            text = (root / rel).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as err:
+            findings.append(f"{rel}: cannot read JavaScript file: {err}")
+            continue
+        findings.extend(_js_module_findings(rel, text))
+    findings.extend(_playground_asset_findings(root, loaded))
+    return findings
+
+
 def run(root: Path) -> Reporter:
     """Run all repository hygiene, licensing, EditorConfig, and source-reference checks."""
     rep = Reporter()
@@ -406,6 +987,12 @@ def run(root: Path) -> Reporter:
         "Vela example finding(s):",
         vela_example_findings(root, loaded.tracked),
         "all tracked pure Vela example files translate and hold to their canonical layout",
+    )
+    rep.report(
+        "javascript",
+        "JavaScript and playground asset finding(s):",
+        javascript_findings(root, loaded),
+        "all tracked JavaScript modules and playground DOM/asset bindings resolve cleanly",
     )
     return rep
 
