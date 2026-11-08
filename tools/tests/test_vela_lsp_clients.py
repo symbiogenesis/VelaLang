@@ -1,0 +1,588 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Independent archive authentication, oracle, and wire-transcript controls for LSP clients."""
+
+import copy
+import hashlib
+import io
+import json
+import tarfile
+import tempfile
+import zipfile
+from collections.abc import Callable
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+from typing import cast
+from unittest.mock import patch
+
+from tests.harness import Case, ensure
+from toolchain import lsp_clients
+from toolchain.cli import vela_lsp
+from toolchain.lsp import serve
+from toolchain.protocol_json import encode_message
+
+INDEPENDENT_CASES = True
+_URI = "file:///workspace/interop.vela"
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _refuses(operation: Callable[[], object], label: str) -> None:
+    try:
+        operation()
+    except (ValueError, SystemExit):
+        return
+    raise AssertionError(f"accepted {label}")
+
+
+def _make_zip(members: dict[str, bytes]) -> bytes:
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, mode="w", compression=zipfile.ZIP_DEFLATED) as bundle:
+        for name, payload in members.items():
+            bundle.writestr(name, payload)
+    return stream.getvalue()
+
+
+def _make_targz(members: dict[str, bytes]) -> bytes:
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode="w:gz") as bundle:
+        for name, payload in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(payload)
+            bundle.addfile(info, io.BytesIO(payload))
+    return stream.getvalue()
+
+
+def _archive_and_license_authentication() -> None:
+    exe_bytes = b"binary-payload"
+    lic_bytes = b"MIT License\n"
+    lua_bytes = b"return { lsp = true }\n"
+    unwanted_bytes = b"GPL-3.0-or-later disallowed tool"
+    zip_data = _make_zip(
+        {
+            "pkg/bin/tool.exe": exe_bytes,
+            "pkg/LICENSE.txt": lic_bytes,
+            "pkg/share/nvim/runtime/lua/vim/lsp.lua": lua_bytes,
+            "pkg/unwanted/diff.exe": unwanted_bytes,
+        }
+    )
+    pin = lsp_clients.ArchivePin(
+        url="https://example.com/pkg.zip",
+        filename="pkg.zip",
+        archive_sha256=_sha256(zip_data),
+        prefix="pkg",
+        executable="bin/tool.exe",
+        required_sha256={
+            "bin/tool.exe": _sha256(exe_bytes),
+            "LICENSE.txt": _sha256(lic_bytes),
+        },
+    )
+    with tempfile.TemporaryDirectory(prefix="vela-lsp-archive-") as td:
+        dest = Path(td) / "zip-out"
+        digests = lsp_clients.extract_verified_archive(
+            zip_data,
+            pin,
+            dest,
+            allow_predicate=("share/nvim/runtime/lua/",),
+        )
+        ensure(
+            set(digests)
+            == {
+                "bin/tool.exe",
+                "LICENSE.txt",
+                "share/nvim/runtime/lua/vim/lsp.lua",
+            },
+            f"unexpected extracted member set: {sorted(digests)}",
+        )
+        ensure(not (dest / "unwanted" / "diff.exe").exists(), "disallowed member was extracted")
+        ensure((dest / "bin" / "tool.exe").read_bytes() == exe_bytes, "extracted binary mismatch")
+
+        bad_archive_pin = lsp_clients.ArchivePin(
+            url=pin.url,
+            filename=pin.filename,
+            archive_sha256="0" * 64,
+            prefix=pin.prefix,
+            executable=pin.executable,
+            required_sha256=pin.required_sha256,
+        )
+        _refuses(
+            lambda: lsp_clients.extract_verified_archive(zip_data, bad_archive_pin, Path(td) / "bad1"),
+            "tampered archive digest",
+        )
+
+        bad_member_pin = lsp_clients.ArchivePin(
+            url=pin.url,
+            filename=pin.filename,
+            archive_sha256=pin.archive_sha256,
+            prefix=pin.prefix,
+            executable=pin.executable,
+            required_sha256={"bin/tool.exe": "f" * 64, "LICENSE.txt": _sha256(lic_bytes)},
+        )
+        _refuses(
+            lambda: lsp_clients.extract_verified_archive(zip_data, bad_member_pin, Path(td) / "bad2"),
+            "tampered member digest",
+        )
+
+        for unsafe_name in ("pkg/../escape.txt", "/abs/path.txt", "other/LICENSE.txt", "pkg\\back.txt"):
+            unsafe_tar = _make_targz({unsafe_name: lic_bytes, "pkg/LICENSE.txt": lic_bytes})
+            unsafe_pin = lsp_clients.ArchivePin(
+                url="https://example.com/pkg.tar.gz",
+                filename="pkg.tar.gz",
+                archive_sha256=_sha256(unsafe_tar),
+                prefix="pkg",
+                executable="LICENSE.txt",
+                required_sha256={"LICENSE.txt": _sha256(lic_bytes)},
+            )
+            _refuses(
+                lambda u=unsafe_tar, p=unsafe_pin: lsp_clients.extract_verified_archive(
+                    u, p, Path(td) / "unsafe"
+                ),
+                f"unsafe tar member {unsafe_name!r}",
+            )
+
+        cache_dir = Path(td) / "cache"
+        _refuses(
+            lambda: lsp_clients._download_bytes("http://example.com/x", _sha256(lic_bytes), cache_dir, "x"),
+            "non-HTTPS download URL",
+        )
+        cached_file = cache_dir / "lic.txt"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cached_file.write_bytes(lic_bytes)
+        ensure(
+            lsp_clients._download_bytes(
+                "https://example.com/lic.txt",
+                _sha256(lic_bytes),
+                cache_dir,
+                "lic.txt",
+            )
+            == lic_bytes,
+            "verified cached file was not reused",
+        )
+
+
+def _wire_transcript_recording_and_cli() -> None:
+    req_init: dict[str, object] = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {"capabilities": {}},
+    }
+    notif_init: dict[str, object] = {"jsonrpc": "2.0", "method": "initialized", "params": {}}
+    req_shutdown: dict[str, object] = {"jsonrpc": "2.0", "id": 2, "method": "shutdown", "params": None}
+    notif_exit: dict[str, object] = {"jsonrpc": "2.0", "method": "exit", "params": None}
+
+    wire_in = b"".join(
+        encode_message(msg) for msg in (req_init, notif_init, req_shutdown, notif_exit)
+    )
+    frames: list[dict[str, object]] = []
+    out_stream = io.BytesIO()
+    exit_code = serve(io.BytesIO(wire_in), out_stream, transcript=frames)
+    ensure(exit_code == 0, f"expected clean exit 0, got {exit_code}")
+    ensure(len(frames) == 6, f"expected 6 recorded frames, got {len(frames)}")
+    directions = [frame["direction"] for frame in frames]
+    ensure(
+        directions
+        == [
+            "client_to_server",
+            "server_to_client",
+            "client_to_server",
+            "client_to_server",
+            "server_to_client",
+            "client_to_server",
+        ],
+        f"unexpected frame direction sequence: {directions}",
+    )
+
+    with tempfile.TemporaryDirectory(prefix="vela-lsp-cli-") as td:
+        transcript_path = Path(td) / "session-transcript.json"
+        with (
+            patch("sys.stdin", new=io.TextIOWrapper(io.BytesIO(wire_in))),
+            patch("sys.stdout", new=io.TextIOWrapper(io.BytesIO())),
+        ):
+            rc = vela_lsp.main(["--transcript", str(transcript_path)])
+        ensure(rc == 0 and transcript_path.is_file(), "CLI --transcript did not write transcript file")
+        loaded = json.loads(transcript_path.read_text(encoding="utf-8"))
+        ensure(
+            loaded.get("exit_code") == 0 and len(loaded.get("frames", [])) == 6,
+            f"unexpected CLI transcript payload: {loaded!r}",
+        )
+
+        with redirect_stderr(io.StringIO()):
+            _refuses(lambda: vela_lsp.main(["--output", str(Path(td) / "out.json")]), "--output alone")
+            _refuses(
+                lambda: vela_lsp.main(
+                    ["--qualify-clients", "--transcript", str(Path(td) / "tr.json")]
+                ),
+                "--qualify-clients with --transcript",
+            )
+
+        report_path = Path(td) / "qualification.json"
+        fake_report = {"schema": 1, "status": "passed"}
+        with patch("toolchain.lsp_clients.qualify_clients", return_value=fake_report):
+            rc = vela_lsp.main(["--qualify-clients", "--output", str(report_path)])
+        ensure(
+            rc == 0 and json.loads(report_path.read_text(encoding="utf-8")) == fake_report,
+            "CLI --qualify-clients --output did not write report",
+        )
+
+
+def _synthetic_session(
+    *,
+    incremental: bool,
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    oracle = lsp_clients.expected_scenario_oracle(_URI)
+    next_id = 1
+    wire_chunks: list[bytes] = []
+
+    def send_req(method: str, params: object = None) -> int:
+        nonlocal next_id
+        rid = next_id
+        next_id += 1
+        wire_chunks.append(
+            encode_message({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
+        )
+        return rid
+
+    def send_notif(method: str, params: object = None) -> None:
+        wire_chunks.append(
+            encode_message(
+                {"jsonrpc": "2.0", "method": method, "params": {} if params is None else params}
+            )
+        )
+
+    send_req("initialize", {"capabilities": {"general": {"positionEncodings": ["utf-16"]}}})
+    send_notif("initialized")
+    send_notif(
+        "textDocument/didOpen",
+        {
+            "textDocument": {
+                "uri": _URI,
+                "languageId": "vela",
+                "version": 1,
+                "text": lsp_clients.INITIAL_SOURCE,
+            }
+        },
+    )
+
+    for pos in ((2, 17), (6, 20), (6, 27), (7, 6), (0, 3), (6, 26)):
+        send_req(
+            "textDocument/hover",
+            {"textDocument": {"uri": _URI}, "position": {"line": pos[0], "character": pos[1]}},
+        )
+    for pos in ((6, 20), (11, 11), (14, 11)):
+        send_req(
+            "textDocument/definition",
+            {"textDocument": {"uri": _URI}, "position": {"line": pos[0], "character": pos[1]}},
+        )
+    for inc in (True, False):
+        send_req(
+            "textDocument/references",
+            {
+                "textDocument": {"uri": _URI},
+                "position": {"line": 8, "character": 10},
+                "context": {"includeDeclaration": inc},
+            },
+        )
+    send_req("textDocument/documentSymbol", {"textDocument": {"uri": _URI}})
+    for rstart, rend in (((0, 0), (17, 0)), ((7, 0), (8, 0))):
+        send_req(
+            "textDocument/inlayHint",
+            {
+                "textDocument": {"uri": _URI},
+                "range": {
+                    "start": {"line": rstart[0], "character": rstart[1]},
+                    "end": {"line": rend[0], "character": rend[1]},
+                },
+            },
+        )
+    send_req("textDocument/semanticTokens/full", {"textDocument": {"uri": _URI}})
+    send_req(
+        "textDocument/formatting",
+        {"textDocument": {"uri": _URI}, "options": {"tabSize": 4, "insertSpaces": True}},
+    )
+
+    # Stage 2: Apply formatting
+    send_notif(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": _URI, "version": 2},
+            "contentChanges": [
+                {
+                    "range": {
+                        "start": {"line": 0, "character": 0},
+                        "end": {"line": 17, "character": 0},
+                    },
+                    "text": lsp_clients.FORMATTED_SOURCE,
+                }
+                if incremental
+                else {"text": lsp_clients.FORMATTED_SOURCE}
+            ],
+        },
+    )
+    send_req(
+        "textDocument/formatting",
+        {"textDocument": {"uri": _URI}, "options": {"tabSize": 4, "insertSpaces": True}},
+    )
+    send_req("textDocument/semanticTokens/full", {"textDocument": {"uri": _URI}})
+
+    # Stage 3: Same-line edit after 😀 on line 5
+    send_notif(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": _URI, "version": 3},
+            "contentChanges": [
+                {
+                    "range": {
+                        "start": {"line": 5, "character": 33},
+                        "end": {"line": 5, "character": 34},
+                    },
+                    "text": "!",
+                }
+                if incremental
+                else {"text": lsp_clients.UNICODE_DOC_SOURCE}
+            ],
+        },
+    )
+    send_req(
+        "textDocument/hover",
+        {"textDocument": {"uri": _URI}, "position": {"line": 6, "character": 17}},
+    )
+
+    # Stage 4: Type error
+    send_notif(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": _URI, "version": 4},
+            "contentChanges": [{"text": lsp_clients.TYPE_ERROR_SOURCE}],
+        },
+    )
+    send_req(
+        "textDocument/hover",
+        {"textDocument": {"uri": _URI}, "position": {"line": 11, "character": 22}},
+    )
+    send_req(
+        "textDocument/definition",
+        {"textDocument": {"uri": _URI}, "position": {"line": 11, "character": 22}},
+    )
+    send_req(
+        "textDocument/references",
+        {
+            "textDocument": {"uri": _URI},
+            "position": {"line": 13, "character": 12},
+            "context": {"includeDeclaration": True},
+        },
+    )
+    send_req("textDocument/documentSymbol", {"textDocument": {"uri": _URI}})
+    send_req(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": _URI},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 25, "character": 0}},
+        },
+    )
+    send_req(
+        "textDocument/formatting",
+        {"textDocument": {"uri": _URI}, "options": {"tabSize": 4, "insertSpaces": True}},
+    )
+    send_req("textDocument/semanticTokens/full", {"textDocument": {"uri": _URI}})
+
+    # Stage 5: Unsupported error
+    send_notif(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": _URI, "version": 5},
+            "contentChanges": [{"text": lsp_clients.UNSUPPORTED_ERROR_SOURCE}],
+        },
+    )
+
+    # Stage 6: Recovery + notifications + close + shutdown/exit
+    send_notif(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": _URI, "version": 6},
+            "contentChanges": [{"text": lsp_clients.RECOVERED_SOURCE}],
+        },
+    )
+    send_req(
+        "textDocument/hover",
+        {"textDocument": {"uri": _URI}, "position": {"line": 11, "character": 22}},
+    )
+    send_req(
+        "textDocument/definition",
+        {"textDocument": {"uri": _URI}, "position": {"line": 11, "character": 29}},
+    )
+    send_req(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": _URI},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 25, "character": 0}},
+        },
+    )
+    send_req("textDocument/semanticTokens/full", {"textDocument": {"uri": _URI}})
+    send_notif("workspace/didChangeConfiguration", {"settings": {}})
+    send_notif(
+        "workspace/didChangeWatchedFiles",
+        {"changes": [{"uri": _URI + ".deleted", "type": 3}]},
+    )
+    send_notif("$/cancelRequest", {"id": 99999})
+    send_notif("textDocument/didClose", {"textDocument": {"uri": _URI}})
+    send_req("shutdown")
+    send_notif("exit")
+
+    frames: list[dict[str, object]] = []
+    exit_code = serve(io.BytesIO(b"".join(wire_chunks)), io.BytesIO(), transcript=frames)
+    transcript = {"exit_code": exit_code, "frames": frames}
+
+    stage1_obs = dict(cast("dict[str, object]", copy.deepcopy(oracle["stage1"])))
+    stage1_obs["diagnostics"] = []
+    stage1_obs["goto_definition_cursor_1based"] = [5, 18]
+
+    stage2_obs = dict(cast("dict[str, object]", copy.deepcopy(oracle["stage2"])))
+    stage2_obs["diagnostics"] = []
+
+    stage3_obs = dict(cast("dict[str, object]", copy.deepcopy(oracle["stage3"])))
+    stage3_obs["diagnostics"] = []
+
+    oracle4 = cast("dict[str, object]", oracle["stage4"])
+    stage4_obs: dict[str, object] = {
+        "diagnostics": [copy.deepcopy(oracle4["diagnostic"])],
+        "broken_hover": oracle4["broken_hover"],
+        "broken_definition": oracle4["broken_definition"],
+        "broken_references": copy.deepcopy(oracle4["broken_references"]),
+        "broken_document_symbols": copy.deepcopy(oracle4["broken_document_symbols"]),
+        "broken_inlay_hints": copy.deepcopy(oracle4["broken_inlay_hints"]),
+        "broken_formatting": copy.deepcopy(oracle4["broken_formatting"]),
+        "broken_semantic_tokens": copy.deepcopy(oracle4["broken_semantic_tokens"]),
+    }
+
+    oracle5 = cast("dict[str, object]", oracle["stage5"])
+    stage5_obs: dict[str, object] = {"diagnostics": [copy.deepcopy(oracle5["diagnostic"])]}
+
+    stage6_obs = dict(cast("dict[str, object]", copy.deepcopy(oracle["stage6"])))
+    stage6_obs["diagnostics"] = []
+
+    observation: dict[str, object] = {
+        "client": "synthetic",
+        "uri": _URI,
+        "offset_encoding": "utf-16",
+        "server_capabilities": copy.deepcopy(oracle["capabilities"]),
+        "stage1": stage1_obs,
+        "stage2": stage2_obs,
+        "stage3": stage3_obs,
+        "stage4": stage4_obs,
+        "stage5": stage5_obs,
+        "stage6": stage6_obs,
+    }
+    return oracle, observation, transcript
+
+
+def _scenario_oracle_and_observation_controls() -> None:
+    oracle, observation, _ = _synthetic_session(incremental=True)
+    lsp_clients.verify_client_observation(observation, oracle)
+
+    for mutator, label in (
+        (lambda obs: obs.update(offset_encoding="utf-8"), "wrong offset_encoding"),
+        (
+            lambda obs: cast("dict[str, object]", obs["server_capabilities"]).update(
+                completionProvider=True
+            ),
+            "advertised completionProvider",
+        ),
+        (
+            lambda obs: cast("dict[str, object]", obs["stage1"]).update(
+                goto_definition_cursor_1based=[5, 19]
+            ),
+            "wrong :LspGotoDefinition cursor",
+        ),
+        (
+            lambda obs: cast("dict[str, object]", obs["stage2"]).update(
+                formatting_edits_idempotent=[{"newText": "x"}]
+            ),
+            "non-idempotent second formatting",
+        ),
+        (
+            lambda obs: cast("dict[str, object]", obs["stage4"]).update(
+                broken_hover={"contents": "stale"}
+            ),
+            "stale hover on broken buffer",
+        ),
+        (
+            lambda obs: cast("dict[str, object]", obs["stage4"]).update(diagnostics=[]),
+            "missing type diagnostic in stage4",
+        ),
+        (
+            lambda obs: cast("dict[str, object]", obs["stage5"]).update(diagnostics=[]),
+            "missing unsupported diagnostic in stage5",
+        ),
+        (
+            lambda obs: cast("dict[str, object]", obs["stage6"]).update(
+                recovered_hover_square=None
+            ),
+            "missing recovered hover in stage6",
+        ),
+    ):
+        tampered = copy.deepcopy(observation)
+        mutator(tampered)
+        _refuses(
+            lambda t=tampered: lsp_clients.verify_client_observation(t, oracle),
+            label,
+        )
+
+
+def _wire_transcript_replay_and_controls() -> None:
+    _, _, inc_transcript = _synthetic_session(incremental=True)
+    inc_summary = lsp_clients.verify_wire_transcript(inc_transcript, require_ranged_change=True)
+    ensure(
+        inc_summary["ranged_did_change_count"] == 2
+        and inc_summary["same_line_unicode_ranged_change"] is True,
+        f"unexpected incremental transcript summary: {inc_summary!r}",
+    )
+
+    _, _, full_transcript = _synthetic_session(incremental=False)
+    full_summary = lsp_clients.verify_wire_transcript(full_transcript, require_ranged_change=False)
+    ensure(
+        full_summary["ranged_did_change_count"] == 0,
+        f"unexpected full-sync transcript summary: {full_summary!r}",
+    )
+    _refuses(
+        lambda: lsp_clients.verify_wire_transcript(full_transcript, require_ranged_change=True),
+        "full-sync transcript when ranged changes are required",
+    )
+
+    bad_exit = copy.deepcopy(inc_transcript)
+    bad_exit["exit_code"] = 1
+    _refuses(
+        lambda: lsp_clients.verify_wire_transcript(bad_exit, require_ranged_change=True),
+        "non-zero exit_code in transcript",
+    )
+
+    bad_unqualified = copy.deepcopy(inc_transcript)
+    for raw_frame in cast("list[dict[str, object]]", bad_unqualified["frames"]):
+        msg = cast("dict[str, object]", raw_frame["message"])
+        if msg.get("method") == "textDocument/publishDiagnostics":
+            params = cast("dict[str, object]", msg["params"])
+            diags = cast("list[dict[str, object]]", params["diagnostics"])
+            if diags:
+                cast("dict[str, object]", diags[0]["data"])["unqualified"] = False
+                break
+    _refuses(
+        lambda: lsp_clients.verify_wire_transcript(bad_unqualified, require_ranged_change=True),
+        "diagnostic publication without unqualified provenance",
+    )
+
+
+def _live_two_client_qualification() -> None:
+    with redirect_stdout(io.StringIO()):
+        report = lsp_clients.qualify_clients()
+    ensure(report.get("status") == "passed", f"live qualification failed: {report!r}")
+
+
+def cases() -> list[Case]:
+    return [
+        Case("archive-and-license-authentication", _archive_and_license_authentication),
+        Case("wire-transcript-recording-and-cli", _wire_transcript_recording_and_cli),
+        Case("scenario-oracle-and-observation-controls", _scenario_oracle_and_observation_controls),
+        Case("wire-transcript-replay-and-controls", _wire_transcript_replay_and_controls),
+        Case("live-two-client-qualification", _live_two_client_qualification, slow=True),
+    ]

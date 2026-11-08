@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Untrusted host LSP adapter for the pure Vela diagnostic producer."""
 
+import hashlib
 import subprocess
 import sys
 from collections.abc import Callable
@@ -367,15 +368,17 @@ class Server:
             return []
 
 
-def serve(input_stream: BinaryIO, output_stream: BinaryIO) -> int:
+def serve(input_stream: BinaryIO, output_stream: BinaryIO,
+          *, transcript: list[dict[str, object]] | None = None) -> int:
     server = Server()
     try:
         while server.exit_code is None:
             raw = read_frame(input_stream)
             if raw is None:
                 return 1
+            decoded: dict[str, object] | None = None
             try:
-                message = decode_message(raw)
+                decoded = decode_message(raw)
             except FrameError:
                 raise
             except MessageError:
@@ -383,8 +386,20 @@ def serve(input_stream: BinaryIO, output_stream: BinaryIO) -> int:
             except (ValueError, UnicodeError):
                 replies = [_error(None, -32700, "Parse error")]
             else:
-                replies = server.handle(message)
-            output_stream.writelines(encode_message(reply) for reply in replies)
+                replies = server.handle(decoded)
+            if transcript is not None:
+                transcript.append({"index": len(transcript), "direction": "client_to_server",
+                                   "body_bytes": len(raw),
+                                   "body_sha256": hashlib.sha256(raw).hexdigest(),
+                                   "message": decoded})
+            for reply in replies:
+                encoded = encode_message(reply)
+                if transcript is not None:
+                    transcript.append({"index": len(transcript), "direction": "server_to_client",
+                                       "frame_bytes": len(encoded),
+                                       "frame_sha256": hashlib.sha256(encoded).hexdigest(),
+                                       "message": reply})
+                output_stream.write(encoded)
             output_stream.flush()
     except (FrameError, OSError, ValueError) as error:
         print(f"vela-lsp: session closed: {str(error)[:256]}", file=sys.stderr)
