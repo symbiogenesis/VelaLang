@@ -57,7 +57,6 @@ def _refuses(source: bytes | str, kind: str, fragment: str = "") -> VelaError:
 
 
 def _oracle() -> None:
-    # Chosen independently of the emitter by the separate contract reviewer.
     # Cube is left associated; Choose has separate branch locals and a nested exit.
     expected = (_header(_ORACLE) + "Module Vela_Oracle.\n\n"
                 f"Definition f_Cube (v_x : {_NAT}) : {_NAT} :=\n"

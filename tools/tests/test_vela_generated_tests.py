@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Independent coordinate/overlay/formatter oracle and seeded-fault controls for Q25x."""
+"""Independent coordinate, overlay, and formatter oracle and seeded-fault controls."""
 
 import json
 from contextlib import redirect_stderr, redirect_stdout

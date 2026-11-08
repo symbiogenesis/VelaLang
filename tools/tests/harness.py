@@ -1,13 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The vocabulary every test module shares.
+"""Shared test helpers and fixture builders.
 
-A test module under `tools/tests/` is one subject: it exports `cases()` returning
-the checks it makes, and each check decides by raising. `ensure` is the one
-assertion helper, a raise rather than an `assert`, because `python -O` deletes
-asserts and a test that -O empties is a test that lies. `sandbox_tree` is the
-fixture builder for anything that needs a corpus-shaped checkout: mutating-path
-tests (`--fix`, `--bless`, ledger and manifest writes) run there, never against
-the live tree.
+Each module under `tools/tests/` exports `cases()` returning `Case` objects that
+signal failure by raising. `ensure` raises `AssertionError` explicitly so checks
+remain active under `python -O`. `sandbox_tree` builds a temporary git-tracked
+repository for tests that mutate files or git state.
 """
 
 import os
@@ -22,7 +19,6 @@ from functools import cache
 from pathlib import Path
 from typing import Literal
 
-# Where the real tools live, for a test that runs one as a subprocess.
 TOOLS = Path(__file__).resolve().parents[1]
 
 type Lane = Literal["any", "host", "guest", "toolchain"]
@@ -30,13 +26,10 @@ type Lane = Literal["any", "host", "guest", "toolchain"]
 
 @dataclass(frozen=True)
 class Case:
-    """One check: `fn` returns None on pass and raises, with a message, on failure.
+    """A single test case (`fn` returns `None` on pass and raises on failure).
 
-    `slow` cases run only under `--slow`; `lane` is "any", "host", "guest", or
-    "toolchain". The runner decides "host" and "guest" by platform, so one module can
-    carry both lanes' cases; "toolchain" is the guest with the Sail switch standing,
-    which a Linux runner that never provisioned is not, so a case that drives the
-    toolchain is skipped there rather than failing on a precondition about the machine.
+    `slow` cases run only under `--slow`. `lane` is `"any"`, `"host"`, `"guest"`, or
+    `"toolchain"` (guest with the Sail opam switch provisioned).
     """
 
     name: str
@@ -46,20 +39,13 @@ class Case:
 
 
 def ensure(cond: bool, msg: str) -> None:
-    """The assertion that survives -O: raise, never assert."""
+    """Raise `AssertionError(msg)` if `cond` is false, even under `python -O`."""
     if not cond:
         raise AssertionError(msg)
 
 
 def with_env(name: str, value: str | None, fn: Callable[[], None]) -> None:
-    """Run `fn` with one environment override in place, restoring whatever stood.
-
-    The hook the tools' own call-time overrides are written for: `toolchain.env` reads each
-    of its `VOS_*` settings where it uses them rather than at import, so a case can
-    name the build root, the lane or the administrative directory a run is to answer
-    about. Shared here because three modules want it, and the restore is what keeps a
-    case that sets one from deciding the next case's answer.
-    """
+    """Run `fn` with environment variable `name` set to `value` (or unset if `None`), then restore it."""
     was = os.environ.get(name)
     if value is None:
         os.environ.pop(name, None)
@@ -76,15 +62,7 @@ def with_env(name: str, value: str | None, fn: Callable[[], None]) -> None:
 
 @contextmanager
 def sandbox_tree(files: dict[str, str]) -> Generator[Path]:
-    """A throwaway git-tracked tree holding exactly `files` (relative path -> text).
-
-    Contents are written byte-for-byte (UTF-8, no newline translation), then
-    `git init` + `git add -A` so a tool whose corpus is the index sees every file.
-    The init is `git_skeleton`'s copy of what `git init` writes, unless `files` itself
-    reaches into `.git`, where git's own init decides what such a file meets.
-    The tree lives in the system tempdir and vanishes with the context; nothing a
-    test does here can reach the real checkout.
-    """
+    """Yield a temporary git-tracked directory populated with `files` (relative path -> UTF-8 text)."""
     with tempfile.TemporaryDirectory(prefix="vela-test-") as td:
         root = Path(td).resolve()
         for rel, text in files.items():
@@ -106,27 +84,17 @@ def sandbox_tree(files: dict[str, str]) -> Generator[Path]:
         yield root
 
 
-# A fresh repository's administrative directory: every directory in it, and every file
-# with its bytes and permission bits, each by its path relative to `.git`.
+# Cached .git directory structure: (relative directory paths, (relative file path, bytes, mode)).
 type Skeleton = tuple[tuple[str, ...], tuple[tuple[str, bytes, int], ...]]
 
 
 @cache
 def git_skeleton() -> Skeleton:
-    """What `git init` writes into an empty directory under the system tempdir, read
-    once per process.
-
-    A sandbox writes this rather than starting `git init` itself, because starting the
-    process is most of what an init costs, on Windows above all. The copy is what init
-    would write there: the template is git's, and the tempdir's filesystem decides the
-    probes `config` records. Git for Windows also marks the directory hidden, which no
-    reader here consults.
-    """
+    """Return the cached `.git` skeleton produced by `git init` in a temporary directory."""
     with tempfile.TemporaryDirectory(prefix="vela-test-init-") as td:
         admin = Path(td).resolve() / ".git"
         _git(admin.parent, "init", "-q")
-        # An init sent elsewhere, as by a GIT_DIR in the environment, leaves nothing here
-        # to walk; caching that would hand every later sandbox an empty `.git`.
+        # Reject an init redirected by GIT_DIR so we never cache an empty .git directory.
         if not (admin / "HEAD").is_file():
             raise RuntimeError(f"git init wrote no repository at {admin}")
         directories: list[str] = []
@@ -142,7 +110,7 @@ def git_skeleton() -> Skeleton:
 
 
 def cli_argv(root: Path, module: str, *args: str) -> list[str]:
-    """Run a fixture's CLI in the settled interpreter without provisioning its inputs."""
+    """Build a `sys.executable -c` command line that runs `module.main(args)` from `root / "tools"`."""
     return [sys.executable, "-c",
             "import sys; from importlib import import_module; "
             "sys.path.insert(0, sys.argv[1]); "

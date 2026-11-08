@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Behavioral tests for the Q25w / Q25ag Span<byte> carrier and vela-first-slice lowering."""
+"""Behavioral tests for the Span<byte> carrier and vela-first-slice lowering."""
 
 import hashlib
 import tempfile

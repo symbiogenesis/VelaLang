@@ -21,12 +21,9 @@ from tests.harness import Case, ensure
 from toolchain.cli import typecheck
 from toolchain.report import Reporter
 
-# Each case writes its fixtures only under directories it creates and patches only
-# inside a `with`, so the cases share no state, and a sharded run spreads them over
-# every shard (toolchain/cli/test.py).
+# Cases use isolated temporary directories and scoped patches, so they can run in any shard.
 INDEPENDENT_CASES = True
 
-# The fake executable's version banner, independent of installed checkers.
 _STUB_NAME = "vostestfakechk"
 _STUB_PIN = "9.9.9"
 
@@ -99,11 +96,8 @@ def _summarize_truncation() -> None:
 
 
 def _summarize_counts_findings_not_lines() -> None:
-    # The verdict is how many findings there are, and the lines are never that number:
-    # a rule header sits above each sample, so under the cap they run long, and a
-    # single tail line stands in for everything the cap held back, so over it they run
-    # short. Both directions are pinned because the first is what a clean tree meeting
-    # a newly escalated rule sees, and the second is what a large regression sees.
+    # `rep.findings` counts findings rather than output lines: rule headers add lines
+    # below `PER_RULE`, and truncation collapses excess findings into one tail line.
     rep = Reporter()
     findings = [("A100", "a-one"), ("A100", "a-two"), ("B900", "b-one")]
     typecheck._summarize(rep, "stub", "finding(s):", findings, "clean")
@@ -141,8 +135,7 @@ def _environment_tool_resolution() -> None:
 
 
 def _stub(directory: Path, name: str, body: str) -> Path:
-    # A .bat file is the one stub shape CreateProcess runs from a bare argv on this
-    # lane, which is why the cases that need one are marked host.
+    # Windows `CreateProcess` runs `.bat` stubs directly from `argv`.
     path = directory / f"{name}.bat"
     path.write_text(body, encoding="utf-8", newline="")
     return path
@@ -179,9 +172,7 @@ def _stub_pass(detail: str = "") -> typecheck.Pass:
 
 def _run_stub_checker(body: str, pin: str,
                       passes: list[typecheck.Pass] | None = None) -> Reporter:
-    """One `_run_checker` call routed at a stub, one pass unless `passes` says
-    otherwise, so the pin gate, each run, the parse and the verdict are all the real
-    code's."""
+    """Run `typecheck._run_checker` against a `.bat` stub executable."""
     rep = Reporter()
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         directory = Path(td)
@@ -194,9 +185,7 @@ def _run_stub_checker(body: str, pin: str,
 
 
 def _crash_reported_beside_findings() -> None:
-    # The wave-1 contract: exit 5 with diagnostics printed first is a crash whatever
-    # parsed, so the checker error is reported AND the partial findings stand beside
-    # it rather than reading as the whole verdict.
+    # Exit codes outside (0, 1) report a checker crash alongside any parsed diagnostics.
     rep = _run_stub_checker(_checker_stub_body(5, finding=True), _STUB_PIN)
     joined = "\n".join(rep.out)
     ensure(f"FAIL {_STUB_NAME}: 1 checker error(s):" in joined
@@ -257,9 +246,7 @@ def _pin_gate_refusals() -> None:
 
 
 def _passes_share_one_pin_probe() -> None:
-    # Each pass is its own verdict under the checker's one rule, in the order given,
-    # and a crash names the pass it came from. The pin is one fact about one
-    # executable: probed once, so a drifted pin is one finding and no pass runs.
+    # Multiple passes share one version check and report separate verdicts in order.
     two = [_stub_pass("first"), _stub_pass("second")]
     clean = _run_stub_checker(_checker_stub_body(0, finding=False), _STUB_PIN, two)
     ensure(clean.findings == 0 and clean.out == [f"ok {_STUB_NAME}: clean first",
@@ -436,15 +423,12 @@ def _passes(checker: MagicMock) -> list[typecheck.Pass]:
 
 
 def _claims(checker: MagicMock) -> list[bool]:
-    """Whether each ty pass the patched `_run_checker` was given claims every rule at
-    error, one entry per pass."""
+    """Return whether each `ty` pass claims `"all rules at error"` in its success message."""
     return [run.ok.endswith("all rules at error") for run in _passes(checker)]
 
 
 def _ty_runs_every_platform() -> None:
-    # One ty pass per platform, linux and then win32, each naming its platform on the
-    # command line, in its verdict and in its failures, with every other argument
-    # the same; the first is the platform ty.toml holds for an editor.
+    # `_run_ty` runs one pass per platform (`linux` then `win32`) with identical non-platform flags.
     ensure(typecheck.TY_PLATFORMS == ("linux", "win32"),
            "the gate must retain its Linux and Windows platform passes")
     rep = Reporter()
@@ -484,9 +468,7 @@ def _ty_runs_every_platform() -> None:
 
 
 def _win32_pass_types_host_branches() -> None:
-    # The real ty over a module whose one error sits in a branch only win32 takes.
-    # The linux pass, which is ty.toml's platform and the whole of what one run under
-    # it would check, reports nothing; the win32 pass reports the error.
+    # The `win32` pass typechecks `sys.platform == "win32"` branches that the `linux` pass skips.
     rep = Reporter()
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         root = Path(td)
@@ -510,9 +492,7 @@ def _win32_pass_types_host_branches() -> None:
 
 
 def _ruff_checks_ignored_modules() -> None:
-    # The real ruff over a module an ignore file matches, under a ruff.toml that does
-    # not say respect-gitignore = false: ruff would skip the module and report
-    # nothing, so the gate's own flag is what keeps it in the run.
+    # `--no-respect-gitignore` keeps gitignored tracked files in the Ruff pass.
     rep = Reporter()
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         root = Path(td)
@@ -560,9 +540,7 @@ def _ty_settings_reported_beside_the_run() -> None:
 
 
 def _user_config_located() -> None:
-    # ty's user configuration directory on each platform, read from the environment
-    # ty inherits: the variable when it names a usable directory, the home directory's
-    # default otherwise, and nothing where no file is.
+    # `_user_config` checks `APPDATA` / `XDG_CONFIG_HOME` first and falls back to the home directory.
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         base, home = Path(td) / "base", Path(td) / "home"
         home.mkdir()
@@ -600,8 +578,7 @@ def _user_config_located() -> None:
 
 
 def _user_config_reported_beside_the_run() -> None:
-    # A user-level ty.toml that ty would merge is a ty finding naming its path, the
-    # checker still runs, and the run no longer claims every rule at error.
+    # A user-level `ty.toml` is reported as a finding and drops the "all rules at error" claim.
     variable = "APPDATA" if sys.platform == "win32" else "XDG_CONFIG_HOME"
     for present in (False, True):
         rep = Reporter()
@@ -635,9 +612,7 @@ def _user_config_reported_beside_the_run() -> None:
 
 
 def _pythonpath_reported_beside_the_run() -> None:
-    # A PYTHONPATH that ty would search ahead of the standard library is a ty finding
-    # naming its value, an empty one included; the checker still runs, and the run no
-    # longer claims every rule at error. Without the variable nothing is added.
+    # Any set `PYTHONPATH` (including empty) is reported as a finding and drops the full-error claim.
     for value in (None, "", "shadow"):
         rep = Reporter()
         with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
@@ -824,16 +799,7 @@ def _ruff_settings_refuse_per_file_suppressions() -> None:
 
 
 def _file_suppressions_refused() -> None:
-    # Each comment ruff reads as a file-level suppression, in any of ruff's spellings
-    # and wherever it sits, is refused unless it names only N999, and so is one after
-    # trailing code, which ruff ignores. A code with no colon before it names nothing,
-    # and ruff reads that directive as switching every rule off. Each comment of a range
-    # is refused too: both ends of a pair at module level or in a class body, a disable
-    # with no enable, which runs to the end of its block, and one spaced as ruff still
-    # reads it; and so are a file-ignore and isort's skip_file and off, a trailing
-    # skip_file among them, which ruff reads wherever it sits. A string spelling either, a
-    # spelling ruff does not read, and a suppression reaching one logical line or one line
-    # are not refused.
+    # Reject file-level and range suppressions (except `N999`), while allowing single-line suppressions.
     refused = {
         "codes.py": "# ruff: noqa: ANN001\n",
         "flake8.py": "# flake8: noqa: ANN001,ANN201\n",
@@ -898,14 +864,8 @@ def _file_suppressions_refused() -> None:
 
 
 def _ruff_ignore_reaches_one_line() -> None:
-    # The reading under which the gate admits ruff's `ignore[...]` comment, held against
-    # the pinned ruff: on a line of its own it reaches the one logical line beneath it,
-    # past blank and comment lines, a multi-line one whole, a compound statement's header
-    # but not its block unless the block shares the header's line, a decorator but not
-    # the definition beneath, and every statement a semicolon joins; inside brackets it
-    # reaches the one line of code beneath it, past blank and comment lines, including
-    # backslash and multi-line-string continuations; one ending a line reaches that same
-    # code line alone. The module's E711 findings are what ruff leaves.
+    # Verify that `ignore[...]` suppresses only the immediately following logical line
+    # (or bracketed/same-line target), leaving all other E711 sites active.
     lines = (
         "x = y = None",                          # 1
         "# ruff: ignore[E711]",                  # 2
@@ -976,14 +936,7 @@ def _ruff_ignore_reaches_one_line() -> None:
 
 
 def _suppressions_reported_beside_the_run() -> None:
-    # The real ruff under a per-file-ignores entry, a file-level directive, a range
-    # spanning the module and a file-ignore, each switching ANN off for a module with an
-    # unannotated function, under a per-file target version of py37, which switches UP006
-    # off for a module annotating with `typing.List`, and under isort's skip_file, which
-    # switches I001 off for an unsorted import block: ruff reports nothing and its log
-    # names the module as checked, so the floor alone passes, and the refusal is what
-    # fails the gate, one finding per refused key or comment; the run's verdict then
-    # claims no more than it showed. Without a suppression ruff reports each module.
+    # Suppressed lint rules pass Ruff itself, so the gate's config/comment suppression check must fail the run.
     def ruff_run(config: str, text: str) -> Reporter:
         rep = Reporter()
         with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
@@ -1049,8 +1002,7 @@ _SCAN_FAIL = ("import(s) of a module ruff.toml bans at module level outside a fu
 
 
 def _write_tools(root: Path, modules: dict[str, str], config: str | None) -> None:
-    """A tools tree under `root` holding `modules`, under a ruff.toml holding `config`,
-    or none at all."""
+    """Write `modules` (and optional `ruff.toml`) under `root / "tools"`."""
     tools = root / "tools"
     tools.mkdir()
     if config is not None:
@@ -1081,24 +1033,8 @@ def _unadmitted(site: str, test: str, names: str = "fcntl") -> str:
 
 
 def _imports_refused_outside_functions() -> None:
-    # An import of a banned module, or of a banned submodule by its parent, that runs
-    # outside a function body is refused wherever it sits: unnested at module level, in
-    # a class body at any depth, and in a module-level block such as the main guard. A
-    # name spelled with a fullwidth letter is the banned module, since Python
-    # NFKC-normalizes identifiers, though the text never spells it in ASCII. An `if`
-    # reading a `platform` other than `sys.platform`, another object's or one imported
-    # from sys and read bare, is not the check the scan admits, and neither is one
-    # reading `sys.platform` other than by comparing it with string literals: by truth
-    # value, beside a constant or another operand, beside a comparison of something
-    # other than `sys.platform` with literals by `==`, `in` or startswith, through a call
-    # other than startswith, against a name or with `in` against a string. Both branches
-    # of such an `if` are refused, each import naming the nearest such test above it.
-    #
-    # A comparison the scan reads is refused where both platforms take the branch: a
-    # tautology built from the admitted forms, a test only another platform fails, a
-    # display or a prefix both platforms match, and an empty `not in`. So is a test of a
-    # form the scan does not read beneath one that keeps both platforms, nested in its
-    # body, in its `else` or as its `elif`; each names the nearest test above it.
+    # Reject banned imports outside functions unless guarded by an admitted `sys.platform`
+    # check that excludes at least one platform.
     refused = {
         "receiver.py": "if args.platform == 'linux':\n    import fcntl\n",
         "fromsys.py": "from sys import platform\n\nif platform == 'linux':\n    import fcntl\n",
@@ -1189,9 +1125,7 @@ def _imports_refused_outside_functions() -> None:
 
 
 def _run_wires_in_the_scan() -> None:
-    # The whole run, with the index fixed and both checkers' runs replaced by no-ops,
-    # over a tree whose one module imports a banned module in a class body: the scan
-    # runs beside the checkers, and its refusal is in the run's report and its count.
+    # `typecheck.run` includes the banned-import scan alongside `ty` and `ruff`.
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         _write_tools(Path(td), {"classbody.py": "class Locks:\n    import fcntl\n"}, _BANNING)
         with patch.object(typecheck, "_tracked", return_value=frozenset({"classbody.py"})), \
@@ -1203,15 +1137,7 @@ def _run_wires_in_the_scan() -> None:
 
 
 def _imports_admitted_in_functions_and_platform_blocks() -> None:
-    # A function body runs only when called, and an if comparing sys.platform with string
-    # literals keeps each of its branches to the platforms that take it, at module level
-    # or in a class body: by == or != with one, by in or not in with a tuple, list or set
-    # of them, or through startswith with one or a tuple of them, alone, under not, or
-    # joined by and or or. Each import below is kept to linux, where fcntl is found, and
-    # stays so beneath a test of any form nested in the branch, in its body or its elif;
-    # one no platform reaches, behind another platform or an empty display, is admitted
-    # too. A name that only begins like a banned one, a banned module's parent, a relative
-    # import and a string are none of them an import of a banned module.
+    # Admit banned imports inside functions or inside `sys.platform` branches that exclude `win32`.
     admitted = {
         "platformin.py": ("import sys\n\nif sys.platform in ('linux', 'darwin'):\n"
                           "    import fcntl\n"),
@@ -1256,17 +1182,7 @@ def _missing(site: str, test: str, names: str, platform: str) -> str:
 
 
 def _imports_refused_where_the_running_platform_lacks_them() -> None:
-    # Keeping an import from one platform does not say which platform has the module, so
-    # on each lane an import the running platform reaches is refused where this
-    # interpreter cannot find its top-level module, naming the nearest test reading
-    # `sys.platform`, whose body or `else` the running platform takes, in a class body as
-    # at module level. The same import kept to the other platform is admitted, and so are
-    # one of a module the interpreter finds and one of a submodule whose package it
-    # finds, which this reading does not catch. With modules no interpreter finds, the
-    # refusal follows the running platform: each of the two refuses the import it
-    # reaches, and a platform outside them refuses neither. A name the finder refuses,
-    # raising rather than answering, is refused as one it cannot find, fail-closed, even
-    # where the interpreter has the module.
+    # Reject platform-guarded imports when the running platform takes the branch and lacks the top-level module.
     config = ('[lint.flake8-tidy-imports]\nbanned-module-level-imports = ["fcntl", "msvcrt", '
               '"asyncio.unix_events", "asyncio.windows_events", "vosnolinux", "vosnowin32"]\n')
     running = sys.platform
@@ -1312,10 +1228,7 @@ def _imports_refused_where_the_running_platform_lacks_them() -> None:
 
 
 def _imports_fail_closed() -> None:
-    # A ruff.toml the scan cannot read a non-empty list of module names from is one
-    # finding and scans nothing; a module that spells a banned name and cannot be read
-    # or parsed is a finding. A module spelling no banned name is not parsed, its syntax
-    # being ruff's E9 finding.
+    # Fail closed when `ruff.toml` lacks a valid banned-import list or when a candidate module cannot be read or parsed.
     for config, expected in ((None, "cannot be read"),
                              ("[lint\n", "cannot be read"),
                              ('[lint]\nselect = ["ANN"]\n', "to None;"),
@@ -1343,10 +1256,7 @@ def _imports_fail_closed() -> None:
 
 
 def _imports_close_what_ruff_leaves_open() -> None:
-    # The positive control. Under the committed ruff.toml, whose list the scan reads,
-    # the real ruff reports TID253 for an unnested module-level import of a banned
-    # module and nothing, neither TID253 nor PLC0415, for one in a class body, a
-    # module-level block or the main guard; the scan refuses all four.
+    # Ruff's `TID253` catches only unnested top-level imports; `_run_imports` also catches class-body, `if`, and `__main__` blocks.
     committed = Path(typecheck.__file__).resolve().parents[2] / "ruff.toml"
     banned, unread = typecheck._banned(committed)
     ensure(not unread and {"fcntl", "curses", "readline", "nt", "_winapi"} <= banned,
@@ -1377,14 +1287,8 @@ def _imports_close_what_ruff_leaves_open() -> None:
            f"the scan must refuse every import ruff leaves open: {scan.out!r}")
 
 
-# The program `_import_failures` runs in a child of the running interpreter: each module
-# the interpreter lists as its standard library, and each submodule of a package among
-# them that imports, imported in turn, then one line after `_PROBED`, a JSON object
-# naming each that fails with the module its ImportError names, where that module did not
-# load, or null where it names none, names one that loaded, as `cannot import name` does,
-# or the failure is another exception. The marker keeps the line apart from anything a
-# module prints as it imports. A `__main__` submodule runs a program, and the trees left
-# out run one or open a browser when imported.
+# Child-process script that imports every non-interactive stdlib module and reports
+# `{module: missing_target_or_none}` for failures.
 _PROBED = "vos-import-probe: "
 _IMPORT_PROBE = """\
 import importlib, json, pkgutil, sys
@@ -1412,10 +1316,7 @@ while queue:
 
 
 def _import_failures(program: str = _IMPORT_PROBE) -> dict[str, str | None]:
-    """Each standard-library module or submodule the running interpreter cannot import,
-    with the module its ImportError names, where that module did not load, or `None`
-    where it names none, names one that loaded, or the failure is another exception, as
-    `program`, the probe unless a case gives another, reports them."""
+    """Run `program` in a clean subprocess and return its `{failed_module: missing_dependency}` map."""
     done = subprocess.run([sys.executable, "-B", "-I", "-c", program],
                           stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
                           errors="replace", check=False, timeout=typecheck.TIMEOUT)
@@ -1427,10 +1328,7 @@ def _import_failures(program: str = _IMPORT_PROBE) -> dict[str, str | None]:
 
 
 def _import_probe_names_modules_that_did_not_load() -> None:
-    # The probe over modules of its own in place of the standard library: one failing for
-    # want of a module that is nowhere names it; one failing to import a name from a
-    # module that loaded, as `cannot import name` does, and one raising another exception
-    # name nothing; and one that imports is not recorded.
+    # Record the missing module name only when an `ImportError` names a module that did not load.
     modules = {"vosprobeloaded": "VALUE = 1\n", "vosprobeabsent": "import vosprobenowhere\n",
                "vosprobename": "from vosprobeloaded import MISSING\n",
                "vosprobeerror": "raise RuntimeError('refused')\n"}
@@ -1446,8 +1344,7 @@ def _import_probe_names_modules_that_did_not_load() -> None:
 
 
 def _ty_unresolved(modules: list[str]) -> set[str]:
-    """Each of `modules` the gate's own ty run, under the ty.toml it admits, cannot
-    resolve under one of its platforms or more, read from the findings each run gives."""
+    """Return the subset of `modules` that `ty` reports as `import-not-found` on any platform."""
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         root = Path(td)
         _write_tools(root, {"probe.py": "".join(f"import {name}\n" for name in modules),
@@ -1467,9 +1364,7 @@ def _ty_unresolved(modules: list[str]) -> set[str]:
     return {modules[int(text.partition(" ")[0].rsplit(":", 2)[1]) - 1] for _, text in found}
 
 
-# The standard-library packages no platform lacks that an installer may leave out or a
-# distribution ships apart from the rest, by top-level name, each with where. An
-# interpreter short of one is short of its build's standard library, not of a platform's.
+# Cross-platform stdlib packages that some OS packages or installers ship separately.
 _TCL_TK = ("python.org's Windows installer makes Tcl/Tk optional, and Debian and Ubuntu "
            "ship tkinter in the package python3-tk installs")
 _SEPARABLE = {"_tkinter": _TCL_TK, "tkinter": _TCL_TK,
@@ -1477,21 +1372,9 @@ _SEPARABLE = {"_tkinter": _TCL_TK, "tkinter": _TCL_TK,
 
 
 def _banned_list_covers_what_cannot_be_imported() -> None:
-    # The list's claim, held on this lane: each standard-library module the running
-    # interpreter cannot import, that the gate's ty resolves under both of its platforms,
-    # is covered by a listed name, itself or a parent. A module whose import fails for want
-    # of one that did not load and that configure records as built, missing or disabled,
-    # any state but n/a, is the build's rather than the platform's: one a build left out
-    # for want of an optional library, or one it built whose shared library is absent at
-    # run time. A failure naming a module that loaded, as `cannot import name` does, is not
-    # read as the build's. The Windows lane holds the half Windows lacks and the Linux lane
-    # the other. The control is that the search finds the best-known module this lane's
-    # platform lacks, so an empty search cannot pass for a clean one. The case decides the
-    # list only on an interpreter carrying its build's whole standard library, as the
-    # interpreters Host CI's setup-python installs do: a Windows build records no state,
-    # and a distribution ships some pure-Python packages apart, so an interpreter short of
-    # a package `_SEPARABLE` names fails the case as short of its library rather than
-    # asked to ban it.
+    # Every stdlib module that fails to import on this platform (excluding optional C
+    # extensions) but resolves under `ty` on both platforms must be covered by
+    # `banned-module-level-imports` in `ruff.toml`.
     def omitted(missing: str | None) -> bool:
         return missing is not None and sysconfig.get_config_var(
             f"MODULE_{missing.upper()}_STATE") not in {None, "n/a"}
@@ -1529,9 +1412,7 @@ def _git(root: Path, *args: str) -> None:
 
 
 def _tracked_reads_the_index() -> None:
-    # The index's Python sources and stubs under tools/, relative to it: not another
-    # file there, not a module elsewhere, not an untracked module, and not a tracked
-    # one the working tree has deleted.
+    # `_tracked` returns git-indexed `.py` and `.pyi` files under `tools/` that still exist on disk.
     with tempfile.TemporaryDirectory(prefix="vos-test-") as td:
         root = Path(td)
         _git(root, "init", "--quiet")
@@ -1548,10 +1429,7 @@ def _tracked_reads_the_index() -> None:
 
 
 def _unreached(out: list[str]) -> list[str]:
-    """Why a report of the gate's ty and ruff runs does not show every run reaching
-    every tracked module: a line saying a run left a module unchecked, crashed, or never
-    ran for want of the pinned checker, and each run giving no verdict line, since a
-    run that never happened reports no module unchecked."""
+    """Return any unchecked-module errors, checker crashes, pin failures, or missing verdicts in `out`."""
     refusals = ("did not check", "checker error(s)", "not installed",
                 "other than the pinned one")
     def ty_verdict(line: str, platform: str) -> bool:
@@ -1580,11 +1458,8 @@ def _live_runs(root: Path, tracked: frozenset[str]) -> Reporter:
 
 
 def _live_tree_reaches_every_tracked_module() -> None:
-    # This checkout: the index's modules include this file and the gate's, and each of
-    # the gate's ty runs and its ruff run gives a verdict and reaches every one of them.
-    # The controls run the gate with its checker missing and with another version
-    # installed: neither run happens, so neither reports a module unchecked, and each is
-    # refused for the missing verdict and the pin gate's own line.
+    # Verify that `ty` and `ruff` check every tracked module in the live repository,
+    # and fail closed when a checker is missing or has a version mismatch.
     root = Path(typecheck.__file__).resolve().parents[3]
     tracked = typecheck._tracked(root)
     ensure({"toolchain/cli/typecheck.py", "tests/test_typecheck.py"} <= tracked,

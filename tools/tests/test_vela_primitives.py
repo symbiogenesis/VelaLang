@@ -70,7 +70,7 @@ _WIDTHS = {width.name: width for width in (
     _Width("u8", 0, 8, False), _Width("u16", 1, 16, False), _Width("u32", 2, 32, False),
     _Width("u64", 3, 64, False), _Width("usize", 4, 64, False), _Width("i8", 5, 8, True),
     _Width("i16", 6, 16, True), _Width("i32", 7, 32, True), _Width("i64", 8, 64, True))}
-# The boundary classes the brief names: u8, i8, u16, i32, u64, i64 and usize.
+# Sampled boundary widths covering signed, unsigned, and pointer-sized integers.
 _SAMPLED = ("u8", "i8", "u16", "i32", "u64", "i64", "usize")
 _USIZE = _WIDTHS["usize"]
 _SCALAR_MAX = 0x10FFFF
