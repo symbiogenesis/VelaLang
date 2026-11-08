@@ -65,10 +65,11 @@ The supported increment includes:
   `where` precontracts and multiple `ensures` clauses on `theorem` and `lemma`
   declarations. Indexed vectors and finite indices provide a
   concrete dependent collection boundary, including length preservation and safe
-  lookup. Regular and multi-quote raw string literals (`"""..."""`) elaborate to
+  lookup.
+- Regular and multi-quote raw string literals (`"""..."""`) elaborating to
   UTF-8 byte vectors `Vec<Nat, n>` (bounded by 256 bytes) with `ByteLength`
   and `At` lookup, and `TextBuilder<capacity>` / `EmptyBuilder` /
-  `Format.Write(ref builder, $"...")` / `Fits` / `Written` model allocation-free
+  `Format.Write(ref builder, $"...")` / `Fits` / `Written` modeling allocation-free
   checked formatting with AST-checked hole expressions (`Nat`, `bool`, `char`
   when proved ASCII `<= '\u{7F}'`, `Vec<Nat, n>`,
   and `:x2`/`:x4`/`:x8`/`:d`/`:b` specifiers), structural target-buffer aliasing

@@ -42,9 +42,9 @@ constructor patterns, `if (...) ... else ...` expressions, `let ... else` /
 answers.
 All examples share one selector and one source buffer. Debounced source checks
 automatically update diagnostics and editor-service availability. Dependent source
-disables pure-only LSP, formatting, lint and binding preview services explicitly;
+disables pure-only LSP, formatting and pure-lint services explicitly;
 its diagnostics come from mathematical compilation, including the
-[generic type naming and pattern lints](authoring-tools.md#generic-type-parameter-naming).
+[generic type parameter naming lint](authoring-tools.md#generic-type-parameter-naming).
 Returning to supported pure source restores those services automatically. Edits
 clear old diagnostics and results, including in plain-text fallback; late analysis
 must never restore services or output for an obsolete source or connection.
@@ -199,10 +199,10 @@ bindings, documentation and numeric separators. Neither examples nor inspector
 controls imply wider-language implementation.
 
 Acceptance adds independent HTTP/worker controls for exact lint findings,
-source-preserving and rechecked candidates, no-op previews, invalid source,
+invalid source,
 Unicode/newline coordinates, malformed worker results, size/time limits and
-recovery. Exercise the browser's authoring check, stale-preview refusal, explicit
-apply/undo, outline/documentation/reference navigation, display toggles and
+recovery. Exercise the browser's authoring check,
+outline/documentation/reference navigation, display toggles and
 downloads using available local browser infrastructure. If that infrastructure
 is unavailable, record the missing browser verification explicitly and retain
 focused API/LSP checks and code review as their narrower evidence. Run the

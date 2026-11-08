@@ -29,7 +29,7 @@ it is a setup example, with two-client qualification still outstanding.
 ```lua
 vim.filetype.add({ extension = { vela = 'vela' } })
 vim.lsp.config['vela'] = {
-  cmd = { 'python', 'C:/src/VerifiedOS/tools/run.py', 'vela-lsp' },
+  cmd = { 'python', 'C:/src/VelaLang/tools/run.py', 'vela-lsp' },
   filetypes = { 'vela' },
   root_markers = { '.git' },
 }

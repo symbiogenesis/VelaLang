@@ -18,7 +18,7 @@
 | [tooling/pure-prototype.md](tooling/pure-prototype.md) | Pure Vela-to-Gallina translation prototype, extended expressions, and natural division/remainder |
 | [tooling/parser.md](tooling/parser.md) | Menhir development parser, checked-parser migration contract, and generated syntax campaigns |
 | [tooling/elaboration-prototype.md](tooling/elaboration-prototype.md) | Generic dependent mathematics, first-class proofs, and native Rocq kernel replay |
-| [tooling/authoring-tools.md](tooling/authoring-tools.md) | Canonical formatter, advisory lints (`VELA101`–`VELA105`), numeric separators, and binding previews |
+| [tooling/authoring-tools.md](tooling/authoring-tools.md) | Canonical formatter, advisory lints (`VELA100`–`VELA103`, `VELA105`), numeric separators, and assist-don't-coerce previews |
 | [tooling/documentation-qualification.md](tooling/documentation-qualification.md) | Declaration-documentation attachment and hover qualification |
 | [tooling/lsp-prototype.md](tooling/lsp-prototype.md) | Language Server Protocol lifecycle, diagnostics, navigation, inlay hints, formatting, and semantic tokens |
 | [tooling/playground.md](tooling/playground.md) | Browser playground architecture, local loopback transport, and GitHub Pages in-browser runtime |

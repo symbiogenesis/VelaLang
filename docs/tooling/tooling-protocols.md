@@ -147,8 +147,8 @@ and resource-bearing outcomes, and propagation suggestions retain cleanup and
 restoration obligations. Show inferred types on demand without manufacturing
 authority or hiding an unresolved proof. Advertise these semantic features only
 when their actual producer supports them; parser acceptance supplies no resource
-facts. The [pure binding preview](authoring-tools.md#lint-policy) remains an
-explicit command and grants no extra LSP capability.
+facts, and the [lint and assist helpers](authoring-tools.md#lint-policy) grant
+no extra LSP capability.
 
 Semantic highlighting uses LSP semantic tokens from compiler-resolved facts,
 with a declared token legend and qualified full/range/delta capabilities. Test

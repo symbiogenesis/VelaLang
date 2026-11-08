@@ -46,7 +46,7 @@ never ignored.
 The prototype accepts UTF-8 source with ASCII identifiers and `//` line comments.
 Identifiers match `[A-Za-z_][A-Za-z0-9_]*`, excluding grammar and reserved extension
 keywords; the latter produce unsupported-feature diagnostics. Decimal
-literals match `[0-9](../?:_?[0-9])*`; underscores separate digits, while leading
+literals match `[0-9](?:_?[0-9])*`; underscores separate digits, while leading
 zeros are permitted. Separators and leading zeros normalize on emission; their
 authored spelling and source locations remain intact in syntax. The
 [separator contract](authoring-tools.md#numeric-separators) owns the digit bounds
@@ -261,10 +261,10 @@ StyleCop-inspired style, documentation, lint policy and publication checks.
 source-preserving default, or `--format write` to opt into canonical formatting.
 `--no-lint` disables optional lints; repeatable `--allow ID` and
 `--deny ID` control individual findings without disabling language checks.
-`vela lint --preview-bindings SOURCE` prints a rechecked candidate containing
-only the suggested `let` insertions, preserving original comments and newlines
-and leaving the input file unchanged. Its [source-bound preview contract](authoring-tools.md#lint-policy)
-keeps annotation checking, allow/deny policy and semantic comparison explicit.
+`VELA104` and `vela lint --preview-bindings` are permanently retired (`Q25ah`)
+now that local declarations require an explicit `let` or `var` keyword; the
+library `preview_bindings` helper retains its [source-bound migration contract](authoring-tools.md#lint-policy)
+for legacy inputs without exposing a CLI flag or reusing the rule ID.
 
 `python tools/run.py vela emit SOURCE` uses the same default authoring passes and
 writes Gallina to standard output; `--output FILE` publishes it through the shared

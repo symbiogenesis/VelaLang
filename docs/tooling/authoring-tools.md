@@ -8,12 +8,12 @@ checking and emission read-only with respect to source; formatting writes requir
 an explicit command or option. The formatter and original lints cover
 the pure subset, following the
 [source-preserving command policy](#compiler-commands-and-publication).
-Q25ae's [generic type naming and pattern lints](#generic-type-parameter-naming) also cover the
+Q25ae's [generic type parameter naming lint](#generic-type-parameter-naming) also covers the
 mathematical development fragment. Wider formatting
 and semantic lints consume qualified parser/frontend producers through
 [compiler services](tooling-protocols.md#compiler-inspection-api).
 Q25z owns the [familiar authoring migration](../language/surface-grammar.md#familiar-authoring-migration),
-including typed pure locals and their binding preview. Wider editor support and
+including mandatory `let`/`var` local keywords and typed pure locals. Wider editor support and
 formatting retain their qualified frontend prerequisites.
 
 ## Common style
@@ -188,7 +188,7 @@ and mutability guidance does not rename a symbol or change the formatter's token
 
 Whenever Vela refuses a C# shortcut to preserve soundness, the compiler already
 has the semantic facts needed to offer a verified, source-preserving code action
-or diagnostic suggestion extending the `vela lint --preview-bindings` architecture:
+or diagnostic suggestion using the compiler's source-bound preview architecture:
 
 | C# / novice habit | Why Vela refuses it | Friendliness bridge (diagnostic + checked edit) |
 | --- | --- | --- |
