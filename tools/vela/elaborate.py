@@ -1814,7 +1814,9 @@ def _checked_elaboration(
         for declaration in elaborator.nodes(root["declarations"]):
             elaborator.declaration(declaration)
         generated_module = "Vela_" + module.replace(".", "_")
+        # REUSE-IgnoreStart
         gallina = ("(* SPDX-License-Identifier: Apache-2.0 *)\n"
+                   # REUSE-IgnoreEnd
                    "(* Vela mathematical elaboration: unqualified kernel proposal. "
                    f"Source SHA256: {hashlib.sha256(source).hexdigest()} *)\n"
                    f"Module {generated_module}.\n\n" + _PRELUDE + "\n"

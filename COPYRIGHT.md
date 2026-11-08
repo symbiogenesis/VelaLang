@@ -2,107 +2,38 @@
 
 Copyright 2026 Edward Miller.
 
-*Three licenses govern this repository, one per kind of content, and every original tracked path falls under exactly one of them. Where this document and a license file disagree, the license file wins. [THIRD-PARTY.md](THIRD-PARTY.md) carries everything somebody else wrote and the terms it arrives under.*
+*Two licenses govern this repository, one per kind of content, and every original tracked path falls under one of them, as declared in [REUSE.toml](REUSE.toml). Where this document and a license file disagree, the license file wins. [THIRD-PARTY.md](THIRD-PARTY.md) carries everything somebody else wrote and the terms it arrives under.*
 
 ## The map
 
 | Path | License | Ground |
 | --- | --- | --- |
-| Every original `.md` file outside `model/`, including [docs/](docs/) and [README.md](README.md), except the license texts named below | `CC-BY-4.0`, in [LICENSE-docs.md](LICENSE-docs.md) | The prose is a specification meant to be cited, quoted, and inherited, and a document license says what a software license only gestures at. It is the license the RISC-V specifications themselves carry. |
-| Every non-Markdown original file outside `model/`, including [tools/](tools/), [proofs/](proofs/) and [rtl/](rtl/) | `Apache-2.0`, in [LICENSE.md](LICENSE.md) | The patent grant is the reason rather than a side effect: this repository specifies a bespoke instruction set, a bespoke capability format, and bespoke block instructions, and an implementer of any of them is owed an explicit grant. |
-| [model/](model/) | `BSD-2-Clause`, in [model/LICENCE](model/LICENCE) | The curated tree is a derivative of the upstream Sail model and stays on upstream's terms, so a repair found here can go back upstream without a license negotiation. Modifications made here are offered on the same terms. |
-| `model/dependencies/` | each component's own, per [THIRD-PARTY.md](THIRD-PARTY.md) | Some components are vendored verbatim with their license files beside them. The rest are `FetchContent` declarations pinned to a content hash: the license file is tracked, the code is not, and it arrives from its own upstream when somebody configures a build. |
-| `upstream/` | not redistributed here | Submodule gitlinks: a URL and a commit hash, never the code. What a clone fetches from them answers to its own repository. |
-| `tools/sail-lsp/dependency-refresh.patch` | `BSD-2-Clause`, in [SAIL-LICENSE.md](tools/sail-lsp/SAIL-LICENSE.md) | Patch to the selected upstream Sail server. Its context retains upstream terms and authored modifications are offered on those same terms. |
-| [tools/sail-lsp/SAIL-LICENSE.md](tools/sail-lsp/SAIL-LICENSE.md) | the upstream instrument's own terms | Verbatim Sail license and copyright notice retained beside the patch. |
-| [tools/vela/floordiv.py](tools/vela/floordiv.py) | `Apache-2.0` for the authored Python adaptation; upstream portions retain `MIT` | The adaptation is distributed under MIT's sublicensing permission with Ben Joffe's copyright and the full upstream notice retained in [tools/fast-floordiv/LICENSE.md](tools/fast-floordiv/LICENSE.md). |
-| [tools/fast-floordiv/LICENSE.md](tools/fast-floordiv/LICENSE.md) | the upstream instrument's own terms | Verbatim MIT license and copyright notice for the constant floor-division reference. |
-| `docs/implementation/retained-evidence/root/build/lane-q35g-20261003/q35g/coq-sail-reals-eqdep.patch` | `BSD-2-Clause`, in coq-sail's retained `LICENSE` beside it | Q35g's diff to `rocq-sail-stdpp` 0.20.3, held as evidence. Its context retains upstream terms and authored modifications are offered on those same terms. |
-| `docs/implementation/retained-evidence/root/build/lane-q35g-20261003/q35g/sail-rocq-real-import.patch` | `BSD-2-Clause`, in [SAIL-LICENSE.md](tools/sail-lsp/SAIL-LICENSE.md) | Q35g's diff to Sail's Rocq backend, held as evidence. Its context retains upstream terms and authored modifications are offered on those same terms. |
-| `docs/implementation/retained-evidence/root/build/lane-q35g-20261003/tagtree/LICENSE` | the upstream library's own terms | Verbatim coq-sail 0.20.3 license and copyright notice retained for the library diff. |
-| `docs/implementation/retained-evidence/rocq-compat-20261012/sail.LICENSE` | the upstream library's own terms | Verbatim coq-sail 0.20.3 BSD-2-Clause license and copyright notice retained with the compatibility trial. |
-| `docs/implementation/retained-evidence/rocq-compat-20261012/stdpp.LICENSE` | the upstream library's own terms | Verbatim stdpp 1.13.0 BSD-3-Clause license and copyright notice retained with the compatibility trial. |
-| `docs/implementation/retained-evidence/q35n-20261013/sail-support-strict.patch`, `freeze/*.txt`, `freeze/*.txt.gz` and `rocq-sail-stdpp.opam` beneath that bundle | `BSD-2-Clause`, in that bundle's `Sail-Support-LICENSE` | Syntax-only changes, printed upstream declarations and verbatim package metadata from coq-sail 0.20.3. Authored modifications are offered on the upstream terms. |
-| `docs/implementation/retained-evidence/q35n-20261013/Sail-Support-LICENSE` | the upstream library's own terms | Verbatim coq-sail 0.20.3 license and copyright notice accompanying the source-derived evidence. |
-| `docs/implementation/retained-evidence/q35o-20261013/write-tag-fragment.txt` | `BSD-2-Clause`, in that bundle's `Model-LICENSE` and `CHERI-LICENSE` | Retained fragment of the generated model; the whole emitted term remains untracked. |
-| `docs/implementation/retained-evidence/q35o-20261013/Model-LICENSE` and `CHERI-LICENSE` | the upstream models' own terms | Verbatim notices retained with the generated model fragment. |
-| `docs/implementation/retained-evidence/q35n-hosted-20261013-refusal/build/package-metadata.txt` | `BSD-2-Clause`, in that bundle's `build/Sail-Support-LICENSE` | Effective package metadata derived from coq-sail 0.20.3, with the reviewed source/patch identities added. |
-| `docs/implementation/retained-evidence/q35n-hosted-20261013-refusal/build/Sail-Support-LICENSE` | the upstream library's own terms | Verbatim coq-sail notice retained with the cold qualification refusal. |
-| `docs/implementation/retained-evidence/q35n-hosted-20261014-refusal/build/package-metadata.txt` and `build/inventory-1.log` beneath that bundle | `BSD-2-Clause`, in that bundle's `build/Sail-Support-LICENSE` | Effective coq-sail 0.20.3 metadata and printed upstream declaration types retained with the native-inventory refusal. |
-| `docs/implementation/retained-evidence/q35n-hosted-20261014-refusal/build/Sail-Support-LICENSE` | the upstream library's own terms | Verbatim coq-sail notice retained with the second cold qualification refusal. |
-| `docs/implementation/retained-evidence/q35q-native-20261013/candidate-1-Provenance.stdout.log` and `candidate-2-SignatureBoundary.stdout.log` beneath that bundle | `BSD-2-Clause`, in that bundle's `Sail-Support-LICENSE` | Printed coq-sail 0.20.3 module and signature declarations retained with the bounded native inventory diagnosis. |
-| `docs/implementation/retained-evidence/q35q-native-20261013/Sail-Support-LICENSE` | the upstream library's own terms | Verbatim coq-sail notice accompanying the printed native provenance. |
-| `docs/implementation/retained-evidence/close3-q35q-20261013/candidate-1-native-signature.stdout.log` | `BSD-2-Clause`, in that bundle's `Sail-Support-LICENSE` | Printed coq-sail 0.20.3 module and signature declarations retained with the signature type completeness refusal. |
-| `docs/implementation/retained-evidence/close3-q35q-20261013/Sail-Support-LICENSE` | the upstream library's own terms | Verbatim coq-sail notice accompanying the bounded census evidence. |
-| `docs/implementation/retained-evidence/q35q-native-api-20261023/Sail-Support-LICENSE` and `docs/implementation/retained-evidence/q35q-native-api-restoration-20261023/Sail-Support-LICENSE` | the upstream library's own terms | Verbatim coq-sail notice accompanying the native API diagnosis and restored replay. |
-| `docs/implementation/retained-evidence/q35q-native-api-restoration-20261023/native-metadata.stdout.log` | `BSD-2-Clause`, in that bundle's `Sail-Support-LICENSE` | Diagnostic native signature types from coq-sail 0.20.3, with authored control output. The authored plugin sources remain under the original-file map; no linked plugin is conveyed. |
-| `docs/implementation/retained-evidence/reuse-wire-census-20261023/attempt-3-native-query.stdout.log.gz` | `BSD-2-Clause`, in [Sail-Support-LICENSE](tools/rocq-census/Sail-Support-LICENSE.md) | Constructor-based metadata of coq-sail 0.20.3 declarations and authored controls. The original producer and controls remain under the original-file map; no linked plugin is conveyed. |
-| `tools/rocq-census/Sail-Support-LICENSE.md` | the upstream library's own terms | Verbatim coq-sail notice accompanying the retained constructor-based metadata. |
-| `docs/implementation/retained-evidence/reuse-wire-tags-20261023/canonical-tag-outcomes.patch`, `binding-reading.txt`, `bindings.v.txt`, `bindings_types.v.txt`, `baseline-interface-reading.txt`, `candidate-interface-reading.txt` and `interface-reading.diff` beneath that bundle | `BSD-2-Clause`, in that bundle's `Sail-Support-LICENSE`, `Model-LICENSE`, `CHERI-LICENSE` and `Sail-LICENSE` | Isolated coq-sail tag-outcome extension, unchanged model-derived reproducer outputs and printed interface readings. Authored support modifications are offered on the upstream terms; the original interpreter and controls retain their Apache-2.0 marks. |
-| `docs/implementation/retained-evidence/reuse-wire-tags-20261023/Sail-Support-LICENSE`, `Model-LICENSE`, `CHERI-LICENSE` and `Sail-LICENSE` beneath that bundle | the upstreams' own terms | Verbatim paired support, model, CHERI and Sail notices accompanying the isolated tag candidate. |
-| `docs/implementation/retained-evidence/close3-q35p-20261013/bindings.sail.txt`, `bindings.v.txt` and `bindings_types.v.txt` | `BSD-2-Clause`, in that bundle's `Model-LICENSE`, `CHERI-LICENSE` and `Sail-LICENSE` | Minimal model-derived reproducer and its unchanged generated outputs. Authored scaffolding is offered on the same terms; the complete canonical term remains untracked. |
-| `docs/implementation/retained-evidence/close3-q35p-20261013/outcome-algebra.txt`, `outcome-bindings.txt`, `data-outcomes.txt` and `state-tags.txt` | `BSD-2-Clause`, in that bundle's `Sail-Support-LICENSE` | Source excerpts from paired coq-sail 0.20.3 identifying the canonical outcome and state interfaces. |
-| `docs/implementation/retained-evidence/close3-q35p-20261013/emulator-outcome-callers.txt`, `emulator-write-callers.txt` and `runtime-tags.txt` | `BSD-2-Clause`, in that bundle's `Sail-LICENSE` | Source excerpts from the locked Sail library and runtime identifying existing memory and tag behavior. |
-| `docs/implementation/retained-evidence/close3-q35p-20261013/Model-LICENSE`, `CHERI-LICENSE`, `Sail-LICENSE` and `Sail-Support-LICENSE` | the upstreams' own terms | Verbatim model, CHERI, Sail and paired support notices accompanying the semantic refusal evidence. |
-| `docs/implementation/retained-evidence/close3-q35o-20261013/sail-emission-syntax.patch`, `frozen-baseline.json` and `frozen-candidate.json` | `BSD-2-Clause`, in that bundle's `LICENSE.sail` | Private syntax-only diff to Sail 0.20.3 and printed generated declaration readings. Authored backend modifications are offered on the same terms. |
-| `docs/implementation/retained-evidence/close3-q35o-20261013/canonical-imports.txt` | `BSD-2-Clause`, in that bundle's `LICENSE.model` and `LICENSE.sail` | Imports-only fragment of the actual generated canonical outputs; complete canonical files remain untracked. |
-| `docs/implementation/retained-evidence/close3-q35o-20261013/LICENSE.model` and `LICENSE.sail` | the upstreams' own terms | Verbatim model and Sail notices accompanying the emission evidence. |
-| `docs/implementation/retained-evidence/q35o-scope-20261023/sail-emission-syntax.patch`, `frozen-baseline.json.gz` and `frozen-candidate.json.gz` | `BSD-2-Clause`, in that bundle's `LICENSE.sail` | Private Sail backend syntax changes and printed generated declarations. Authored backend modifications are offered on the same terms. |
-| `docs/implementation/retained-evidence/q35o-scope-20261023/canonical-imports.txt` | `BSD-2-Clause`, in that bundle's `LICENSE.model` and `LICENSE.sail` | Imports-only fragment of the generated canonical output; complete generated files remain untracked. |
-| `docs/implementation/retained-evidence/q35o-scope-20261023/LICENSE.model` and `LICENSE.sail` | the upstreams' own terms | Verbatim model and Sail notices accompanying the scoped-notation evidence. |
-| `docs/implementation/retained-evidence/q35o-handwritten-types-20261023/handwritten-*-source.v`, `frozen-*.json`, `canonical-types-frozen-*.json.gz`, and the `*-Inventory.stdout`, `*-Facts.stdout`, `*-Bodies.stdout` readings and their gzip counterparts in that bundle | `BSD-2-Clause`, in the bundle's `LICENSE.model`, `LICENSE.model-cheri`, `LICENSE.model-cheri-verif`, `LICENSE.sail` and `LICENSE.support` | Model-derived handwritten sources and native elaborated model/support declarations. The preserving import changes use the model's terms; compiler and paired-support notices remain distinct. |
-| `docs/implementation/retained-evidence/q35o-handwritten-types-20261023/LICENSE.model`, `LICENSE.model-cheri`, `LICENSE.model-cheri-verif`, `LICENSE.sail` and `LICENSE.support` | the upstreams' own terms | Exact model, CHERI, CHERI verification, Sail compiler and paired coq-sail notices accompanying the handwritten/types qualification. |
-| `docs/implementation/retained-evidence/q35p-tag-outcomes-20261023/canonical-tag-outcomes.patch`, `native-readings.log` and `concrete-native-readings.log` | `BSD-2-Clause`, in the bundle's `Sail-Support-LICENSE`, `Model-LICENSE`, `CHERI-LICENSE` and `Sail-LICENSE` | Diff to the paired coq-sail support and printed support/model declarations. Authored support modifications use the upstream terms; fresh authored law and query sources follow the original-file map. |
-| `docs/implementation/retained-evidence/q35p-tag-outcomes-20261023/bindings.sail.txt`, `bindings.v.txt` and `bindings_types.v.txt` | `BSD-2-Clause`, in the bundle's `Model-LICENSE`, `CHERI-LICENSE` and `Sail-LICENSE` | Unchanged model-derived minimal reproducer and its actual-plugin generated outputs, with scaffolding on the same terms. Complete canonical source remains untracked. |
-| `docs/implementation/retained-evidence/q35p-tag-outcomes-20261023/Model-LICENSE`, `CHERI-LICENSE`, `Sail-LICENSE` and `Sail-Support-LICENSE` | the upstreams' own terms | Exact notices retained with the tag-outcome patch, minimal emitted consumer and native readings. |
-| [LICENSE.md](LICENSE.md), [LICENSE-docs.md](LICENSE-docs.md) | the stewards' own terms | Verbatim license texts. Apache's appendix placeholder is filled in as Apache's own instructions direct; nothing else is changed in either file. |
-
-The split is decidable by path and extension alone. The named upstream patch and
-license instruments take precedence over the general original-file rows.
-Resolver-generated lock data, every `.lock` file, is dependency metadata rather
-than authored or upstream source, so neither original-file row reaches it: it
-records the package names, versions, sources and checksums a resolver chose,
-each package keeping its own terms. That includes
-[tools/sail-isla/isla.Cargo.lock](tools/sail-isla/isla.Cargo.lock), upstream
-Isla's Cargo-generated lock, and
-[tools/memory-planner/idealloc.Cargo.lock](tools/memory-planner/idealloc.Cargo.lock),
-idealloc's Cargo-generated lock, each with reviewed package-version and checksum
-overrides that preserve its upstream dependency graph.
-
-A full frozen opam snapshot can embed upstream patch bytes as extra files. Those
-bytes retain their upstream terms; Q35n's standalone hosted snapshot carries its
-BSD-2-Clause patches and the exact `Sail-Support-LICENSE` together. This exception
-does not make the resolver's remaining metadata authored source.
+| Every original `.md` file and `docs/evidence/*.json`, including [docs/](docs/) and [README.md](README.md) | `CC-BY-4.0`, in [LICENSES/CC-BY-4.0.txt](LICENSES/CC-BY-4.0.txt) | The prose is a language specification meant to be cited, quoted, and inherited, and a document license says what a software license only gestures at. |
+| Every non-Markdown original file, including [tools/](tools/), [.editorconfig](.editorconfig), [.gitattributes](.gitattributes), [.gitignore](.gitignore), and [REUSE.toml](REUSE.toml) | `Apache-2.0`, in [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) | Explicit software and patent grant for the toolchain, parser, elaborator, playground, and verification harnesses. |
+| [tools/uv.lock](tools/uv.lock) | `Apache-2.0`, via [REUSE.toml](REUSE.toml) | Resolver-generated dependency lock metadata recording package names, versions, sources, and SHA-256 checksums; each upstream package retains its own terms. |
+| [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt), [LICENSES/CC-BY-4.0.txt](LICENSES/CC-BY-4.0.txt) | the stewards' own terms | Verbatim license texts required by the REUSE Specification v3.3. |
 
 ## Marking a new file
 
 Every original file whose kind can carry a comment opens with an SPDX line, in that kind's own comment syntax:
 
-```
+```text
 # SPDX-License-Identifier: Apache-2.0
 ```
 
-`tools/check.py` reads the identifier out of that block and holds every markable file against it, so a file that arrives unmarked, marked with another identifier, or marked in another kind's comment syntax is a finding. The tool carries a table of comment syntaxes rather than a list of files to skip, so a kind it has no ruling for is a finding too: an unknown kind is a decision somebody owes, not a gap to guess past.
+`python tools/run.py check` reads the identifier out of that block, holds every markable file against it, and runs the pinned FSFE `reuse lint` checker against [REUSE.toml](REUSE.toml) and [LICENSES/](LICENSES/). A file that arrives unmarked, marked with another identifier, or marked in another kind's comment syntax is a finding. The tool carries an explicit table of comment syntaxes rather than a list of files to skip, so a file kind it has no ruling for is a finding too.
 
-Authored Menhir `.mly` grammars use `/* ... */` for their opening mark;
-OCaml `.ml` sources and `.mll` lexer definitions use `(* ... *)`.
+Authored Menhir `.mly` grammars, CSS `.css` stylesheets, and Vela `.vela` sources use `/* ... */` (or `// ...` for `.vela`) for their opening mark; OCaml `.ml`/`.mli` sources, `.mll` lexer definitions, and Coq/Rocq `.v` files use `(* ... *)`; JavaScript `.mjs`/`.js` files use `// ...`; HTML `.html` files use `<!-- ... -->`.
 
-These kinds carry no mark:
+These kinds carry no in-file mark and are covered by [REUSE.toml](REUSE.toml):
 
 | Kind | Ground |
 | --- | --- |
-| `.md` | The map above already reaches it by path. |
+| `.md` | The map above and [REUSE.toml](REUSE.toml) already reach it by path. |
 | `.json` | JSON admits no comment, so a mark would make the file unparseable. |
 | `.lock` | Resolver-generated dependency metadata rather than authored content; the resolver regenerates it without authored headers. |
-| `.patch` | A diff's bytes are its meaning, and a prepended line breaks the hunks it names. |
-| `.gitattributes`, `.gitignore`, `.gitmodules` | Git's own configuration rather than authored content. |
-
-Files under `model/` keep whatever header they arrived with, and a new file authored there takes the upstream BSD-2-Clause header its neighbours carry.
+| `.txt` under `LICENSES/` | Verbatim license texts governed by the REUSE Specification. |
 
 ## Terms this tree does not carry
 
-No tracked file is subject to a reciprocal or non-commercial term. That is a property of today's tree rather than a standing guarantee, and the [implementation plan](PLAN.md)'s milestone gates are what preserve it: an upstream's license is read at the milestone that would incorporate it, never at release.
-
-Three planned upstreams carry terms that would decide what the composed system could be licensed as, and all three calls are taken without moving a row of the map. The verified compiler and the control-plane compiler are **contained**: each is a build-time producer this repository never redistributes, so its non-commercial term reaches nothing offered here. The kernel specification is **authored instead**: no `GPL-2.0-only` object is translated, that being the one term of the three that would have reached the shipped image, and a derivation once written is not undone by a later decision. [THIRD-PARTY.md](THIRD-PARTY.md) quotes each instrument, and what containment costs is recorded at the milestones that spend it.
-
-The no-copyleft property is the *tree*'s and not every build artifact's: the golden-model emulator links against GMP, offered as `LGPL-3.0-or-later OR GPL-2.0-or-later`, which makes that executable a Combined Work whose conditions attach on conveyance. [THIRD-PARTY.md](THIRD-PARTY.md) states what those conditions are and when they would be engaged.
+No tracked file is subject to a reciprocal or non-commercial term. That is a property of today's tree rather than a standing guarantee, and the [implementation plan](PLAN.md)'s milestone gates are what preserve it: an upstream's license is read at the milestone that would incorporate it, never at release. [THIRD-PARTY.md](THIRD-PARTY.md) records the reviewed development tools, browser editor CDN assets, and candidate proof-tooling references.

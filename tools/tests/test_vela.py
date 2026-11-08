@@ -37,7 +37,9 @@ def _nat(value: int) -> str:
 
 
 def _header(source: bytes) -> str:
+    # REUSE-IgnoreStart
     return ("(* SPDX-License-Identifier: Apache-2.0 *)\n"
+            # REUSE-IgnoreEnd
             "(* Vela pure prototype: unqualified. Source SHA256: "
             f"{hashlib.sha256(source).hexdigest()} *)\n"
             "From Corelib Require Import Init.Datatypes Init.Nat.\n\n")
