@@ -387,8 +387,24 @@ def _pure_authoring_rejects_mathematical_lint() -> None:
 
 def _playground_formatting_example_assets() -> None:
     root = Path(__file__).resolve().parents[2]
-    html = (root / "tools/toolchain/playground/index.html").read_text(encoding="utf-8")
-    script = (root / "tools/toolchain/playground/app.mjs").read_text(encoding="utf-8")
+    playground_dir = root / "tools/toolchain/playground"
+    docs_dir = root / "docs"
+    html = (playground_dir / "index.html").read_text(encoding="utf-8")
+    script = (playground_dir / "app.mjs").read_text(encoding="utf-8")
+    styles = (playground_dir / "style.css").read_text(encoding="utf-8")
+    ensure((docs_dir / "index.html").read_text(encoding="utf-8") == html,
+           "GitHub Pages docs/index.html drifted from tools/toolchain/playground/index.html")
+    ensure((docs_dir / "app.mjs").read_text(encoding="utf-8") == script,
+           "GitHub Pages docs/app.mjs drifted from tools/toolchain/playground/app.mjs")
+    ensure((docs_dir / "style.css").read_text(encoding="utf-8") == styles,
+           "GitHub Pages docs/style.css drifted from tools/toolchain/playground/style.css")
+    ensure('href="./style.css"' in html and 'src="./app.mjs"' in html,
+           "playground index.html must use relative ./style.css and ./app.mjs asset paths for GitHub Pages")
+    for section_id in ("overview", "playground", "pillars", "tour", "reference", "verification", "specifications"):
+        ensure(f'id="{section_id}"' in html,
+               f"GitHub Pages index.html omitted section #{section_id}")
+    ensure("export const EXAMPLES = {" in script and "export async function browserApi(" in script,
+           "playground app.mjs omitted exported EXAMPLES or in-browser browserApi runtime")
     ensure('<option value="formatting">Raw strings &amp; checked formatting</option>' in html,
            "playground selector omitted the raw-strings and checked-formatting example")
     ensure("formatting: {" in script and "Format.Write(ref " in script and '"""' in script,
