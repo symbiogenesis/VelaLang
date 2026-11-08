@@ -21,7 +21,8 @@
 | [tooling/authoring-tools.md](tooling/authoring-tools.md) | Canonical formatter, advisory lints (`VELA101`–`VELA105`), numeric separators, and binding previews |
 | [tooling/documentation-qualification.md](tooling/documentation-qualification.md) | Declaration-documentation attachment and hover qualification |
 | [tooling/lsp-prototype.md](tooling/lsp-prototype.md) | Language Server Protocol lifecycle, diagnostics, navigation, inlay hints, formatting, and semantic tokens |
-| [tooling/playground.md](tooling/playground.md) | Local browser playground with Monaco editor, pure and dependent elaboration, and expression console |
+| [tooling/playground.md](tooling/playground.md) | Browser playground architecture, local loopback transport, and GitHub Pages in-browser runtime |
+| [index.html](index.html) | GitHub Pages language overview, interactive tour, compact reference, and embedded Vela Playground |
 | [tooling/tooling-protocols.md](tooling/tooling-protocols.md) | Compiler inspection API, LSP, Tree-sitter/TextMate, SARIF, SCIP, BSP, remarks/traces, DWARF, and DAP |
 
 ## Assurance and verification (`docs/assurance/`)

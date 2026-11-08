@@ -7,6 +7,7 @@
 | Path | Purpose |
 | --- | --- |
 | [PLAN.md](PLAN.md) | Vela backlog (`Q25` series), first-release delivery stages, ergonomics roadmap, and whole-system authoring proposals |
+| [docs/index.html](docs/index.html) | GitHub Pages language overview, compact reference, and embedded in-browser Vela Playground |
 | [docs/README.md](docs/README.md) | Index of Vela language specifications, contracts, and extension dossiers |
 | [docs/language/reference.md](docs/language/reference.md) | Compact language reference for the synchronous first-release surface |
 | [docs/language/first-release.md](docs/language/first-release.md) | First-release boundary, primitive and module semantics, ownership libraries, and qualification |

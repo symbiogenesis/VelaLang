@@ -71,7 +71,14 @@ only when requested. Hosting and wider-language qualification retain their owner
 
 The editor uses pinned Monaco 0.55.1 browser assets from jsDelivr. Internet access
 is needed for those editor assets; authored source is sent only to the local
-compiler service. The browser must clearly report an editor-load failure and
+compiler service when launched with a `#token=...` loopback URL, or evaluated
+locally in the browser when served statically from [docs/index.html](../index.html)
+([docs/app.mjs](../app.mjs), [docs/style.css](../style.css)) on GitHub Pages.
+The static `docs/` bundle and [tools/toolchain/playground/](../../tools/toolchain/playground/)
+share identical `index.html`, `style.css`, and `app.mjs` assets with relative
+`./style.css` and `./app.mjs` paths so both static hosting and `PlaygroundServer`
+serve the same language overview, tour, compact reference, and embedded
+playground. The browser must clearly report an editor-load failure and
 offer plain-text editing with the same compile/evaluate controls. This fallback
 does not claim Monaco highlighting or inline editor providers; the inspector
 panels still use the local language services. The

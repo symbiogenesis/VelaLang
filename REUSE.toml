@@ -12,6 +12,9 @@ SPDX-License-Identifier = "CC-BY-4.0"
 
 [[annotations]]
 path = [
+    "docs/*.html",
+    "docs/*.mjs",
+    "docs/*.css",
     "examples/**",
     "tools/**/*.json",
     "tools/uv.lock",

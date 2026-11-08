@@ -1,0 +1,927 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <meta
+      name="description"
+      content="Vela is a verification-aware systems and mathematical authoring language designed alongside VerifiedOS, with an interactive in-browser playground, dependent types, explicit loans, and Rocq/Gallina elaboration."
+    >
+    <title>Vela — Verification-Aware Systems &amp; Mathematical Language</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="site-brand" href="#overview">
+          <span class="brand-glyph" aria-hidden="true">V</span>
+          <span class="brand-text">
+            <strong>Vela</strong>
+            <span>Verification-Aware Systems &amp; Mathematical Language</span>
+          </span>
+        </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="#playground" class="nav-link nav-link-primary">Playground</a>
+          <a href="#pillars" class="nav-link">Pillars</a>
+          <a href="#tour" class="nav-link">Language Tour</a>
+          <a href="#reference" class="nav-link">Reference</a>
+          <a href="#verification" class="nav-link">Verification</a>
+          <a href="#specifications" class="nav-link">Specs</a>
+          <a
+            href="https://github.com/symbiogenesis/VelaLang"
+            class="nav-link nav-link-external"
+            target="_blank"
+            rel="noopener noreferrer"
+          >GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <section id="overview" class="hero-section">
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow">VelaLang &middot; Designed alongside VerifiedOS</p>
+          <h1>Systems control and machine-checked mathematics in one explicit surface.</h1>
+          <p class="hero-lead">
+            <strong>Vela</strong> combines call-site-visible ownership and loan modes
+            (<code>in</code>, <code>ref</code>, <code>out</code>), bounded loop and resource
+            contracts with selective invariant lifting (<code>open (...) lifts</code>),
+            dependent <code>Vec&lt;T, n&gt;</code> and <code>Fin&lt;n&gt;</code> mathematics with
+            first-class <code>proof { calc { ... } }</code> blocks, and hygienic elaboration to
+            <strong>Rocq/Gallina</strong> (<code>rocq c</code> / <code>rocqchk</code>) and
+            <strong>Clight/CompCert</strong>.
+          </p>
+          <div class="hero-actions">
+            <a href="#playground" class="btn-hero-primary">Jump to Live Playground</a>
+            <button type="button" class="btn-hero-example" data-load-example="dependent">
+              Load Dependent Proof
+            </button>
+            <button type="button" class="btn-hero-example" data-load-example="vectors">
+              Load Safe Vec &amp; Fin
+            </button>
+            <button type="button" class="btn-hero-example" data-load-example="formatting">
+              Load Checked Formatting
+            </button>
+            <button type="button" class="btn-hero-example" data-load-example="ergonomics">
+              Load Records &amp; Guards
+            </button>
+          </div>
+        </div>
+        <div class="hero-highlights" aria-label="Core language guarantees">
+          <div class="highlight-card">
+            <span class="highlight-tag">Loans &amp; Ownership</span>
+            <strong><code>in</code> &middot; <code>ref</code> &middot; <code>out</code> &middot; <code>move</code></strong>
+            <p>Every borrow or ownership transfer is visible at both declaration and call site. No hidden copies or implicit borrows.</p>
+          </div>
+          <div class="highlight-card">
+            <span class="highlight-tag">Dependent Mathematics</span>
+            <strong><code>Vec&lt;T, n&gt;</code> &middot; <code>Fin&lt;n&gt;</code> &middot; <code>Prop</code></strong>
+            <p>Length-indexed vectors, bounded finite indices, generic functions, and calculational proofs elaborate directly to CIC terms.</p>
+          </div>
+          <div class="highlight-card">
+            <span class="highlight-tag">Contracts &amp; Lifting</span>
+            <strong><code>requires</code> &middot; <code>ensures</code> &middot; <code>open (...) lifts</code></strong>
+            <p>Named record and struct invariants stay in force unless selectively opened and re-established before block exit.</p>
+          </div>
+          <div class="highlight-card">
+            <span class="highlight-tag">Zero Hidden Control Flow</span>
+            <strong>Explicit <code>Result&lt;T, E&gt;</code> &amp; Total Arithmetic</strong>
+            <p>No exceptions, panics, unwinding, or ambient heap allocation. Checked formatting writes into bounded <code>TextBuilder&lt;cap&gt;</code> storage.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="playground" class="playground-wrapper" aria-label="Interactive Vela Playground">
+      <div class="topbar">
+        <div class="brand">
+          <p class="eyebrow">Interactive Vela Playground</p>
+          <h2>Pure &amp; Dependent Elaboration, Expression Console &amp; LSP Inspector</h2>
+        </div>
+        <div class="status-group" aria-label="Playground status">
+          <span id="connection-badge" class="badge badge-neutral">Connecting</span>
+          <span id="scope-badge" class="badge badge-scope"
+            >Pure Nat/bool + dependent math &middot; unqualified prototype</span
+          >
+          <span id="editor-mode-badge" class="badge badge-neutral">Loading editor</span>
+        </div>
+      </div>
+
+      <section class="toolbar" aria-label="Playground controls">
+        <div class="control-cluster">
+          <label for="example-select">Example</label>
+          <select id="example-select">
+            <option value="squares">Squares &amp; threshold</option>
+            <option value="branches">Branching &amp; helper calls</option>
+            <option value="logic">Boolean logic &amp; comparisons</option>
+            <option value="subtraction">Saturating subtraction</option>
+            <option value="division">Division &amp; remainder</option>
+            <option value="constants">Compile-time constants</option>
+            <option value="bindings">Immutable bindings &amp; let preview</option>
+            <option value="named">Named arguments, docs &amp; separators</option>
+            <option value="generic">Generic &amp; higher-order functions</option>
+            <option value="vectors">Length-indexed vectors &amp; Fin lookup</option>
+            <option value="dependent">Dependent length &amp; calc proof</option>
+            <option value="formatting">Raw strings &amp; checked formatting</option>
+            <option value="ergonomics">Records, properties, updates &amp; guards</option>
+          </select>
+        </div>
+
+        <div class="button-cluster">
+          <button id="compile-button" type="button" class="primary">Compile to Gallina</button>
+          <button id="format-button" type="button">Format</button>
+          <button id="authoring-button" type="button">Check style &amp; preview</button>
+          <button id="download-source-button" type="button">Download .vela</button>
+          <button id="download-gallina-button" type="button" disabled>Download .v</button>
+        </div>
+
+        <div class="toggle-cluster" aria-label="Editor display toggles">
+          <label class="toggle">
+            <input id="type-hints-toggle" type="checkbox" checked>
+            <span>Type hints</span>
+          </label>
+          <label class="toggle">
+            <input id="semantic-tokens-toggle" type="checkbox" checked>
+            <span>Semantic tokens</span>
+          </label>
+        </div>
+      </section>
+
+      <div id="status-banner" class="banner" role="status" aria-live="polite">
+        Preparing Vela compiler, dependent elaborator, and language services&hellip;
+      </div>
+
+      <main class="workspace" id="playground-workspace">
+        <section class="pane source-pane" aria-labelledby="source-heading">
+          <div class="pane-header">
+            <div>
+              <h3 id="source-heading">Source</h3>
+              <p class="pane-subtitle">
+                <code>untitled:playground.vela</code> &middot; unsaved browser buffer
+              </p>
+            </div>
+            <div class="shortcut-hint" aria-label="Keyboard shortcuts">
+              <span><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Enter</kbd> Compile</span>
+              <span><kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd> Format</span>
+            </div>
+          </div>
+          <div class="editor-host">
+            <div id="monaco-container" class="monaco-container" aria-label="Vela source editor"></div>
+            <textarea
+              id="fallback-editor"
+              class="fallback-editor"
+              aria-label="Vela plain-text source editor"
+              spellcheck="false"
+              hidden
+            ></textarea>
+          </div>
+          <footer class="pane-footer">
+            <span id="cursor-status">Line 1, Col 1</span>
+            <span id="selection-action-status"
+              >Pure source uses LSP hover/navigation; dependent source uses mathematical compilation</span
+            >
+          </footer>
+        </section>
+
+        <section class="pane output-pane" aria-label="Compiler and language-server outputs">
+          <form id="evaluate-form" class="console-bar" aria-label="Compile-time expression console">
+            <div class="console-field">
+              <label for="expression-input">Closed expression</label>
+              <input
+                id="expression-input"
+                name="expression"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Square(x: 7) + 1"
+              >
+            </div>
+            <div class="console-type">
+              <label for="expression-type">Type</label>
+              <select id="expression-type" name="valueType">
+                <option value="Nat">Nat</option>
+                <option value="bool">bool</option>
+              </select>
+            </div>
+            <div class="console-submit">
+              <button id="evaluate-button" type="submit" class="primary">Evaluate</button>
+            </div>
+          </form>
+
+          <div
+            id="expression-suggestions"
+            class="suggestion-bar"
+            aria-label="Suggested console expressions"
+          ></div>
+
+          <div class="tabs" role="tablist" aria-label="Output views">
+            <button
+              id="tab-console"
+              class="tab is-active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="panel-console"
+              data-panel="console"
+            >
+              Console
+            </button>
+            <button
+              id="tab-gallina"
+              class="tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-gallina"
+              data-panel="gallina"
+            >
+              Gallina
+            </button>
+            <button
+              id="tab-diagnostics"
+              class="tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-diagnostics"
+              data-panel="diagnostics"
+            >
+              Problems <span id="diagnostic-count" class="count">0</span>
+            </button>
+            <button
+              id="tab-inspect"
+              class="tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-inspect"
+              data-panel="inspect"
+            >
+              Inspect <span id="symbol-count" class="count">0</span>
+            </button>
+            <button
+              id="tab-authoring"
+              class="tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-authoring"
+              data-panel="authoring"
+            >
+              Authoring <span id="authoring-count" class="count">0</span>
+            </button>
+          </div>
+
+          <div class="panel-stack">
+            <section
+              id="panel-console"
+              class="output-panel is-active"
+              role="tabpanel"
+              aria-labelledby="tab-console"
+            >
+              <div class="panel-note">
+                Checks the complete source buffer and reduces one closed expression with the
+                selected pure or mathematical evaluator. It is a compile-time reducer, not a
+                Rocq kernel replay or native program execution.
+              </div>
+              <pre id="console-output" class="code-output">Ready. Choose Evaluate to compute a compile-time Nat or bool value.</pre>
+            </section>
+
+            <section
+              id="panel-gallina"
+              class="output-panel"
+              role="tabpanel"
+              aria-labelledby="tab-gallina"
+              hidden
+            >
+              <div class="panel-note">
+                Emits the Gallina module produced for the exact UTF-8 source buffer by the
+                automatically selected pure compiler or mathematical elaborator.
+              </div>
+              <pre id="gallina-output" class="code-output"></pre>
+            </section>
+
+            <section
+              id="panel-diagnostics"
+              class="output-panel"
+              role="tabpanel"
+              aria-labelledby="tab-diagnostics"
+              hidden
+            >
+              <div class="panel-note">
+                Diagnostics come from the pure LSP overlay for pure source, or from automatic
+                mathematical compilation (including <code>VELA105</code> generic type naming
+                warnings) when the source uses dependent declarations.
+              </div>
+              <ul id="diagnostics-list" class="item-list" aria-label="Diagnostics"></ul>
+            </section>
+
+            <section
+              id="panel-inspect"
+              class="output-panel"
+              role="tabpanel"
+              aria-labelledby="tab-inspect"
+              hidden
+            >
+              <div class="panel-note">
+                Symbol outline, plain-text hover (including <code>///</code> documentation),
+                definition, and references from the pure language server for the current
+                source version.
+              </div>
+              <div class="inspector-grid">
+                <div>
+                  <h4 class="subhead">Symbols</h4>
+                  <ul id="symbols-list" class="item-list" aria-label="Document symbols"></ul>
+                </div>
+                <div>
+                  <h4 class="subhead">Selected symbol</h4>
+                  <pre id="hover-output" class="code-output compact-output">Select a symbol or place the cursor on an identifier.</pre>
+                  <h4 class="subhead">References</h4>
+                  <ul id="references-list" class="item-list" aria-label="Symbol references"></ul>
+                </div>
+              </div>
+            </section>
+
+            <section
+              id="panel-authoring"
+              class="output-panel"
+              role="tabpanel"
+              aria-labelledby="tab-authoring"
+              hidden
+            >
+              <div class="panel-note">
+                Runs <code>lint_source</code> (<code>VELA100</code>&ndash;<code>VELA103</code>)
+                and <code>preview_bindings</code> on the current pure source without changing
+                the buffer until you apply a candidate.
+              </div>
+              <div class="authoring-actions">
+                <button id="apply-preview-button" type="button" disabled>
+                  Apply explicit-let preview
+                </button>
+                <button id="undo-preview-button" type="button" disabled>
+                  Undo applied preview
+                </button>
+                <span id="preview-status" class="muted"
+                  >Run &ldquo;Check style &amp; preview&rdquo; to inspect the current buffer.</span
+                >
+              </div>
+              <div class="inspector-grid">
+                <div>
+                  <h4 class="subhead">Advisory lint findings</h4>
+                  <ul id="authoring-list" class="item-list" aria-label="Authoring lint findings"></ul>
+                </div>
+                <div>
+                  <h4 class="subhead">Explicit-binding preview</h4>
+                  <pre id="preview-output" class="code-output compact-output">No preview computed for the current source.</pre>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <section id="pillars" class="content-section">
+      <div class="section-inner">
+        <div class="section-header">
+          <p class="eyebrow">Architecture &amp; Ergonomics</p>
+          <h2>Four pillars of verification-aware authoring</h2>
+          <p>
+            Every construct in Vela is designed so that systems programmers can read ownership,
+            mutation, and resource bounds directly from source, while proof engineers elaborate the
+            exact same declarations to kernel-checked Rocq propositions.
+          </p>
+        </div>
+
+        <div class="pillars-grid">
+          <article class="pillar-card">
+            <div class="pillar-card-head">
+              <span class="pillar-badge">Pillar 01 &middot; Dependent Mathematics</span>
+              <h3>Length-indexed <code>Vec&lt;T, n&gt;</code>, <code>Fin&lt;n&gt;</code> &amp; <code>calc</code> Proofs</h3>
+            </div>
+            <p>
+              Dependent functions quantify over erased <code>ghost Nat n</code> indices and carry
+              first-class <code>ensures</code> contracts and <code>proof { calc { ... } }</code>
+              obligations. Out-of-bounds indices and mismatched vector lengths are rejected before
+              emission.
+            </p>
+            <pre class="pillar-code"><code>public definition Vec&lt;T, Succ(n)&gt; KeepLength&lt;T, ghost Nat n&gt;(
+    T head, Vec&lt;T, n&gt; tail)
+    ensures result == Prepend(head, tail)
+    =&gt; Prepend(head, tail);
+
+public lemma PlusZeroRight(Nat n)
+    ensures n + 0 == n
+    proof {
+        calc { assert n + 0 == n; }
+        assert n + 0 == n;
+    }</code></pre>
+            <div class="pillar-card-foot">
+              <button type="button" class="btn-card-action" data-load-example="dependent">
+                Load in Playground &uarr;
+              </button>
+              <button type="button" class="btn-card-action" data-load-example="vectors">
+                Try Safe Vec Lookup &uarr;
+              </button>
+            </div>
+          </article>
+
+          <article class="pillar-card">
+            <div class="pillar-card-head">
+              <span class="pillar-badge">Pillar 02 &middot; Allocation-Free Formatting</span>
+              <h3>Multi-Quote Raw Strings &amp; Checked <code>Format.Write</code></h3>
+            </div>
+            <p>
+              Vela forbids hidden heap allocation in formatting. Multi-quote raw string literals
+              (<code>"""..."""</code>) strip common indentation at compile time, and
+              <code>Format.Write(ref builder, $"...")</code> writes into a fixed-capacity
+              <code>TextBuilder&lt;capacity&gt;</code> over an explicit <code>ref</code> loan.
+            </p>
+            <pre class="pillar-code"><code>public const String Banner = """
+    Vela raw string:
+    "quotes" stay unescaped
+    """;
+
+public Nat FormatLine(Nat count) {
+    var TextBuilder&lt;32&gt; builder = TextBuilder.Empty&lt;32&gt;();
+    let _ = Format.Write(ref builder, $"items={count}; ok={true}");
+    return ByteLength(builder);
+}</code></pre>
+            <div class="pillar-card-foot">
+              <button type="button" class="btn-card-action" data-load-example="formatting">
+                Load in Playground &uarr;
+              </button>
+            </div>
+          </article>
+
+          <article class="pillar-card">
+            <div class="pillar-card-head">
+              <span class="pillar-badge">Pillar 03 &middot; Familiar Systems Surface</span>
+              <h3>Nominal Records, Total Properties, Updates &amp; Pattern Guards</h3>
+            </div>
+            <p>
+              Author data models with nominal <code>record</code> declarations, total read-only
+              expression properties (<code>public Nat Remaining =&gt; ...;</code>), functional
+              <code>with { ... }</code> updates, declaration-order labeled patterns, and
+              <code>let ... else</code> / <code>if (x is ...)</code> guards.
+            </p>
+            <pre class="pillar-code"><code>public record Counter(Nat Value, Nat Limit) {
+    public Nat Remaining =&gt; this.Limit - this.Value;
+    public bool Full =&gt; this.Value &gt;= this.Limit;
+}
+
+public Counter Advance(Counter counter, Nat step) =&gt;
+    if (counter.Full) counter with { Limit = counter.Limit + step }
+    else counter with { Value = counter.Value + step };</code></pre>
+            <div class="pillar-card-foot">
+              <button type="button" class="btn-card-action" data-load-example="ergonomics">
+                Load in Playground &uarr;
+              </button>
+              <button type="button" class="btn-card-action" data-load-example="generic">
+                Try Higher-Order Fn &uarr;
+              </button>
+            </div>
+          </article>
+
+          <article class="pillar-card">
+            <div class="pillar-card-head">
+              <span class="pillar-badge">Pillar 04 &middot; Pure Core &amp; Authoring Discipline</span>
+              <h3>Required-Static Constants, Total Arithmetic &amp; LSP Inspection</h3>
+            </div>
+            <p>
+              Pure <code>Nat</code> and <code>bool</code> modules compile directly to Gallina
+              definitions with required-static <code>const</code> evaluation, canonical formatting,
+              advisory lints (<code>VELA100</code>&ndash;<code>VELA105</code>), explicit
+              <code>let</code> previews, and full LSP hover, definition, references, and inlay hints.
+            </p>
+            <pre class="pillar-code"><code>/// Scale a runtime value by a compile-time factor.
+public Nat Scale(const Nat factor, Nat value) {
+    const Nat multiplier = factor * 2;
+    let scaled = multiplier * value;
+    return scaled;
+}</code></pre>
+            <div class="pillar-card-foot">
+              <button type="button" class="btn-card-action" data-load-example="constants">
+                Load Constants &uarr;
+              </button>
+              <button type="button" class="btn-card-action" data-load-example="bindings">
+                Try Let Preview &uarr;
+              </button>
+              <button type="button" class="btn-card-action" data-load-example="named">
+                Try Style Lints &uarr;
+              </button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="tour" class="content-section content-section-alt">
+      <div class="section-inner">
+        <div class="section-header">
+          <p class="eyebrow">Language Tour</p>
+          <h2>Ownership, loans, contracts, and selective invariant lifting</h2>
+          <p>
+            Vela separates immutable value passing from shared borrows (<code>in</code>),
+            initialized exclusive borrows (<code>ref</code>), and uninitialized output borrows
+            (<code>out</code>), while keeping struct and record invariants modular.
+          </p>
+        </div>
+
+        <div class="tour-grid">
+          <div class="tour-card">
+            <h3>1. Call-Site-Visible Loan Modes</h3>
+            <p>
+              Every ordinary loan argument repeats its mode at the call site. Inference never
+              silently inserts <code>in</code>, <code>ref</code>, <code>out</code>, or
+              <code>move</code>. A loan ends at its last use on each control-flow branch.
+            </p>
+            <pre class="pillar-code"><code>module Tour.Loans;
+
+public record Window(Nat Start, Nat Count)
+    invariant Bounded: Start + Count &lt;= 4096
+{
+    public Nat End =&gt; this.Start + this.Count;
+}
+
+public Nat Measure(Window w) =&gt; w.End - w.Start;</code></pre>
+          </div>
+
+          <div class="tour-card">
+            <h3>2. Selective Invariant Lifting (<code>open (...) lifts</code>)</h3>
+            <p>
+              Instead of monolithic class invariants that break on every field mutation,
+              <code>open (ref this) lifts A, B { ... }</code> opens only the named invariant
+              conjuncts and requires them to be re-established before block exit.
+            </p>
+            <pre class="pillar-code"><code>public struct Buffer&lt;ghost Nat capacity&gt; {
+    private usize length;
+    private Slots&lt;byte, capacity&gt; slots;
+    invariant InitializedPrefix: LivePrefix(this.slots, this.length);
+    invariant VacantSuffix: VacantRange(this.slots, this.length, capacity);
+
+    public void Push(ref this, byte item)
+        requires this.length &lt; capacity
+    {
+        open (ref this) lifts InitializedPrefix, VacantSuffix {
+            this.slots = Slots.Write(this.slots, this.length, item);
+            this.length += 1;
+        }
+    }
+}</code></pre>
+          </div>
+
+          <div class="tour-card">
+            <h3>3. Bounded Loops &amp; Decreasing Measures</h3>
+            <p>
+              <code>foreach (let i in low..high) invariant P</code> supplies its range bound and
+              decreasing measure automatically; <code>while</code> loops carry explicit
+              <code>invariant P decreases m</code> clauses.
+            </p>
+            <pre class="pillar-code"><code>module Tour.Loops;
+
+public Nat CountTo(Nat limit) {
+    var Nat count = 0;
+    foreach (let index in 0..limit)
+        invariant count == index
+    {
+        count += 1;
+    }
+    return count;
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="reference" class="content-section">
+      <div class="section-inner">
+        <div class="section-header">
+          <p class="eyebrow">Compact Reference</p>
+          <h2>Constructs, precedence, and implementation status</h2>
+          <p>
+            Each construct in the synchronous first-release specification carries an implementation
+            status marker linking it to its verification owner.
+          </p>
+        </div>
+
+        <div class="status-legend" aria-label="Implementation status markers">
+          <div class="legend-item">
+            <span class="status-pill status-p">P</span>
+            <div>
+              <strong>Pure Prototype</strong>
+              <span>Checked by the pure compiler, LSP server, formatter, and Gallina emitter over <code>Nat</code> and <code>bool</code>.</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <span class="status-pill status-m">M</span>
+            <div>
+              <strong>Mathematical Elaborator</strong>
+              <span>Accepted by the dependent elaborator and emitted as CIC terms for Rocq kernel replay.</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <span class="status-pill status-s">S</span>
+            <div>
+              <strong>Surface Parser</strong>
+              <span>Parsed as located syntax by the conflict-free Menhir grammar for syntax campaigns.</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <span class="status-pill status-d">D</span>
+            <div>
+              <strong>Design Contract</strong>
+              <span>Specified by a first-release or extension contract with settled surface rules.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ref-tables-grid">
+          <div class="ref-table-card">
+            <h3>Declarations &amp; Types</h3>
+            <div class="table-scroll">
+              <table class="ref-table">
+                <thead>
+                  <tr>
+                    <th>Construct</th>
+                    <th>Surface Syntax</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Module &amp; Import</td>
+                    <td><code>module Name.Path;</code> &middot; <code>import Vela.Numerics;</code></td>
+                    <td><span class="status-pill status-p">P</span> / <span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>Required-Static Constant</td>
+                    <td><code>public const T Name = expr;</code> / local <code>const T x = expr;</code></td>
+                    <td><span class="status-pill status-p">P</span></td>
+                  </tr>
+                  <tr>
+                    <td>Function &amp; Static Param</td>
+                    <td><code>public [const] T Name(const U cfg, V val) { ... }</code></td>
+                    <td><span class="status-pill status-p">P</span></td>
+                  </tr>
+                  <tr>
+                    <td>Mathematical Definition</td>
+                    <td><code>public definition T Name&lt;...&gt;(...) =&gt; expr;</code></td>
+                    <td><span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>Theorem &amp; Lemma</td>
+                    <td><code>public lemma Name(...) ensures P proof { ... }</code></td>
+                    <td><span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>Record &amp; Property</td>
+                    <td><code>record R(T F) invariant I: P { public T Prop =&gt; e; }</code></td>
+                    <td><span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>Union &amp; Interfaces</td>
+                    <td><code>union U { Case(T x); Empty(); }</code> &middot; <code>interface</code> / <code>impl</code></td>
+                    <td><span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>Indexed &amp; Ownership Types</td>
+                    <td><code>Vec&lt;T, n&gt;</code>, <code>Fin&lt;n&gt;</code>, <code>Seq&lt;T&gt;</code>, <code>Slots&lt;T, cap&gt;</code>, <code>TextBuilder&lt;cap&gt;</code></td>
+                    <td><span class="status-pill status-m">M</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="ref-table-card">
+            <h3>Operator Precedence (Weakest to Strongest)</h3>
+            <div class="table-scroll">
+              <table class="ref-table">
+                <thead>
+                  <tr>
+                    <th>Level</th>
+                    <th>Operators &amp; Forms</th>
+                    <th>Assoc</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>1&ndash;2</td>
+                    <td><code>x =&gt; e</code>, <code>forall (T x) =&gt; P</code>, <code>if (c) a else b</code>, <code>==&gt;</code>, <code>&lt;==&gt;</code></td>
+                    <td>Right</td>
+                    <td><span class="status-pill status-m">M</span> / <span class="status-pill status-s">S</span></td>
+                  </tr>
+                  <tr>
+                    <td>3&ndash;4</td>
+                    <td>Logical OR <code>||</code> (3), Logical AND <code>&amp;&amp;</code> (4)</td>
+                    <td>Left</td>
+                    <td><span class="status-pill status-p">P</span></td>
+                  </tr>
+                  <tr>
+                    <td>5&ndash;6</td>
+                    <td><code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>e is P</code> (5); Range <code>a..b</code> (6)</td>
+                    <td>None</td>
+                    <td><span class="status-pill status-p">P</span> / <span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>7&ndash;9</td>
+                    <td>Bitwise <code>|</code> (7), <code>^</code> (8), <code>&amp;</code> (9)</td>
+                    <td>Left</td>
+                    <td><span class="status-pill status-m">M</span> / <span class="status-pill status-s">S</span></td>
+                  </tr>
+                  <tr>
+                    <td>10&ndash;11</td>
+                    <td>Additive <code>+</code>, <code>-</code> (10); Multiplicative <code>*</code>, <code>/</code>, <code>%</code> (11)</td>
+                    <td>Left</td>
+                    <td><span class="status-pill status-p">P</span></td>
+                  </tr>
+                  <tr>
+                    <td>12</td>
+                    <td>Record functional update <code>e with { Field = v, ... }</code></td>
+                    <td>Left</td>
+                    <td><span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>13</td>
+                    <td>Prefix <code>!</code>, <code>-</code>, <code>move</code>, <code>in</code>, <code>ref</code>, <code>out</code></td>
+                    <td>Right</td>
+                    <td><span class="status-pill status-p">P</span> / <span class="status-pill status-m">M</span></td>
+                  </tr>
+                  <tr>
+                    <td>14&ndash;15</td>
+                    <td>Calls <code>f(...)</code>, <code>.Member</code>, <code>e[i]</code>, <code>F&lt;T&gt;(...)</code>, <code>e?</code>, <code>match</code></td>
+                    <td>Left</td>
+                    <td><span class="status-pill status-p">P</span> / <span class="status-pill status-m">M</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="verification" class="content-section content-section-alt">
+      <div class="section-inner">
+        <div class="section-header">
+          <p class="eyebrow">Assurance &amp; Verification Boundary</p>
+          <h2>From Vela source to kernel-checked Rocq and Clight</h2>
+          <p>
+            Vela separates rapid interactive feedback from foundational kernel verification. Every
+            obligation discharged by the domain solver is recorded as an explicit, auditable entry in
+            the solver-trust ledger rather than silently elided.
+          </p>
+        </div>
+
+        <div class="pipeline-strip" aria-label="Vela compilation and verification pipeline">
+          <div class="pipeline-step">
+            <span class="pipeline-num">01</span>
+            <strong>Token-Only Surface Grammar</strong>
+            <p>Strict UTF-8 source parsed without symbol-table feedback or syntactic ambiguity.</p>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-num">02</span>
+            <strong>Authoring, Lints &amp; LSP</strong>
+            <p>Canonical formatting, <code>VELA100</code>&ndash;<code>VELA105</code> lints, and source-bound UTF-16 navigation.</p>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-num">03</span>
+            <strong>Pure &amp; Dependent Elaboration</strong>
+            <p>Automatic source selection between pure <code>Nat</code>/<code>bool</code> translation and full CIC elaboration.</p>
+          </div>
+          <div class="pipeline-step">
+            <span class="pipeline-num">04</span>
+            <strong>Rocq Kernel Replay &amp; Ledger</strong>
+            <p>Independent verification via <code>rocq c</code> and <code>rocqchk</code> with explicit solver-trust auditing.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="specifications" class="content-section">
+      <div class="section-inner">
+        <div class="section-header">
+          <p class="eyebrow">Documentation Corpus</p>
+          <h2>Specifications, prototypes, and extension dossiers</h2>
+          <p>
+            Explore the complete Vela specification corpus in the repository, or launch the native
+            Menhir + Python toolchain locally via <code>python tools/run.py</code>.
+          </p>
+        </div>
+
+        <div class="specs-grid">
+          <div class="spec-group">
+            <h3>Language Specifications (<code>docs/language/</code>)</h3>
+            <ul class="spec-links">
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/language/reference.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Language Reference</strong>
+                  <span>Declarations, types, loans, contracts, expressions, statements, patterns, proofs</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/language/first-release.md" target="_blank" rel="noopener noreferrer">
+                  <strong>First-Release Boundary</strong>
+                  <span>Primitive semantics, module rules, ownership libraries, and first-slice qualification</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/language/core-design.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Core Design &amp; Loans</strong>
+                  <span>Explicit loan/mutation calculus, refinement tier, and proof obligations</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/language/surface-grammar.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Surface Grammar</strong>
+                  <span>Concrete syntax, operator precedence, patterns, constants, and familiar ergonomics</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="spec-group">
+            <h3>Toolchain &amp; IDE (<code>docs/tooling/</code>)</h3>
+            <ul class="spec-links">
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/tooling/elaboration-prototype.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Mathematical Elaborator</strong>
+                  <span>Generic dependent mathematics, first-class proofs, and Rocq kernel replay</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/tooling/playground.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Browser Playground Contract</strong>
+                  <span>Monaco editor, pure and dependent elaboration, console reducer, and security boundary</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/tooling/lsp-prototype.md" target="_blank" rel="noopener noreferrer">
+                  <strong>LSP Server Prototype</strong>
+                  <span>Diagnostics, hover, definition, references, document symbols, inlay hints, and formatting</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/tooling/authoring-tools.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Authoring Tools</strong>
+                  <span>Canonical formatter, advisory lints (<code>VELA100</code>&ndash;<code>VELA105</code>), and binding previews</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="spec-group">
+            <h3>Assurance &amp; Extensions (<code>docs/assurance/</code> &amp; <code>extensions/</code>)</h3>
+            <ul class="spec-links">
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/assurance/verification-strategy.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Verification Strategy</strong>
+                  <span>Kernel-honest elaboration boundary, permanent exclusions, and tool qualification</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/assurance/compiler-route-contract.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Compiler Route Contract</strong>
+                  <span>Retained compiler route and source-to-artifact correspondence</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/docs/extensions/README.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Extension Dossiers</strong>
+                  <span>Graded foundation, algebraic handlers/async, interior mutability, and metaprogramming</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/symbiogenesis/VelaLang/blob/main/PLAN.md" target="_blank" rel="noopener noreferrer">
+                  <strong>Execution Plan (<code>PLAN.md</code>)</strong>
+                  <span>Backlog (<code>Q25</code> series), delivery stages, and acceptance predicates</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <div class="footer-brand">
+          <strong>VelaLang</strong> &middot; Verification-aware systems and mathematical authoring language
+        </div>
+        <div class="footer-links">
+          <a href="#overview">Top</a>
+          <a href="#playground">Playground</a>
+          <a href="https://github.com/symbiogenesis/VelaLang" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/symbiogenesis/VerifiedOS" target="_blank" rel="noopener noreferrer">VerifiedOS</a>
+          <a href="https://github.com/symbiogenesis/VelaLang/blob/main/COPYRIGHT.md" target="_blank" rel="noopener noreferrer">License (Apache-2.0 / CC-BY-4.0)</a>
+        </div>
+      </div>
+    </footer>
+
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>
