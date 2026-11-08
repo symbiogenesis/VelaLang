@@ -9,7 +9,7 @@ assembler around it.
 
 **The rows are generated from the model, not transcribed from it and not read out of the
 RISC-V manuals.** They were transcribed once, and the inversion is M1.4-prime's: the table is
-now emitted by [dialectgen.py](dialectgen.py) out of the bundle the model writes about
+now emitted by [dialectgen.py](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/dialectgen.py) out of the bundle the model writes about
 itself, held byte-for-byte by K-88, and loaded here. A fact has one owner and every other
 statement of it is generated; a hand-written restatement held equal by a rule is the
 older discipline, because the rule can only tell you the two disagree after they already

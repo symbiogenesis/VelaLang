@@ -22,13 +22,18 @@ class Command:
 
 
 COMMANDS: tuple[Command, ...] = (
-    Command("test", "vela.cli.test",
-            "the Vela toolchain's behavioral tests"),
+    Command("gate", "vela.cli.gate",
+            "run check, markdown, and typecheck in one static verdict"),
+    Command("check", "vela.cli.check",
+            "REUSE v3.3, SPDX headers, EditorConfig, glyph hygiene, and source-comment links"),
+    Command("markdown", "vela.cli.markdown",
+            "closed-world Markdown linting and link validation under pinned rumdl"),
     Command("typecheck", "vela.cli.typecheck",
             "the tools' own Python, under two pinned checkers"),
     Command("prepare", "vela.cli.prepare",
-            "format selected changed files with locked tools, without builds",
-            lane="guest", host_ok=frozenset({"python"})),
+            "format selected Python or Markdown files with locked tools, without builds"),
+    Command("test", "vela.cli.test",
+            "the Vela toolchain's behavioral tests"),
     Command("vela", "vela.cli.vela",
             "check pure Vela prototype source and emit unqualified Gallina definitions"),
     Command("vela-lsp", "vela.cli.vela_lsp",

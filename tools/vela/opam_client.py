@@ -6,8 +6,8 @@ the two have to agree for a reason no switch lock records: a Sail switch reports
 client that built it in its version string, `sail @ opam-v<client> <release>`, so one
 lock built under two clients yields two identities. This module is the one owner of
 the client's reviewed release and its per-architecture SHA-256 values, which
-[guest bootstrap](../ci/bootstrap_guest.py) verifies its download against and
-[`run.py provision`](cli/provision.py) holds the installed client to, of the one
+[guest bootstrap](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/ci/bootstrap_guest.py) verifies its download against and
+[`run.py provision`](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/cli/provision.py) holds the installed client to, of the one
 route both take to install it, and of the one route both take to create a root on the
 package repositories. A client is
 replaced deliberately rather than repaired: a client rewrites a root whose format is

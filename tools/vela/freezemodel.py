@@ -6,12 +6,12 @@ executable object is in that encoding, so a wrong answer here is not a recompile
 stored code invalidated wholesale. That is the one place in this tree where a tool's
 output cannot be repaired downstream, which is why the arithmetic is stated twice on
 purpose and the two statements are compared: this module, and
-[tools/quickchick/FreezeModel.v](../quickchick/FreezeModel.v), which states the same
+[tools/quickchick/FreezeModel.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/quickchick/FreezeModel.v), which states the same
 model in Gallina and prints what it computes. `run.py quickchick freeze` runs the second
 and holds it against the first.
 
 **Owned here rather than in the quarantine, for the reason
-[freezeschema.py](freezeschema.py) is.** There are two ends of this arithmetic now: the
+[freezeschema.py](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/freezeschema.py) is.** There are two ends of this arithmetic now: the
 deferred instrument that reports it and the comparison that checks it, and K-83 holds the
 landing loop out of the quarantine while leaving the other direction open, which is why
 this file may not spell that directory's path either. So the model lives here and the

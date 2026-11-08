@@ -2,20 +2,18 @@
 """Prepare explicitly selected files with the locked formatters, without builds."""
 
 import argparse
-import os
-import shutil
 import subprocess
 import sys
 import sysconfig
 from pathlib import Path
 
-from vela import corpus, env, pyversion, toolenv
+from vela import corpus, markdown, pyversion, toolenv
 from vela.cli import Table, dispatch
 
 
 def selected(root: Path, names: list[str], scope: str) -> list[str]:
     """Resolve ordinary files inside the selected owner; refuse aliasing and escapes."""
-    if not names or scope not in {"python", "model"}:
+    if not names or scope not in {"python", "markdown"}:
         raise ValueError("preparation requires explicit files and a known owner")
     base = root.resolve()
     result: list[str] = []
@@ -32,8 +30,8 @@ def selected(root: Path, names: list[str], scope: str) -> list[str]:
         if scope == "python":
             if relative.parts[0] != "tools" or relative.suffix != ".py":
                 raise ValueError(f"Python preparation requires tools/*.py: {name}")
-        elif (relative.parts[0] != "model" or relative.parts[:2] == ("model", "dependencies")):
-            raise ValueError(f"model preparation requires authored model files: {name}")
+        elif relative.suffix != ".md":
+            raise ValueError(f"Markdown preparation requires *.md files: {name}")
         spelling = relative.as_posix()
         if spelling in result:
             raise ValueError(f"duplicate selected file: {name}")
@@ -60,35 +58,32 @@ def python_prepare(root: Path, names: list[str], *, check: bool) -> int:
                           cwd=tools, check=False, timeout=120).returncode
 
 
-def model_prepare(root: Path, names: list[str]) -> int:
-    """The pinned CI hooks on selected files, with native private hook storage."""
-    paths = selected(root, names, "model")
-    if sys.platform != "linux":
-        raise ValueError("model hooks require the guest; use python tools/run.py prepare model")
-    lane = env.load(toolchain=False).lane_root / "model-hooks"
-    uv = shutil.which("uv")
-    if uv is None:
-        raise ValueError("the locked uv client is required")
-    child = os.environ.copy()
-    child.update({
-        "UV_PROJECT_ENVIRONMENT": str(lane / "venv-model"),
-        "PRE_COMMIT_HOME": str(lane / "pre-commit"),
-        "VIRTUALENV_OVERRIDE_APP_DATA": str(lane / "virtualenv"),
-        "PIP_CONSTRAINT": str(root / "tools/ci/model-hooks-constraints.txt"),
-        "PIP_BUILD_CONSTRAINT": str(root / "tools/ci/model-hooks-build-constraints.txt"),
-        "PIP_UPLOADED_PRIOR_TO": "P3D", "SKIP": "markdown-link-check",
-    })
-    argv = [uv, "run", "--project", "tools", "--locked", "--exact", "--only-group", "model",
-            "--no-python-downloads", "pre-commit", "run", "--config", "model/.pre-commit-config.yaml",
-            "--show-diff-on-failure", "--files", *paths]
-    return subprocess.run(argv, cwd=root, env=child, check=False, timeout=1800).returncode
+def markdown_prepare(root: Path, names: list[str], *, check: bool) -> int:
+    """Format or check explicitly selected Markdown files with the locked rumdl edition."""
+    paths = selected(root, names, "markdown")
+    executable = toolenv.ensure_rumdl(root)
+    if executable is None:
+        raise ValueError("preparation requires the locked environment's rumdl executable")
+    pin = toolenv.checker_pins(root)["rumdl"]
+    version = subprocess.run([str(executable), "--version"], cwd=root,
+                             capture_output=True, text=True, check=True, timeout=30)
+    if version.stdout.strip() != f"rumdl {pin}":
+        raise ValueError("preparation requires the locked environment's exact rumdl edition")
+    cfg_findings = markdown.settings_findings(root / markdown.CONFIG)
+    if cfg_findings:
+        raise ValueError("; ".join(cfg_findings))
+    argv = [str(executable), "check", "--no-cache", "--config", str(root / markdown.CONFIG)]
+    if not check:
+        argv.append("--fix")
+    return subprocess.run([*argv, "--", *(str(root / path) for path in paths)],
+                          cwd=root, check=False, timeout=120).returncode
 
 
 def run(args: argparse.Namespace) -> int:
     try:
         root = corpus.find_root()
         code = (python_prepare(root, args.path, check=args.check) if args.command == "python"
-                else model_prepare(root, args.path))
+                else markdown_prepare(root, args.path, check=args.check))
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         print(f"FAIL prepare: {error}")
         return 1
@@ -97,13 +92,12 @@ def run(args: argparse.Namespace) -> int:
 
 
 TABLE: Table = {"python": (run, "locked Ruff import ordering on selected Python files"),
-                "model": (run, "locked model hooks on selected authored files")}
+                "markdown": (run, "locked rumdl formatting on selected Markdown files")}
 
 
-def flags(name: str, parser: argparse.ArgumentParser) -> None:
+def flags(_name: str, parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--path", action="append", required=True, help="selected file; repeatable")
-    if name == "python":
-        parser.add_argument("--check", action="store_true", help="report import ordering without rewriting")
+    parser.add_argument("--check", action="store_true", help="report findings without rewriting")
 
 
 def main(argv: list[str] | None = None) -> int:

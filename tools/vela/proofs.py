@@ -4,21 +4,21 @@ comments end.
 
 Name order is not a dependency order, and a `Require` compiled ahead of its dependency
 is satisfied by whatever stale `.vo` a previous run left behind, which is a green run
-about a proof nobody rebuilt. [run.py proofs](cli/proofs.py) has always derived the
-order rather than assuming it; the parse moved here when [run.py seed](cli/seed.py) needed
+about a proof nobody rebuilt. [run.py proofs](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/cli/proofs.py) has always derived the
+order rather than assuming it; the parse moved here when [run.py seed](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/cli/seed.py) needed
 the same order for a mutated copy of the same tree, on the convention that a parse two
 tools make is written once.
 
 `strip_comments` and `sentences` are here on that same convention and arrived the same
-way. They were the proof gate's own, private to [run.py proofs](cli/proofs.py), until
-[proofcites.py](proofcites.py) needed the second half of a `.v` the gate already reads: what
+way. They were the proof gate's own, private to [run.py proofs](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/cli/proofs.py), until
+[proofcites.py](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/proofcites.py) needed the second half of a `.v` the gate already reads: what
 the file *defines*, which is a sentence's opening vernacular and so is decided by where
 the comments end. Both are lexical and neither knows any Gallina: a comment nests,
 separates the tokens beside it and reads a string literal inside it whole, a string
 literal outside one is kept whole, and a sentence ends at a full stop outside both, and
 that is the whole of what they are for. Nor do they know the tokens a source declares,
 which Rocq's lexer reads whole, so the proof gate refuses a declared token they would
-read as a string, a comment or a sentence end ([proofaudit.py](proofaudit.py)).
+read as a string, a comment or a sentence end ([proofaudit.py](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/proofaudit.py)).
 
 The decoration grammar, what may stand before a command within its sentence, and the
 keywords whose sentence states a theorem are here on the same convention. The gate

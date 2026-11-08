@@ -2,7 +2,7 @@
 """The share of the build environment the proof gate runs on, kept out of env.py.
 
 The gate's implementation identity is every checkout module Python runs to import it,
-which [cli/proofs.py's `_gate_modules`](cli/proofs.py#_gate_modules) derives from
+which [cli/proofs.py's `_gate_modules`](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/cli/proofs.py) derives from
 import statements,
 and a change to any of those modules invalidates every cached proof object and kernel
 verdict. [env.py](env.py) changes for model, opam and CI reasons the gate never reads,

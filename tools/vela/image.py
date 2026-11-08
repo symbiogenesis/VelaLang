@@ -17,7 +17,7 @@ sees it.
 
 M0.12 wrote this writer so that hand-written corpus programs had something to run.
 Since M1.4-prime the backend's emitted mix is assembled into the same container, and
-[compose.py](compose.py) composes images from it; M1.4 re-homes only LLVM's
+[compose.py](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/compose.py) composes images from it; M1.4 re-homes only LLVM's
 disassembly and object tooling beside them, so another composer needs a reviewed
 replacement contract.
 """
