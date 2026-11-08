@@ -48,7 +48,7 @@ an implemented trial or production theorem.
 
 #### Q21a · Specify the core design and its qualification contract
 
-[The core contract](core-design.md) rejects at unavailable/unpriced returned-view laws and missing frontend admission. Exit, reborrow, cleanup, source and diagnostic-generation obligations remain. Independent/integrated review accepted corrections; closing review is excluded from calibration. No language refutation or implemented metatheory/frontend qualification is established.
+[The core contract](../language/core-design.md) rejects at unavailable/unpriced returned-view laws and missing frontend admission. Exit, reborrow, cleanup, source and diagnostic-generation obligations remain. Independent/integrated review accepted corrections; closing review is excluded from calibration. No language refutation or implemented metatheory/frontend qualification is established.
 
 Landed: Tier A. The reasoned rejection closes this decision while preserving
 its conditional contract and reopening evidence. No metatheory, frontend
@@ -72,7 +72,7 @@ grant or production theorem.
 
 ### Q25 · Design the full graded dependent language and its control and mutation rules
 
-The [full-language commitments](verification-strategy.md#full-language-design-commitments), [assurance presets](extensions/assurance-profiles.md) and [composition review](extensions/full-language-review.md) are completed design and qualification planning, covered by Q25a–Q25d. They join graded dependent typing, handlers, structured async/cancellation and guarded mutation.
+The [full-language commitments](verification-strategy.md#full-language-design-commitments), [assurance presets](../extensions/assurance-profiles.md) and [composition review](../extensions/full-language-review.md) are completed design and qualification planning, covered by Q25a–Q25d. They join graded dependent typing, handlers, structured async/cancellation and guarded mutation.
 
 Frontend commissioning remains blocked by the interpretation commitment and register acts. The bounded-pool amendment, concrete CHERI laws, metatheory, frontend/backend and target qualification remain with their owners. No executed language or production binary is supplied. Children own evidence and actuals; this parent duplicates no estimate or effort, and settled integration supplies host validation.
 
@@ -82,7 +82,7 @@ Landed: Tier A. The combined design and its recorded acceptance boundaries are r
 
 #### Q25a · Specify the graded dependent foundation
 
-The [foundation dossier](extensions/graded-foundation.md) specifies grades, dependent contexts and constructors, structural rules and substitution, with explicit inference, specialization, ABI and source-correspondence limits. Its examples separate exact use, erasure and resource authority.
+The [foundation dossier](../extensions/graded-foundation.md) specifies grades, dependent contexts and constructors, structural rules and substitution, with explicit inference, specialization, ABI and source-correspondence limits. Its examples separate exact use, erasure and resource authority.
 
 At `6d0ee4e`, focused checks pass; integration reads the dossier against the strategy, synchronous core, sibling interfaces and register. Paper derivations supply no soundness theorem, concrete CHERI instance, executed negative case or qualified binary. The `GF-*` laws remain implementation obligations. Accounting: 0.2 h author/check actual; Q25d owns shared review, integration and host validation.
 
@@ -98,7 +98,7 @@ missing laws at Q25a's design predicate. It opens no frontend implementation.
 
 #### Q25b · Specify handlers and structured async lifecycles
 
-The [control dossier](extensions/handlers-async.md) specifies handler lookup/capture, resumption/disposal and bounded represented async reactions. Cancellation arrival, decision, commit, terminal publication and reuse are distinct; suffix bounds include child-result collection before cleanup dispatch.
+The [control dossier](../extensions/handlers-async.md) specifies handler lookup/capture, resumption/disposal and bounded represented async reactions. Cancellation arrival, decision, commit, terminal publication and reuse are distinct; suffix bounds include child-result collection before cleanup dispatch.
 
 Authoring `9503081` and independent review `1faa273` receive integration corrections to the cancellation bound and checkpoint order. The authored traces remain conditional derivations; `HA-*` laws, target bounds and frontend admission are unimplemented. Accounting: 0.2 h author/check actual; Q25d owns shared review, integration and final host checks. No guest measurement is claimed.
 
@@ -118,7 +118,7 @@ the bound and checkpoint-order corrections, with all target laws still explicit.
 
 #### Q25c · Specify interior mutability and interference guardrails
 
-The [cell dossier](extensions/interior-mutability.md) specifies local/dynamic-borrow interfaces, invariant access, capture/sharing, publication, quiescence and source exits. `CountCell` conserves `AddOnce` allowances through one AMO commit; capability storage remains private. Functional, race, progress and leakage claims retain separate premises and missing `MUT-*` laws.
+The [cell dossier](../extensions/interior-mutability.md) specifies local/dynamic-borrow interfaces, invariant access, capture/sharing, publication, quiescence and source exits. `CountCell` conserves `AddOnce` allowances through one AMO commit; capability storage remains private. Functional, race, progress and leakage claims retain separate premises and missing `MUT-*` laws.
 
 At `1f2d633`, focused checks pass; independent review and integration correct frame release and initialization/cancellation joins. Concrete CHERI witnesses and source-to-Sail correspondence remain owed; wrappers and grades supply no sharing authority. Accounting: 0.2 h author/check actual; Q25d owns shared review, integration and final host checks. No executed language or guest evidence is claimed.
 
@@ -134,7 +134,7 @@ protocol and qualification cases with their unmechanized obligations preserved.
 
 #### Q25d · Review the combined calculus and price its implementation
 
-The [composition dossier](extensions/full-language-review.md) joins the common client, refusal cases and laws over the named byte-and-capability carrier. It supplies reviewed ownership, conditional prices and acceptance predicates for the design debts, frontend and qualification increments, retaining unpriced foundation work. It constructs no carrier inhabitant or checked metatheory.
+The [composition dossier](../extensions/full-language-review.md) joins the common client, refusal cases and laws over the named byte-and-capability carrier. It supplies reviewed ownership, conditional prices and acceptance predicates for the design debts, frontend and qualification increments, retaining unpriced foundation work. It constructs no carrier inhabitant or checked metatheory.
 
 Admission is arm-dependent. A calculus interpreted by elaboration into an existing anchor can use R-05-009; the authored source judgments/reductions instead propose an eighth anchor refused by R-05-019/R-05-020. Frontend rows remain uncommissioned until the interpretation commitment and clarifying register act. R-08-046's inventory classification is negative: new runtime storage needs a proposed inventory/prose amendment, ordered after frontend admission. F-354's disposition separates those acts.
 
@@ -146,12 +146,12 @@ Landed: Tier A. The review states new claims about which admission arm the combi
 
 #### Q25e · Build a pure Vela-to-Gallina prototype
 
-The [pure translation contract](vela-prototype.md) landed at
+The [pure translation contract](../tooling/pure-prototype.md) landed at
 `d8b1cb38` before implementation. The host `vela` command checks explicit Nat/bool
 functions, immutable bindings, branches and prior-function calls, then emits
 hygienic Gallina definitions bound to exact source bytes. Diagnostics retain source
 locations; rejected source and failed atomic file writes preserve existing output.
-The [authored example](../examples/pure.vela) and independent expected
+The [authored example](../../examples/pure.vela) and independent expected
 terms exercise the fragment. Boolean equality binds operands once to keep emitted
 text linear in source size.
 
@@ -171,11 +171,11 @@ file preservation from standard-output streaming.
 
 #### Q25f · Align the executable Vela subset with its proposed surface
 
-The [surface contract](vela-prototype.md#source-fragment) landed at
+The [surface contract](../tooling/pure-prototype.md#source-fragment) landed at
 `2cac393c` before the parser correction. Public declarations and parameters put
 types first, Boolean types use `bool`, and immutable locals precede explicit
 returns or fully returning `if (condition)` blocks. The
-[example](../examples/pure.vela), independent term oracle and rejection
+[example](../../examples/pure.vela), independent term oracle and rejection
 cases use those conventions from the
 [proposed surface](verification-strategy.md#an-ideal-surface).
 The superseded prototype spellings, missing returns, trailing statements,
@@ -196,7 +196,7 @@ design dossier and the parser against independently chosen returning-block cases
 #### Q25j · Prototype path-sensitive loan-end inference over explicit flow facts
 
 Accepted on 2026-11-03 at the
-[bounded diagnostic boundary](loan-analysis.md#diagnostic-disposition).
+[bounded diagnostic boundary](../language/loan-analysis.md#diagnostic-disposition).
 Independent algorithm and fixture review accepts separate complete-path demand,
 transitive captures and moved handles, footprint restrictions, descendant-first
 restoration and explicit structural/budget refusals. The independent branch-demand
@@ -226,9 +226,9 @@ states the receiver-loan exception with its evaluation order, named-view footpri
 and alias checks; ordinary arguments retain explicit modifiers. The callback
 examples use typed local bindings to retain their per-call effect capability and
 provide a place for `in`. The
-[assurance policy](extensions/assurance-profiles.md#evidence-beside-the-declaration)
+[assurance policy](../extensions/assurance-profiles.md#evidence-beside-the-declaration)
 requires current claim status and endpoint beside rendered declarations. The
-[handler contract](extensions/handlers-async.md#compositional-handler-summaries)
+[handler contract](../extensions/handlers-async.md#compositional-handler-summaries)
 separates whole-exploration source work, peak live frames, reserved storage and
 target cost. Existing syntax and implementation owners carry these duties.
 
@@ -253,7 +253,7 @@ anchor was amended.
 
 #### Q25m · Specify staged Vela metaprogramming and compiler services
 
-The [metaprogramming contract](extensions/metaprogramming.md) specifies
+The [metaprogramming contract](../extensions/metaprogramming.md) specifies
 ordinary static computation, opt-in compiler reification/schema dictionaries and
 hygienic construction carrying dependent contexts, grades, captures, effects and
 exit resources. Static availability is separate from ghost status, erasure and
@@ -297,7 +297,7 @@ requirement, coverage cell, semantic anchor or kernel equality was amended.
 #### Q25s · Attach Vela documentation comments to compiler facts
 
 Accepted on 2026-11-03 for public functions and constants in the pure compiler.
-The [independent qualification](documentation-qualification.md) covers the
+The [independent qualification](../tooling/documentation-qualification.md) covers the
 compiler-selected declaration site, original UTF-8 witnesses, bounded plain-text
 hover and complete refusal of forged or stale documentation. At `e29b9547`,
 focused documentation, formatter and lint controls pass, including attachment
@@ -320,7 +320,7 @@ projection, edit invalidation and the independently expected refusal/wire cases.
 #### Q25t · Integrate default Vela formatting and lints
 
 Accepted on 2026-11-03 for the pure compiler's
-[source-preserving command policy](authoring-tools.md#pure-formatting-and-lint-disposition).
+[source-preserving command policy](../tooling/authoring-tools.md#pure-formatting-and-lint-disposition).
 Ordinary checks and emission preserve exact source snapshots; explicit formatting
 preserves tokens, comments, attachment and reparsed syntax. Emission identifies
 the original bytes, or the formatted bytes only after an explicit write.
@@ -345,7 +345,7 @@ atomic publication paths, owner predicates and independent preservation controls
 ### Q25v · Settle the bounded Vela release and practical language contracts
 
 Accepted on 2026-11-03 as a design and planning change. The
-[first-release contract](first-release.md) selects bounded
+[first-release contract](../language/first-release.md) selects bounded
 synchronous software through one retained backend, explicit scalar/text and
 package semantics, and usable initialization/loan libraries. The
 [critique dispositions](critique.md#vela-interface-clarity) map the
@@ -361,7 +361,7 @@ sequential helper execution, ordinary error payloads and task-failure outcomes.
 Q25t owns the executable source-preserving default check/emission policy and
 its independent byte-preservation and explicit-write controls.
 
-The [delivery sequence](../PLAN.md#vela-first-release-delivery) commissions
+The [delivery sequence](../../PLAN.md#vela-first-release-delivery) commissions
 Q25w's finite foundation investigation with separate successful-candidate and
 blocked-result predicates. Later component, independent-package and release
 stages require actual prerequisites and separately priced acceptance. This item
@@ -389,7 +389,7 @@ not source metatheory or executable acceptance.
 
 Completed on 2026-11-06 as a blocked outcome under the finite
 foundation-investigation contract in
-[first-release.md](first-release.md#first-slice-qualification).
+[first-release.md](../language/first-release.md#first-slice-qualification).
 It supplies a concrete `Span<byte>` candidate and target-execution slice but no
 candidate acceptance: most of the candidate's laws, scenarios and contracts reach
 the kernel only as tautologies (item 2), and the inspected upstream Sail and
@@ -397,8 +397,8 @@ machine-logic blockers keep full machine-refinement closure and subsequent
 delivery stages closed:
 
 1. **Concrete `Span<byte>` carrier, inhabited byte case and contract elaboration
-   ([tools/toolchain/elaborate.py](../tools/toolchain/elaborate.py),
-   [examples/first_slice.vela](../examples/first_slice.vela)):**
+   ([tools/toolchain/elaborate.py](../../tools/toolchain/elaborate.py),
+   [examples/first_slice.vela](../../examples/first_slice.vela)):**
    `Span<byte>` elaborates to `vela_Span` over `vela_ByteStore` (`nat -> vela_u8`)
    paired with `Base`, `Length`, `Tag`, `PermRead`, `PermWrite` and derived
    `CanRead`/`CanWrite` predicates. Bounded operations `Span.AllocZeroed`,
@@ -442,7 +442,7 @@ delivery stages closed:
    [Q25af and Q25ag](critique.md#vela-evidence-and-surface-review)
    own honest emission and slice conformance.
 3. **Capacity-invariance gate, semantic negative controls and target execution
-   ([tools/toolchain/first_slice.py](../tools/toolchain/first_slice.py)):**
+   ([tools/toolchain/first_slice.py](../../tools/toolchain/first_slice.py)):**
    checking at static capacity $N = 8$ (`8usize`) and $N = 10^9$
    (`1_000_000_000usize`) produces identical obligation counts (`9`), inference
    work steps (`11765`), reduction steps (`79`) and emitted Gallina size (`86299`
@@ -486,7 +486,7 @@ delivery stages closed:
    `rv64d.v`, mechanized Sail-to-Clight/CompCert refinement for `first_slice.c`,
    and user-managed Host CI and Guest CI runs could not run or remain pending and
    supply no passing verdict. Subsequent stages in
-   [Vela first-release delivery](../PLAN.md#vela-first-release-delivery) remain
+   [Vela first-release delivery](../../PLAN.md#vela-first-release-delivery) remain
    unpriced until those owners land.
 
 The original 24 h estimate, range 16–32, is retained because earlier authoring
@@ -502,7 +502,7 @@ foundation-reuse review, plus local `test_vela_first_slice`, `vela-parser first-
 #### Q25aa · Build a local Vela browser playground
 
 Accepted on 2026-11-03 as a local development demo under the
-[playground contract](playground.md). The host launch command
+[playground contract](../tooling/playground.md). The host launch command
 serves Monaco with syntax coloring, actual pure LSP diagnostics/navigation,
 type hints, semantic tokens and explicit formatting. Compile displays the
 compiler's source-bound Gallina; the expression console reuses its existing
@@ -544,7 +544,7 @@ compiler/protocol/browser evidence accept this bounded development demo.
 #### Q25ab · Extend the Vela playground authoring and inspection controls
 
 Accepted on 2026-11-03 as a local development increment under the
-[playground contract](playground.md#authoring-and-inspection-increment).
+[playground contract](../tooling/playground.md#authoring-and-inspection-increment).
 Authoring checks expose the existing compiler's advisory lints and rechecked
 explicit-binding candidate through the bounded isolated worker. Preview apply
 requires the unchanged source snapshot and supports undo. The visible outline
@@ -584,11 +584,11 @@ compiler/protocol/browser evidence accept this bounded local increment.
 
 Accepted on 2026-11-07 under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a), the
 [evidence review](critique.md#vela-evidence-and-surface-review)
-and the [primitive contract](first-release.md#primitive-semantics).
-The mathematical elaborator ([tools/toolchain/elaborate.py](../tools/toolchain/elaborate.py),
-[elaborate_declarations.py](../tools/toolchain/elaborate_declarations.py),
-[elaborate_types.py](../tools/toolchain/elaborate_types.py) and
-[solver_ledger.py](../tools/toolchain/solver_ledger.py)) emits the real
+and the [primitive contract](../language/first-release.md#primitive-semantics).
+The mathematical elaborator ([tools/toolchain/elaborate.py](../../tools/toolchain/elaborate.py),
+[elaborate_declarations.py](../../tools/toolchain/elaborate_declarations.py),
+[elaborate_types.py](../../tools/toolchain/elaborate_types.py) and
+[solver_ledger.py](../../tools/toolchain/solver_ledger.py)) emits the real
 source proposition for every contract `ensures`, `restores` and theorem
 obligation instead of substituting `true = true` or reflexive `x = x`
 tautologies. Obligations for which the elaborator constructs a kernel proof term
@@ -600,7 +600,7 @@ entry in `solver_trust`. Exclusive `ref` parameters emit kernel post-state
 images (`_post_<param>`) so postconditions and restoration obligations state the
 callable's actual effect.
 
-In the Gallina prelude ([elaborate_types.py](../tools/toolchain/elaborate_types.py)),
+In the Gallina prelude ([elaborate_types.py](../../tools/toolchain/elaborate_types.py)),
 fixed-width integers (`u8`..`u64`, `i8`..`i64`, `usize`, `byte`) are represented
 over little-endian bit lists of width `vela_int_bits k`. Wrapping, saturating
 and checked addition, subtraction, multiplication, division, remainder, negation
@@ -608,8 +608,8 @@ and bitwise shifts, two's-complement signed comparisons (`vela_int_slt`..`vela_i
 and widening/narrowing/checked conversions (`vela_int_from`, `vela_int_try_from`,
 `vela_int_to_nat`, `vela_nat_to_usize`) replace the prior identity and
 placeholder definitions. Independent value controls in
-[test_vela_primitives.py](../tools/tests/test_vela_primitives.py) and
-[test_vela_solver_ledger.py](../tools/tests/test_vela_solver_ledger.py)
+[test_vela_primitives.py](../../tools/tests/test_vela_primitives.py) and
+[test_vela_solver_ledger.py](../../tools/tests/test_vela_solver_ledger.py)
 check boundary values, signedness, overflow/zero-divisor/invalid-shift `Err`
 outcomes, non-tautological obligation types and exact `Print Assumptions`
 agreement with `solver_trust`.
@@ -625,10 +625,10 @@ accounting, bit-list Gallina primitive definitions and local kernel replay.
 
 #### Q25ag · Conform the Vela first slice to the synchronous design
 
-Accepted on 2026-11-07 under the [synchronous core](core-design.md#loans-and-control-flow)
-and [first-slice qualification contract](first-release.md#first-slice-qualification).
-[examples/first_slice.vela](../examples/first_slice.vela)
-and [tools/toolchain/first_slice.py](../tools/toolchain/first_slice.py) conform
+Accepted on 2026-11-07 under the [synchronous core](../language/core-design.md#loans-and-control-flow)
+and [first-slice qualification contract](../language/first-release.md#first-slice-qualification).
+[examples/first_slice.vela](../../examples/first_slice.vela)
+and [tools/toolchain/first_slice.py](../../tools/toolchain/first_slice.py) conform
 to the synchronous design:
 
 - `PrepareAndValidatePacket(ref Span<byte> dst, in Span<byte> pkt) -> Result<ValidatedPacket<'dst>, ValidationError>`
@@ -671,9 +671,9 @@ qualification.
 #### Q25ah · Resolve Vela surface collisions and redundant spellings
 
 Accepted on 2026-11-07 under the [evidence review](critique.md#vela-evidence-and-surface-review)
-and [surface grammar](surface-grammar.md). Across the Menhir
-grammar ([tools/toolchain/parser/parser.mly](../tools/toolchain/parser/parser.mly)),
-lexer ([lexer.mll](../tools/toolchain/parser/lexer.mll)), pure and mathematical
+and [surface grammar](../language/surface-grammar.md). Across the Menhir
+grammar ([tools/toolchain/parser/parser.mly](../../tools/toolchain/parser/parser.mly)),
+lexer ([lexer.mll](../../tools/toolchain/parser/lexer.mll)), pure and mathematical
 elaborators, formatter and lints:
 
 1. Selective record-invariant lifting uses `open (ref this) lifts Clause, ... { ... }`,
@@ -705,7 +705,7 @@ Landed: Tier A. Full grammar, parser, elaborator, formatter and fixture review.
 #### Q25ai · Publish the Vela language reference and separate extension research
 
 Accepted on 2026-11-07 under the [evidence review](critique.md#vela-evidence-and-surface-review).
-[docs/reference.md](reference.md) provides a
+[docs/language/reference.md](../language/reference.md) provides a
 single compact reference covering lexical structure, primitive types, bindings,
 callables, contracts, records/invariants, unions/patterns, interfaces, loans and
 the explicit implementation-status matrix (`pure`, `math`, `first-slice`,
@@ -713,8 +713,8 @@ the explicit implementation-status matrix (`pure`, `math`, `first-slice`,
 `handlers-async.md`, `interior-mutability.md`, `assurance-profiles.md`,
 `metaprogramming.md`, `unified-source-contract.md`, `full-language-review.md`)
 live under `docs/extensions/`, dated external language comparisons
-live in [docs/language-landscape.md](language-landscape.md),
-and [first-release.md](first-release.md) and
+live in [docs/language/language-landscape.md](../language/language-landscape.md),
+and [first-release.md](../language/first-release.md) and
 [workflow-contract.md](workflow-contract.md) record the
 authoring and maintenance costs of arithmetic representability obligations,
 closed `effects` lists and single-tier borrow restrictions together with their

@@ -2,7 +2,7 @@
 """Independent value controls for Vela's fixed-width integer and `char` primitives.
 
 Expected values come from a reference written here over Python integers, directly
-from the [primitive contract](../../docs/first-release.md#primitive-semantics):
+from the [primitive contract](../../docs/language/first-release.md#primitive-semantics):
 truncating division through `Fraction`, modular reduction from the type's minimum,
 clamping by sorting and range tests by comparison. The reference shares no helper
 with the static evaluator or with the Gallina prelude, and both are held to it.

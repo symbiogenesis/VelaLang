@@ -14,14 +14,14 @@ record the selected checks, and leave all pushes and hosted CI to the user.
 | Artifact | Purpose |
 | --- | --- |
 | [README.md](README.md) | Overview, scope, and document map |
-| [docs/reference.md](docs/reference.md) | Vela language reference and semantic rules |
-| [docs/surface-grammar.md](docs/surface-grammar.md) | Lexical, syntactic, and formatting rules |
-| [docs/elaboration-prototype.md](docs/elaboration-prototype.md) | Dependent mathematics, elaboration, and proof kernel boundary |
-| [docs/verification-strategy.md](docs/verification-strategy.md) | Mechanization, proof-tooling qualification, and extraction boundaries |
-| [docs/tooling-protocols.md](docs/tooling-protocols.md) | Formatter, linter, LSP, and generated-test contracts |
-| [docs/playground.md](docs/playground.md) | Browser playground architecture and security boundary |
+| [docs/language/reference.md](docs/language/reference.md) | Vela language reference and semantic rules |
+| [docs/language/surface-grammar.md](docs/language/surface-grammar.md) | Lexical, syntactic, and formatting rules |
+| [docs/tooling/elaboration-prototype.md](docs/tooling/elaboration-prototype.md) | Dependent mathematics, elaboration, and proof kernel boundary |
+| [docs/assurance/verification-strategy.md](docs/assurance/verification-strategy.md) | Mechanization, proof-tooling qualification, and extraction boundaries |
+| [docs/tooling/tooling-protocols.md](docs/tooling/tooling-protocols.md) | Formatter, linter, LSP, and generated-test contracts |
+| [docs/tooling/playground.md](docs/tooling/playground.md) | Browser playground architecture and security boundary |
 | [PLAN.md](PLAN.md) | Backlog, build order, acceptance predicates, and execution state |
-| [docs/completion-log.md](docs/completion-log.md) | Recorded landing evidence |
+| [docs/assurance/completion-log.md](docs/assurance/completion-log.md) | Recorded landing evidence |
 | [tools/README.md](tools/README.md) | Commands, toolchain, validation, and tool-development rules |
 | [COPYRIGHT.md](COPYRIGHT.md) | Repository licensing and file-marking policy |
 | [THIRD-PARTY.md](THIRD-PARTY.md) | Upstream licenses and incorporation status |
@@ -30,7 +30,7 @@ record the selected checks, and leave all pushes and hosted CI to the user.
 
 - **Use current-state prose.** State the current decision, finding, and evidence; replace superseded accounts instead of appending review or search history. Write `n/a` for a not-applicable table cell, never a blank or bare dash.
 - **Link section references to their owners and read their targets.** The closed-world Markdown gate (`python tools/run.py markdown`) verifies every relative link and heading or `<a id="...">` fragment across the tracked corpus.
-- **Keep landing evidence in its assigned place.** Landed or struck items have one [completion-log](docs/completion-log.md) entry with the exact checklist label. Follow the [checklist conventions](PLAN.md#checklist-conventions).
+- **Keep landing evidence in its assigned place.** Landed or struck items have one [completion-log](docs/assurance/completion-log.md) entry with the exact checklist label. Follow the [checklist conventions](PLAN.md#checklist-conventions).
 
 ## Before incorporating an upstream
 

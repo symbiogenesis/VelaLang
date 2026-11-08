@@ -1,14 +1,14 @@
 # Full-language composition review
 
-> Non-normative Q25d integration review: composed client, representation, implementation pricing, frontend disposition and runtime-storage classification. Start with the [primary Vela design and examples](../verification-strategy.md). The [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs; [workflow commissioning](../workflow-contract.md#commissioning-disposition) retains canceled trials and re-entry conditions. No implementation, checked metatheory or target qualification is supplied. R-05-020a records the checked-interpretation classification; the later runtime-storage amendment remains a prerequisite to the features that need it.
+> Non-normative Q25d integration review: composed client, representation, implementation pricing, frontend disposition and runtime-storage classification. Start with the [primary Vela design and examples](../assurance/verification-strategy.md). The [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs; [workflow commissioning](../assurance/workflow-contract.md#commissioning-disposition) retains canceled trials and re-entry conditions. No implementation, checked metatheory or target qualification is supplied. R-05-020a records the checked-interpretation classification; the later runtime-storage amendment remains a prerequisite to the features that need it.
 
 ## Inputs and common boundary
 
-The [first-release contract](../first-release.md#release-boundary) selects synchronous software with fixed usage modes. General graded demand, async, handlers and concurrent mutation need separate commissioning. The [graded foundation](graded-foundation.md), [control/async](handlers-async.md) and [mutability](interior-mutability.md) dossiers state proof obligations about elaborated terms in existing semantic anchors, without defining independent source semantics.
+The [first-release contract](../language/first-release.md#release-boundary) selects synchronous software with fixed usage modes. General graded demand, async, handlers and concurrent mutation need separate commissioning. The [graded foundation](graded-foundation.md), [control/async](handlers-async.md) and [mutability](interior-mutability.md) dossiers state proof obligations about elaborated terms in existing semantic anchors, without defining independent source semantics.
 
 Grades create no memory permission. Each possible outcome must account for its owners, loans, mandatory results, continuations and terminal-completion duties.
 
-The [core](../core-design.md) and [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) still lack concrete CHERI laws, and [compiler routes](../compiler-route-contract.md) lack qualified source-to-machine connections. Q25's added design duties supply none of those prerequisites and reopen no rejected trial.
+The [core](../language/core-design.md) and [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) still lack concrete CHERI laws, and [compiler routes](../assurance/compiler-route-contract.md) lack qualified source-to-machine connections. Q25's added design duties supply none of those prerequisites and reopen no rejected trial.
 
 ## Composed client and inhabited entry
 
@@ -62,7 +62,7 @@ data while changing the stated resource premise.
 
 ## Conservative connection to the synchronous slice
 
-Restrict syntax/representation to the [core](../core-design.md): stable data, flow-sensitive loans, explicit exits and existing callback contracts, without handlers, async, cancellation or concurrent cells. Select domains/structural rules for those uses without weakening `Delta`; preserve runtime lengths, tags and represented values through erasure.
+Restrict syntax/representation to the [core](../language/core-design.md): stable data, flow-sensitive loans, explicit exits and existing callback contracts, without handlers, async, cancellation or concurrent cells. Select domains/structural rules for those uses without weakening `Delta`; preserve runtime lengths, tags and represented values through erasure.
 
 Conservativity must map derivations and executions to the core with identical entry/exit interpretation, effects and observations, introducing no control/memory operations or lost loan/verdict duties. Substitution, reindexing, preservation, erasure, interference and every exit must commute with the projection. That theorem and Q21a's concrete returned-view law remain unavailable.
 
@@ -94,13 +94,13 @@ Q2c records no checked constant for `machine-logic`, `byte-instance` or `scoped-
 | Changed platform behavior | No target control, synchronization, memory or TAL extension is proposed: the scalar counter and the static reaction graph reuse current mechanisms, and a design intention is not target-correspondence evidence. An extension proposed later names its exact normative owner and completes that owner's amendment predicate first. |
 | Assurance-preset policy and mixed-assurance linking | The [preset dossier](assurance-profiles.md) states the claim statuses, composition rules and coverage dimensions this client is selected under, and its policy semantics, status reporting and mixed-assurance interface checks are priced at the same table against the same frontend and evidence-package owners. A claim status is a build output and supplies no source calculus, machine interpretation or admission rule. |
 
-Donors guide these duties without discharging them. The machine-checked graded erasure work restricts modalities/contexts; VerusBelt's subset soundness model leaves its tool's erasure trusted. Dargent's declarative bit-layout accessors carry per-compilation layout proofs in Isabelle, with a trusted C parser and no capability account. Quiver completes specification sketches with checked proofs but cannot establish intended specifications. Every surveyed logic models another language, leaving concrete CHERI laws open. The [research map](../verification-strategy.md#research-landscape) owns boundaries/licences; donor citations price no work, retire no interim and close no debt.
+Donors guide these duties without discharging them. The machine-checked graded erasure work restricts modalities/contexts; VerusBelt's subset soundness model leaves its tool's erasure trusted. Dargent's declarative bit-layout accessors carry per-compilation layout proofs in Isabelle, with a trusted C parser and no capability account. Quiver completes specification sketches with checked proofs but cannot establish intended specifications. Every surveyed logic models another language, leaving concrete CHERI laws open. The [research map](../assurance/verification-strategy.md#research-landscape) owns boundaries/licences; donor citations price no work, retire no interim and close no debt.
 
 ### Reviewed implementation pricing
 
 The retained extension estimates below price parameterized obligations, not the first release or a complete delivery. [The first-release sequence](../../PLAN.md#vela-first-release-delivery) commissions only its finite foundation investigation before repricing from actual prerequisites. Each missing law, frontend component, target connection and [policy qualification stage](assurance-profiles.md#qualification-protocol) has one row, owner, estimate and predicate below.
 
-The [receiver rule](../verification-strategy.md#permanent-language-exclusions)
+The [receiver rule](../assurance/verification-strategy.md#permanent-language-exclusions)
 refines `core-frontend`'s existing resolution and loan obligations: qualify a named
 view receiver, once-only evaluation and an overlapping later argument; ordinary
 arguments still require their loan modifiers. `core-diagnostics` and
@@ -175,7 +175,7 @@ own additional implementation scope. Their costs remain `unpriced` pending
 selection of a supported slice and its interpretation, descriptor protocol and
 source-correspondence boundary. Existing ranges above are unchanged and fund no
 general evaluator, reflection API, staged calculus or public compiler-service
-implementation. The [tooling contract](../tooling-protocols.md#compiler-inspection-api)
+implementation. The [tooling contract](../tooling/tooling-protocols.md#compiler-inspection-api)
 extends these joins to concrete/typed/elaborated/analysis/lowering inspection,
 syntax assets, SARIF/SCIP, build integration, remarks and compiler traces. Their
 separate proposal owners, conditional debugger protocols and generated-output maps

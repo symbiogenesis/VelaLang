@@ -8,14 +8,14 @@
 | --- | --- |
 | [PLAN.md](PLAN.md) | Vela backlog (`Q25` series), first-release delivery stages, ergonomics roadmap, and whole-system authoring proposals |
 | [docs/README.md](docs/README.md) | Index of Vela language specifications, contracts, and extension dossiers |
-| [docs/reference.md](docs/reference.md) | Compact language reference for the synchronous first-release surface |
-| [docs/first-release.md](docs/first-release.md) | First-release boundary, primitive and module semantics, ownership libraries, and qualification |
-| [docs/core-design.md](docs/core-design.md) | Core calculus, explicit loan/ownership rules, refinement tier, and proof obligations |
-| [docs/surface-grammar.md](docs/surface-grammar.md) | Concrete syntax, operator precedence, patterns, constants, and ergonomic surface |
-| [docs/elaboration-prototype.md](docs/elaboration-prototype.md) | Generic dependent mathematics, first-class proofs, and kernel-honest Rocq replay |
-| [docs/vela-parser.md](docs/vela-parser.md) | Menhir development parser, checked-parser promotion contract, and syntax campaigns |
-| [docs/lsp-prototype.md](docs/lsp-prototype.md) | Language Server Protocol lifecycle, diagnostics, navigation, hints, and formatting |
-| [docs/playground.md](docs/playground.md) | Local browser playground with Monaco editor, pure and dependent elaboration, and expression console |
+| [docs/language/reference.md](docs/language/reference.md) | Compact language reference for the synchronous first-release surface |
+| [docs/language/first-release.md](docs/language/first-release.md) | First-release boundary, primitive and module semantics, ownership libraries, and qualification |
+| [docs/language/core-design.md](docs/language/core-design.md) | Core calculus, explicit loan/ownership rules, refinement tier, and proof obligations |
+| [docs/language/surface-grammar.md](docs/language/surface-grammar.md) | Concrete syntax, operator precedence, patterns, constants, and ergonomic surface |
+| [docs/tooling/elaboration-prototype.md](docs/tooling/elaboration-prototype.md) | Generic dependent mathematics, first-class proofs, and kernel-honest Rocq replay |
+| [docs/tooling/parser.md](docs/tooling/parser.md) | Menhir development parser, checked-parser promotion contract, and syntax campaigns |
+| [docs/tooling/lsp-prototype.md](docs/tooling/lsp-prototype.md) | Language Server Protocol lifecycle, diagnostics, navigation, hints, and formatting |
+| [docs/tooling/playground.md](docs/tooling/playground.md) | Local browser playground with Monaco editor, pure and dependent elaboration, and expression console |
 | [docs/extensions/](docs/extensions/README.md) | Extension dossiers: graded foundation, handlers/async, interior mutability, metaprogramming, assurance profiles, unified source |
 | [examples/](examples/) | Authored `.vela` examples (`pure.vela`, `constants.vela`, `expressions.vela`, `surface.vela`, `dependent.vela`, `first_slice.vela`) |
 | [tools/toolchain/parser/](tools/toolchain/parser/) | Menhir grammar (`parser.mly`), OCaml lexer (`lexer.mll`), AST, and native driver |

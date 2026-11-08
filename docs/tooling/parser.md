@@ -1,11 +1,11 @@
 # Vela development parser qualification
 
-The [primary Vela design and examples](verification-strategy.md) explains the language;
+The [primary Vela design and examples](../assurance/verification-strategy.md) explains the language;
 this contract owns the development parser's bounded qualification and retirement.
 
-The [complete development surface grammar](surface-grammar.md) extends syntax through
+The [complete development surface grammar](../language/surface-grammar.md) extends syntax through
 Q25i's separate entry point; the pure entry below remains the migration baseline.
-The selected [familiar authoring migration](surface-grammar.md#familiar-authoring-migration)
+The selected [familiar authoring migration](../language/surface-grammar.md#familiar-authoring-migration)
 is Q25z's bounded grammar/consumer increment. Public syntax entries share an
 internal token-only generic-call probe over the same authored generic productions,
 with parse-local aggregate work bounds. The parser accepts canonical generic
@@ -15,8 +15,8 @@ Native local diagnostics do not replace hosted parser/kernel qualification.
 
 ## Bounded increment
 
-[Q25g](../PLAN.md#q-assessment-actions) commissions syntax-only Menhir parsing
-of the [prototype grammar](vela-prototype.md#source-fragment), consuming the whole
+[Q25g](../../PLAN.md#q-assessment-actions) commissions syntax-only Menhir parsing
+of the [prototype grammar](pure-prototype.md#source-fragment), consuming the whole
 file before separate resolution, typing, elaboration and Gallina emission.
 Duplicate declarations and `true + 1` parse without a name/type verdict. Unsupported
 extension keywords, invalid UTF-8, incomplete input and exhaustion give located refusals.
@@ -27,12 +27,12 @@ one-based lines/columns, treating CRLF and bare CR as line endings. Keep decimal
 spellings, including leading zeros, as strings without machine-integer bounds.
 Comments may be UTF-8; identifiers are ASCII. Provenance hashes unnormalized bytes.
 
-Use Menhir 20260209's code backend and the [Sail snapshot's](../tools/opam/sail.lock)
+Use Menhir 20260209's code backend and the [Sail snapshot's](../../tools/opam/sail.lock)
 exact generator/OCaml compiler; refuse version mismatches. Native-lane build receipts
 bind authored-input digests, tool identities, arguments and generated-file digests.
 Fresh generations must be byte-identical. Track no generated parser/upstream runtime
 source and link no Menhir runtime. Before incorporation, read the release's licence
-and record output terms in [THIRD-PARTY.md](../THIRD-PARTY.md).
+and record output terms in [THIRD-PARTY.md](../../THIRD-PARTY.md).
 
 Input is bounded by the prototype's source-byte and literal-digit limits. The
 native driver also bounds delimiter nesting and raw syntax-tree depth at 256 before exposing
@@ -68,10 +68,10 @@ source correspondence and the full frontend need separate evidence.
 
 ## Generated syntax campaigns
 
-[Q25y](../PLAN.md#q-assessment-actions) qualifies reuse of the
+[Q25y](../../PLAN.md#q-assessment-actions) qualifies reuse of the
 [Menhir manual's](https://gallium.inria.fr/~fpottier/menhir/manual.html) seeded
 sentence generation and interpreter/CST inspection after the exact locked Q25g
-qualification. The [first-release delivery order](../PLAN.md#vela-first-release-delivery)
+qualification. The [first-release delivery order](../../PLAN.md#vela-first-release-delivery)
 retains Q25w's concrete foundation priority. This campaign changes neither the
 existing code backend/runtime closure nor Q25h's checked-parsing prerequisites.
 
@@ -116,7 +116,7 @@ keeps these development results separate from proof and product acceptance.
 
 ## Promotion and retirement
 
-[Q25h](../PLAN.md#q-assessment-actions) owns promotion and Python parser
+[Q25h](../../PLAN.md#q-assessment-actions) owns promotion and Python parser
 retirement. It must qualify the exact generator and Rocq support-library closure
 with the locked prover, preserving version checks, and name the checked parser
 correctness/completeness theorems and their exact assumptions. A conflict-free
@@ -138,7 +138,7 @@ held-out source edits. Compare accepted translations and diagnostic categories,
 disposition every difference, and exercise malformed input without output or
 unbounded failure. Once these predicates pass, remove Python lexing/parsing and
 its fallback, retaining Python orchestration only where useful. The full-language
-frontend remains subject to [Q25d's interpretation and admission prerequisites](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows).
+frontend remains subject to [Q25d's interpretation and admission prerequisites](../extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows).
 
 ### Executable migration preparation
 

@@ -2,10 +2,10 @@
 
 ## Commissioned increment
 
-Q25n in [the plan](../PLAN.md#vela-whole-system-authoring-proposal) commissions
+Q25n in [the plan](../../PLAN.md#vela-whole-system-authoring-proposal) commissions
 an untrusted host LSP 3.17-compatible development server, invoked with
 `python tools/run.py vela-lsp`. Its producer is the existing
-[pure prototype](vela-prototype.md), including its explicit Nat/bool subset and
+[pure prototype](pure-prototype.md), including its explicit Nat/bool subset and
 unqualified diagnostics. It adds no parser, proof acceptance or production
 emission. Broader syntax, semantic services and resident deployment retain the
 [protocol contract](tooling-protocols.md#qualification-and-delivery)'s prerequisites.
@@ -196,7 +196,7 @@ harness alone does not close Q25o or Q25n.
 
 ## Authoring hints
 
-[Q25p](../PLAN.md#q-assessment-actions) supplies `textDocument/inlayHint` for
+[Q25p](../../PLAN.md#q-assessment-actions) supplies `textDocument/inlayHint` for
 inferred local types in the completely checked pure subset. Advertise this
 provider alongside the existing navigation providers. Requests contain a valid
 half-open document range; return type hints at the ends of inferred local
@@ -230,7 +230,7 @@ producer states that mutation requires the wider surface; it grants no accepted
 mutable program or source borrow verdict. A write through an exclusive loan is
 distinct from rebinding its immutable descriptor. Diagnostics and locations must
 survive local shadowing, incremental edits and unsupported resource syntax.
-The [familiar authoring migration](surface-grammar.md#familiar-authoring-migration)
+The [familiar authoring migration](../language/surface-grammar.md#familiar-authoring-migration)
 makes the symmetric `let name`/`let T name` and `var name`/`var T name` forms the
 explanation and completion convention. Q25z qualifies those projections against
 each producer's supported subset; editor text must not imply that the pure
@@ -245,7 +245,7 @@ removes the entire snapshot's semantic facts until a valid edit restores them.
 
 ## Pure editor operations
 
-[Q25u](../PLAN.md#q-assessment-actions) commissions document formatting and
+[Q25u](../../PLAN.md#q-assessment-actions) commissions document formatting and
 full semantic tokens over the synchronized pure-prototype overlay. Reuse the
 existing compiler formatter and resolved inspection facts. These providers add
 no syntax, resolution, proof acceptance or wider-language qualification.

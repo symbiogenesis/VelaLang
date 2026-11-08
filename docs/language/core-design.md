@@ -1,6 +1,6 @@
 # Bounded language core and qualification contract
 
-> Non-normative synchronous-core design. Start with the [primary Vela design and examples](verification-strategy.md) and the [first-release contract](first-release.md). The Q21a fixture retains its [missing prerequisites](#decision-and-reopening-evidence); the [first-release delivery plan](../PLAN.md#vela-first-release-delivery) selects bounded work separately. No frontend, metatheory or production qualification is supplied. The [workflow disposition](workflow-contract.md#commissioning-disposition) governs canceled trials; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations.
+> Non-normative synchronous-core design. Start with the [primary Vela design and examples](../assurance/verification-strategy.md) and the [first-release contract](first-release.md). The Q21a fixture retains its [missing prerequisites](#decision-and-reopening-evidence); the [first-release delivery plan](../../PLAN.md#vela-first-release-delivery) selects bounded work separately. No frontend, metatheory or production qualification is supplied. The [workflow disposition](../assurance/workflow-contract.md#commissioning-disposition) governs canceled trials; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations.
 
 ## Decision and boundary
 
@@ -25,7 +25,7 @@ an existing anchor under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS
 a theorem to be checked about that image and its resource interpretation, with
 source correspondence binding the exact authored computation. This interpretation
 commitment supplies no proof of those laws and admits no independent source reduction.
-The [delivery plan](../PLAN.md#vela-first-release-delivery) scopes an actual
+The [delivery plan](../../PLAN.md#vela-first-release-delivery) scopes an actual
 first consumer, a finite foundation investigation and conditional construction;
 it does not reopen the canceled generic pilot or assert that its foundations
 are now established.
@@ -38,20 +38,20 @@ The fixture has no source allocation, implicit boxing, unwinding, suspension, ca
 
 ## Inputs and their actual subjects
 
-Inspection revision: `4aeaceedf4626ef64583a4680c19da29a469df4f`. The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) records constants and missing connections; [workflow](workflow-contract.md) owns the pilot comparison and [compiler routes](compiler-route-contract.md) the full-artifact comparison.
+Inspection revision: `4aeaceedf4626ef64583a4680c19da29a469df4f`. The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) records constants and missing connections; [workflow](../assurance/workflow-contract.md) owns the pilot comparison and [compiler routes](../assurance/compiler-route-contract.md) the full-artifact comparison.
 
 | Input | Inspected subject | Design use and limit |
 | --- | --- | --- |
 | [DescriptorCheck.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/bedrock2-lowering/DescriptorCheck.v) | `Descriptor.descriptor_check`, `spec_of_descriptor_check`, `descriptor_check_br2fn_ok` | The header check reads bytes within declared length, returns a status word and preserves its byte-array footprint and frame. Its relation uses `BasicC64Semantics`; it neither copies bytes nor proves a CHERI memory rule. Request identifiers, offsets, lengths and session permissions remain validated at use. |
 | [RingContract.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/proofs/RingContract.v) | Generated layouts, operation declarations and status/lifecycle definitions | An extension evaluates layout constants from this owner. The core creates no competing wire enumeration or ring lifecycle. |
 | [CopyRingService.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/proofs/CopyRingService.v) | `svc_op_record`, `service_conjuncts`, `the_staging_buffer_holds_the_declared_payload`, `every_held_reference_is_released_at_cleanup` | These constrain declared capacity and released-reference accounting. The file supplies no byte copying, memory implementation or Ztso refinement. Private staging is a reserved independent consumer, not an implementation baseline. |
-| [Q19/Q20](../PLAN.md#q-assessment-actions) | Concrete-law entry gate and initial/held-out comparison | Parser destination initialization develops the pilot; staging stays held out until interface freeze. Missing consumer implementations belong to Q2b/M7.1. Eventual-core cases are separate from that callback workflow. |
+| [Q19/Q20](../../PLAN.md#q-assessment-actions) | Concrete-law entry gate and initial/held-out comparison | Parser destination initialization develops the pilot; staging stays held out until interface freeze. Missing consumer implementations belong to Q2b/M7.1. Eventual-core cases are separate from that callback workflow. |
 
 The proposed parser-derived extension initializes its fixed private destination whole, copies each admitted input byte once into it and validates that private copy. This development contract exercises [the initialization obligation](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-124), with failure behavior specified below. It does not make the existing header check a complete decoder or make copying an atomic snapshot of a concurrently mutable source.
 
 ## Reuse decisions
 
-Reuse follows the [strategy's comparison](verification-strategy.md#type-theory-and-elaboration-reuse); no upstream artifact is incorporated or newly qualified.
+Reuse follows the [strategy's comparison](../assurance/verification-strategy.md#type-theory-and-elaboration-reuse); no upstream artifact is incorporated or newly qualified.
 
 | Mechanism considered | Selected bounded use | Missing evidence |
 | --- | --- | --- |
@@ -160,13 +160,13 @@ also remains distinct from the production algorithm choice.
 | --- | --- |
 | Source facts | Checked correspondence relates resolved places, field partitions, control edges, call effects and transitive captures to the exact elaborated computation. Unknown overlap remains a proof goal; names, pointer inequality and library spelling create no separation fact. |
 | Loan ends and exits | Checked derivations discharge split, parent suspension and restoration at every reachable exit. Independent source cases cover returned-view success versus restored-owner error, nested reborrows, moved captures, disjoint fields and premature parent reuse. Each invalid neighbor reaches its resource rule after parsing and with an inhabited entry state. |
-| Mutation and dependent facts | Writes and transitive call effects transform the current resource predicate. Reusing a current-content fact requires a checked preservation or re-establishment step; immutable historical snapshots stay stable without granting current access. Fresh authorized reads after a value-changing overwrite succeed, a stale equality fails, and a proved-disjoint field fact survives. For a selected library operation that changes represented length at fixed capacity, an old length-three bound used at index two after shortening to one fails; an unsupported operation supplies no semantic negative. This row states the release rule; the extension's [snapshot and invalidation design](extensions/interior-mutability.md#snapshots-and-dependent-indices) develops it for cells, and selecting Ante-style local aliases still requires that separately gated extension. |
+| Mutation and dependent facts | Writes and transitive call effects transform the current resource predicate. Reusing a current-content fact requires a checked preservation or re-establishment step; immutable historical snapshots stay stable without granting current access. Fresh authorized reads after a value-changing overwrite succeed, a stale equality fails, and a proved-disjoint field fact survives. For a selected library operation that changes represented length at fixed capacity, an old length-three bound used at index two after shortening to one fails; an unsupported operation supplies no semantic negative. This row states the release rule; the extension's [snapshot and invalidation design](../extensions/interior-mutability.md#snapshots-and-dependent-indices) develops it for cells, and selecting Ante-style local aliases still requires that separately gated extension. |
 | Control and demand | Bounded loops establish their invariant at entry and every back edge, closing local descendants as specified above; acyclic unrolling supplies no loop evidence. Transitive capture checking respects the selected fixed usage modes. General grade checking, suspension, cyclic captures and broader loan escape retain their extension boundaries and require their own checked rules before support is claimed. |
 
 The [first-release qualification](first-release.md#qualification) consumes these
 joins on its actual clients. Record unsupported source patterns, unresolved
 proofs and exhausted analysis budgets separately from semantic rejection and
-checked acceptance. The [independent package trial](../PLAN.md#vela-first-release-delivery)
+checked acceptance. The [independent package trial](../../PLAN.md#vela-first-release-delivery)
 owns any commissioned ergonomic or cost comparison; neither feature coverage
 nor a diagnostic's path precision establishes superiority to another checker.
 
@@ -180,7 +180,7 @@ Effects are closed read/write/call footprints with no allocation, including tran
 
 Generators record inputs, environment and outputs for typing, proof and
 source-correspondence checks. Conversion executes only total pure definitions.
-The [staged metaprogramming contract](extensions/metaprogramming.md) separates required-static
+The [staged metaprogramming contract](../extensions/metaprogramming.md) separates required-static
 inputs from ghost/erased indices and use grades, and requires generated terms to
 retain their dependent context, captures, effects and exit resources. Its broader
 reflection and generation facilities are outside this synchronous fixture's
@@ -292,7 +292,7 @@ Both routes consume the same interpreted sequenced graph and representation cont
 
 `SourcePackage` binds source/generated-input contents, independent contract, parsed or validated syntax, resolved names/instances, implicits/transports, desugaring, core graph, derivations and locations. Interpretation and representation name that same graph/contract. Locations and a proof about another graph cannot establish current-source correspondence.
 
-Lowering, capability-correct selection, optimization, stack/ABI relations, typed linkage and final-byte judgments over pinned Sail remain route obligations. Pointer-to-integer substitution needs its own correct relation; a flat array proof supplies no tag/provenance preservation. Erasing loan bookkeeping cannot erase machine authority. A route may abstract source helper-call events only under an explicit proved projection that preserves every requested externally visible observation and exact input-read/write relation. Functional simulation alone cannot transport relational observations or arbitrary-context guarantees. [Existing compiler duties](verification-strategy.md#compiler-amendment-obligations) remain binding.
+Lowering, capability-correct selection, optimization, stack/ABI relations, typed linkage and final-byte judgments over pinned Sail remain route obligations. Pointer-to-integer substitution needs its own correct relation; a flat array proof supplies no tag/provenance preservation. Erasing loan bookkeeping cannot erase machine authority. A route may abstract source helper-call events only under an explicit proved projection that preserves every requested externally visible observation and exact input-read/write relation. Functional simulation alone cannot transport relational observations or arbitrary-context guarantees. [Existing compiler duties](../assurance/verification-strategy.md#compiler-amendment-obligations) remain binding.
 
 Trial identity binds source/contract closure, generated inputs, Rocq/tool/library tuple and flags, actual assumptions, interface/instance, representation/erasure, compiler/assembler/linker/composer revisions, layout, target, Sail term/configuration, placement inputs, final image and evidence digests. Missing artifacts stay explicit; hashes prove no behavior. Q20a owns equivalent-baseline measurement and Q21b the route trial; no competing benchmark/admission format is introduced.
 
@@ -321,7 +321,7 @@ Record semantic inputs, not filenames alone; conservatively invalidate the compo
 ## Proof obligations and proposed work packages
 
 The proposed packages and their estimates are maintained in
-[PLAN.md](../PLAN.md#language-core-proposals). The obligation matrix below
+[PLAN.md](../../PLAN.md#language-core-proposals). The obligation matrix below
 records the technical prerequisites and ownership boundaries for that work.
 
 | Obligation | Existing evidence or missing prerequisite | Owner |
@@ -346,10 +346,10 @@ The blocking `Ready` entailment must close nested readers, preserve copied bytes
 Q21a's broad trial remains uncommissioned. Its conditional
 syntax/frontend/diagnostic/fixture estimates exclude this unpriced foundation.
 The interpretation commitment now selects checked elaboration into the existing
-anchor; the [composition review](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
+anchor; the [composition review](../extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
 records its acceptance boundary. Rocq output or a SourcePackage sketch supplies
 no concrete law or source correspondence. The
-[first-release delivery plan](../PLAN.md#vela-first-release-delivery) owns
+[first-release delivery plan](../../PLAN.md#vela-first-release-delivery) owns
 the finite investigation and any separately accepted narrower component. It
 claims no productivity result or new compiler-route choice.
 

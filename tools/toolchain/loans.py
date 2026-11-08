@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Bounded diagnostic over supplied loan facts, never a source safety verdict.
 
-The contract is docs/loan-analysis.md. Abstract states over the
+The contract is docs/language/loan-analysis.md. Abstract states over the
 control-flow graph retain their own capture environments, loan states and
 per-conjunct invariant debt sets, merging compatible states at join points and
 loop headers. All supplied interpretation, separation, capture and restoration

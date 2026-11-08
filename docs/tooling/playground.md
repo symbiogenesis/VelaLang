@@ -2,7 +2,7 @@
 
 ## Dependent mathematics increment
 
-Q25ae in [the plan](../PLAN.md#q-assessment-actions) commissions one unified
+Q25ae in [the plan](../../PLAN.md#q-assessment-actions) commissions one unified
 playground using the [mathematical elaborator](elaboration-prototype.md).
 `python tools/run.py vela-playground` runs in the native guest lane and builds
 the locked Menhir parser once before serving. Dependent mathematics is always
@@ -60,8 +60,8 @@ without claiming production qualification.
 
 ## Scope and launch
 
-Q25aa in [the plan](../PLAN.md#q-assessment-actions) commissions a local
-browser demo of the implemented [pure Nat/bool compiler](vela-prototype.md) and
+Q25aa in [the plan](../../PLAN.md#q-assessment-actions) commissions a local
+browser demo of the implemented [pure Nat/bool compiler](pure-prototype.md) and
 [language server](lsp-prototype.md). Launch it with
 `python tools/run.py vela-playground` (`python3` on Linux), then open the printed
 loopback URL. The command accepts a port, including zero for an available port,
@@ -75,7 +75,7 @@ compiler service. The browser must clearly report an editor-load failure and
 offer plain-text editing with the same compile/evaluate controls. This fallback
 does not claim Monaco highlighting or inline editor providers; the inspector
 panels still use the local language services. The
-[third-party record](../THIRD-PARTY.md#browser-editor-assets) owns the
+[third-party record](../../THIRD-PARTY.md#browser-editor-assets) owns the
 selected upstream terms and intended distribution.
 
 ## Browser behavior
@@ -162,7 +162,7 @@ except the initial local launch URL.
 
 ## Authoring and inspection increment
 
-Q25ab in [the plan](../PLAN.md#q-assessment-actions) extends the local
+Q25ab in [the plan](../../PLAN.md#q-assessment-actions) extends the local
 playground using the existing [authoring tools](authoring-tools.md) and
 [pure navigation facts](lsp-prototype.md#pure-navigation-increment). Keep the
 pure Nat/bool scope and all existing transport and stale-result constraints.
@@ -203,8 +203,8 @@ settled revision and user-managed hosted selection through `fanout`.
 
 ## Extended expression examples
 
-Q25ac in [the plan](../PLAN.md#q-assessment-actions) connects the
-[pure expression increment](vela-prototype.md#extended-pure-expressions) to the
+Q25ac in [the plan](../../PLAN.md#q-assessment-actions) connects the
+[pure expression increment](pure-prototype.md#extended-pure-expressions) to the
 existing compile and expression-console APIs. Add examples for Boolean logic,
 ordering, inequality and saturating natural subtraction, with expressions users
 can evaluate in the console. Highlight the added spellings and retain compiler
@@ -214,8 +214,8 @@ the examples itself. Both Monaco and plain-text mode use the same APIs.
 
 ## Division and remainder examples
 
-Q25ad in [the plan](../PLAN.md#q-assessment-actions) exposes the
-[natural division and remainder increment](vela-prototype.md#natural-division-and-remainder)
+Q25ad in [the plan](../../PLAN.md#q-assessment-actions) exposes the
+[natural division and remainder increment](pure-prototype.md#natural-division-and-remainder)
 through runnable examples and console suggestions. Show quotient/remainder
 grouping, mixed multiplication precedence and the mathematical zero-divisor
 results explicitly. Highlight `/` and `%` while preserving `//` comments.

@@ -1,6 +1,6 @@
 # Pure Vela translation prototype
 
-Start with the [primary Vela design and examples](verification-strategy.md).
+Start with the [primary Vela design and examples](../assurance/verification-strategy.md).
 This document specifies the implemented pure fragment and its development commands.
 The opt-in [mathematical elaborator](elaboration-prototype.md) adds generics,
 dependent types, higher-order inference and explicit proof terms through the
@@ -8,25 +8,25 @@ existing native surface parser. The pure command below retains its narrow scope.
 
 ## Commission and interpretation
 
-[Q25e/Q25f](../PLAN.md#q-assessment-actions) commission a bounded host tool
+[Q25e/Q25f](../../PLAN.md#q-assessment-actions) commission a bounded host tool
 translating explicitly typed pure functions to Gallina. Accepted expressions mean
 their generated CIC terms, with no independent evaluator, reduction relation or
 semantic anchor. `Nat` and `bool` denote mathematical naturals and booleans, not
 machine words, layouts or CHERI permissions.
 
-The [narrower-fixture rule](core-design.md#decision-and-reopening-evidence) keeps
-this separate from the returned-loan trial and [held full-frontend rows](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows).
+The [narrower-fixture rule](../language/core-design.md#decision-and-reopening-evidence) keeps
+this separate from the returned-loan trial and [held full-frontend rows](../extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows).
 The full calculus retains its interpretation/register duties. Untrusted Python
 parsing/checking supplies no kernel acceptance, checked source correspondence,
 `SourcePackage`, metatheory, compiler qualification or binary admission.
 
 ## Development parser goal
 
-The [Menhir development route](verification-strategy.md#development-parser-and-grammar)
+The [Menhir development route](../assurance/verification-strategy.md#development-parser-and-grammar)
 produces located syntax before separate checking/elaboration. Python syntax and
 the strict generated-AST decoder feed shared resolution, typing and emission.
-Replacement requires the [plan's qualification](../PLAN.md#vela-whole-system-authoring-proposal)
-and [parser/migration contract](vela-parser.md).
+Replacement requires the [plan's qualification](../../PLAN.md#vela-whole-system-authoring-proposal)
+and [parser/migration contract](parser.md).
 
 `python tools/run.py vela-parser parse SOURCE` exercises generated syntax;
 `vela-parser qualify` checks independent AST fixtures/regeneration;
@@ -36,7 +36,7 @@ syntax until Q25h passes. Retain current examples/refusals as migration fixtures
 
 ## Source fragment
 
-This subset follows the [proposed surface](verification-strategy.md#an-ideal-surface):
+This subset follows the [proposed surface](../assurance/verification-strategy.md#an-ideal-surface):
 return types precede operation names, parameter types precede bindings, immutable
 locals use `let` with an optional type, required-static values use typed `const`, and exits use `return`
 or an expression body. Contracts, grades,
@@ -46,7 +46,7 @@ never ignored.
 The prototype accepts UTF-8 source with ASCII identifiers and `//` line comments.
 Identifiers match `[A-Za-z_][A-Za-z0-9_]*`, excluding grammar and reserved extension
 keywords; the latter produce unsupported-feature diagnostics. Decimal
-literals match `[0-9](?:_?[0-9])*`; underscores separate digits, while leading
+literals match `[0-9](../?:_?[0-9])*`; underscores separate digits, while leading
 zeros are permitted. Separators and leading zeros normalize on emission; their
 authored spelling and source locations remain intact in syntax. The
 [separator contract](authoring-tools.md#numeric-separators) owns the digit bounds
@@ -121,7 +121,7 @@ equality and comparison map to `Corelib.Init.Nat.add`, `.sub`, `.mul`, `.div`, `
 `.ltb` and `.leb`.
 Boolean equality maps to pure nested conditionals returning the Boolean
 constructors. Types and constructors come from `Corelib.Init.Datatypes`.
-Constants follow the [required-static contract](surface-grammar.md#required-static-constants):
+Constants follow the [required-static contract](../language/surface-grammar.md#required-static-constants):
 their typed initializers evaluate from earlier constants and pure calls with
 static arguments, under finite work and numeric bounds. The supported constant
 types are `Nat` and `bool`. Unmarked runtime parameters and
@@ -151,7 +151,7 @@ These are host parser limits, not target resource bounds or integer widths.
 
 ## Extended pure expressions
 
-Q25ac in [the plan](../PLAN.md#q-assessment-actions) commissions an
+Q25ac in [the plan](../../PLAN.md#q-assessment-actions) commissions an
 expression increment over the source fragment above. Both the Python route and
 the native pure entry accept `!`, `&&`, `||`, `!=`, `<`, `>`, `>=` and binary
 `-`, using the existing wider surface's spellings and precedence. From weakest
@@ -207,7 +207,7 @@ observations. A syntax refusal cannot satisfy a semantic negative fixture.
 
 ## Natural division and remainder
 
-Q25ad in [the plan](../PLAN.md#q-assessment-actions) adds binary `/` and
+Q25ad in [the plan](../../PLAN.md#q-assessment-actions) adds binary `/` and
 `%` to both pure syntax routes, using the existing wider surface spellings.
 They require two `Nat` operands and return `Nat`, with the same precedence as
 `*`; all three associate left to right. Thus `20 / 3 * 2` is `12`,
@@ -223,7 +223,7 @@ Existing static work, depth, numeric and emission bounds apply. There is no repr
 target divide instruction, timing claim or new proof-admission route.
 This reuses the mathematical elaborator's existing total `Nat` interpretation.
 Represented first-release arithmetic retains the nonzero-divisor and
-representability obligations in [primitive semantics](first-release.md#primitive-semantics);
+representability obligations in [primitive semantics](../language/first-release.md#primitive-semantics);
 these demonstration terms do not discharge those obligations.
 
 Acceptance requires independent values and exact emitted terms for both
@@ -304,7 +304,7 @@ every Guest CI lane for the same settled revision and finish without waiting.
 The translation tests do not establish that a kernel has accepted emitted terms;
 a generated-term kernel replay is a separately identified follow-up unless hosted
 evidence explicitly supplies it. Production language and whole-system migration
-retain the [unified-source acceptance contract](extensions/unified-source-contract.md).
+retain the [unified-source acceptance contract](../extensions/unified-source-contract.md).
 
 ## Try the prototype
 
@@ -316,10 +316,10 @@ python tools/run.py vela emit examples/pure.vela --output out/Pure.v
 ```
 
 Create the output directory first, or omit `--output` to print definitions.
-The [example](../examples/pure.vela) defines a cube and Boolean
+The [example](../../examples/pure.vela) defines a cube and Boolean
 selection: intended `Choose(true, 1)` is true, `Choose(true, 2)` false. Output is
 module `Vela_Oracle` with `f_Cube`/`f_Choose`. The
-[expression example](../examples/expressions.vela) adds Boolean
+[expression example](../../examples/expressions.vela) adds Boolean
 logic, comparisons and saturating natural subtraction. The playground console
 evaluates closed expressions through the bounded static evaluator; kernel
 acceptance requires the separate replay.

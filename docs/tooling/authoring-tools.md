@@ -1,8 +1,8 @@
 # Vela formatting, documentation and lints
 
-This contract owns [Q25r, Q25s and Q25t](../PLAN.md#q-assessment-actions).
-The [surface grammar](surface-grammar.md) owns syntax and the
-[pure prototype](vela-prototype.md) owns its executable semantic boundary.
+This contract owns [Q25r, Q25s and Q25t](../../PLAN.md#q-assessment-actions).
+The [surface grammar](../language/surface-grammar.md) owns syntax and the
+[pure prototype](pure-prototype.md) owns its executable semantic boundary.
 The compiler includes a formatter and an advisory lint pass. The design keeps
 checking and emission read-only with respect to source; formatting writes require
 an explicit command or option. The formatter and original lints cover
@@ -12,7 +12,7 @@ Q25ae's [generic type naming and pattern lints](#generic-type-parameter-naming) 
 mathematical development fragment. Wider formatting
 and semantic lints consume qualified parser/frontend producers through
 [compiler services](tooling-protocols.md#compiler-inspection-api).
-Q25z owns the [familiar authoring migration](surface-grammar.md#familiar-authoring-migration),
+Q25z owns the [familiar authoring migration](../language/surface-grammar.md#familiar-authoring-migration),
 including typed pure locals and their binding preview. Wider editor support and
 formatting retain their qualified frontend prerequisites.
 
@@ -53,12 +53,12 @@ StyleCop or Clippy rule; neither upstream implementation is incorporated.
   contents. Do not sort imports, declarations or arguments, insert conversions,
   change parentheses or synthesize proof, resource or disposal operations.
 
-The [selected syntax](surface-grammar.md#familiar-authoring-migration)
+The [selected syntax](../language/surface-grammar.md#familiar-authoring-migration)
 uses `Pattern => ...` arms without `case` in both expression and statement
 matches, `=>` for ordinary and mathematical function expression
 bodies, and ordinary `F<T>(arguments)` generic calls. Constant/type-alias `=`
 and explicit `::<...>` applications retain their
-own roles. Numeric aliases follow their [standard module's scope and identity](first-release.md#primitive-semantics);
+own roles. Numeric aliases follow their [standard module's scope and identity](../language/first-release.md#primitive-semantics);
 the formatter does not rename width types or synthesize imports.
 The explicit source migration owns token-changing rewrites, with preview,
 source binding and semantic-preservation checks; ordinary formatting keeps its
@@ -192,11 +192,11 @@ or diagnostic suggestion extending the `vela lint --preview-bindings` architectu
 
 | C# / novice habit | Why Vela refuses it | Friendliness bridge (diagnostic + checked edit) |
 | --- | --- | --- |
-| Calling `Fill(buffer, 0)` without `ref` | Ordinary loan arguments require explicit `in`/`ref`/`out` ([verification-strategy.md](verification-strategy.md#permanent-language-exclusions)) | Resolve the target parameter's mode and offer a checked insertion of `ref buffer` (`assist_loan_argument` and `assist_refusal`, or an inlay hint while typing). |
-| Writing `None()` instead of `None` | Constructors use an uppercase initial letter and binders use a lowercase letter or `_`; nullary constructors are written bare without `()` ([surface-grammar.md](surface-grammar.md#concise-authoring-syntax)) | Refuse `None()` in patterns and expressions with a direct diagnostic instructing the author to write bare `None`. |
-| Writing `Read()?.Value` | `?` is early-return propagation, not C#'s null-conditional `?.` ([surface-grammar.md](surface-grammar.md#explicit-values-loans-and-absence)) | Explain the difference from C# `?.` and offer `(Read()?).Value` (to propagate) or a `match` skeleton (to handle locally, via `assist_null_conditional` and `assist_refusal`). |
-| Omitting or under-specifying `effects` on a function | Public signatures require explicit closed `effects` ([verification-strategy.md](verification-strategy.md#surface-conventions)) | Compute the body's closed read/write/call footprint and offer a checked preview that writes or updates the explicit `effects(...)` clause in source (`assist_effects_clause`). |
-| Passing `int` where `long` or `usize` is expected | No implicit numeric widening ([first-release.md](first-release.md#primitive-semantics)) | Suggest the exact named conversion (`long.From(x)` when infallibly wider, or `usize.TryFrom(x)` when range- or sign-checked, via `suggest_numeric_conversion`). |
+| Calling `Fill(buffer, 0)` without `ref` | Ordinary loan arguments require explicit `in`/`ref`/`out` ([verification-strategy.md](../assurance/verification-strategy.md#permanent-language-exclusions)) | Resolve the target parameter's mode and offer a checked insertion of `ref buffer` (`assist_loan_argument` and `assist_refusal`, or an inlay hint while typing). |
+| Writing `None()` instead of `None` | Constructors use an uppercase initial letter and binders use a lowercase letter or `_`; nullary constructors are written bare without `()` ([surface-grammar.md](../language/surface-grammar.md#concise-authoring-syntax)) | Refuse `None()` in patterns and expressions with a direct diagnostic instructing the author to write bare `None`. |
+| Writing `Read()?.Value` | `?` is early-return propagation, not C#'s null-conditional `?.` ([surface-grammar.md](../language/surface-grammar.md#explicit-values-loans-and-absence)) | Explain the difference from C# `?.` and offer `(Read()?).Value` (to propagate) or a `match` skeleton (to handle locally, via `assist_null_conditional` and `assist_refusal`). |
+| Omitting or under-specifying `effects` on a function | Public signatures require explicit closed `effects` ([verification-strategy.md](../assurance/verification-strategy.md#surface-conventions)) | Compute the body's closed read/write/call footprint and offer a checked preview that writes or updates the explicit `effects(...)` clause in source (`assist_effects_clause`). |
+| Passing `int` where `long` or `usize` is expected | No implicit numeric widening ([first-release.md](../language/first-release.md#primitive-semantics)) | Suggest the exact named conversion (`long.From(x)` when infallibly wider, or `usize.TryFrom(x)` when range- or sign-checked, via `suggest_numeric_conversion`). |
 
 Every source-rewriting helper validates its one-based compiler coordinates and token
 boundaries against the original UTF-8 snapshot without mutating files in place or
@@ -270,35 +270,35 @@ Retain refusal without writes for invalid, unsupported, oversized, aliased,
 changed or nonregular input/output. Update CLI help, examples and callers with the
 new default before reporting migration complete. Run focused host tests and Python
 checks; hand the selected hosted validation to the user under the shared
-[validation procedure](../AGENTS.md#tool-execution-and-validation).
+[validation procedure](../../AGENTS.md#tool-execution-and-validation).
 Wider-language formatting and semantic lints remain consumer-gated extensions
-after the [first release](first-release.md#qualification).
+after the [first release](../language/first-release.md#qualification).
 
 ## Pure formatting and lint disposition
 
 Q25t's pure implementation meets its local predicate. Independent review covers
-the complete [formatter and lints](../tools/toolchain/authoring.py),
-[compiler command](../tools/toolchain/cli/vela.py) and
-[publication helper](../tools/toolchain/atomic.py) at
+the complete [formatter and lints](../../tools/toolchain/authoring.py),
+[compiler command](../../tools/toolchain/cli/vela.py) and
+[publication helper](../../tools/toolchain/atomic.py) at
 `bd51161f7858b55cb1a3e854730998c1c22c3204`, with the acceptance controls added by
 this landing. Ordered token/comment fingerprints, documentation-break tracking,
 location-erased reparsed syntax and stable second rendering preserve the source
-contract. The [formatting controls](../tools/tests/test_vela_format.py)
+contract. The [formatting controls](../../tools/tests/test_vela_format.py)
 independently specify canonical bytes, including constants, separators, named
 arguments, expression bodies, nesting and comments together. The
-[lint controls](../tools/tests/test_vela_lint.py) specify stable findings and
+[lint controls](../../tools/tests/test_vela_lint.py) specify stable findings and
 original locations, complete-check requirements and unavailable-inspection refusal.
 
-The [command controls](../tools/tests/test_vela_authoring_cli.py) pass for
+The [command controls](../../tools/tests/test_vela_authoring_cli.py) pass for
 immutable repeated defaults, read-only input, original-snapshot emission, explicit
 formatting and post-format provenance, policy choices and refusal without writes.
 Explicit-write denial preserves source and output; an output failure after an
 explicit source publication truthfully retains formatted source and predecessor
 output, cleans pending files and recovers on the next emission. The
-[editor controls](../tools/tests/test_vela_lsp_editor.py) pass for exact
+[editor controls](../../tools/tests/test_vela_lsp_editor.py) pass for exact
 proposed edits, unchanged overlays and positions, worker refusal/recovery and real
 stdio operations. Focused Windows host controls and locked Python checks pass.
-The [shared handoff](../AGENTS.md#tool-execution-and-validation) records the
+The [shared handoff](../../AGENTS.md#tool-execution-and-validation) records the
 settled revision and user-managed hosted validation; no hosted passing verdict
 follows from this acceptance. Wider-language formatting, semantic lints,
 two-editor interoperability, checked source correspondence and production

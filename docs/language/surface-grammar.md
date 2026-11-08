@@ -6,19 +6,19 @@ and [module/package rules](first-release.md#modules-and-packages). Parsing a
 future grade, handler, async or hardware form grants no implementation commitment.
 Ordinary theorem syntax remains available to its separately scoped mathematical
 consumer. Exploratory contract claims use a distinct editor/scratch channel;
-accepted exported `requires`/`ensures` follow the [assurance contract](extensions/assurance-profiles.md).
+accepted exported `requires`/`ensures` follow the [assurance contract](../extensions/assurance-profiles.md).
 
-This is the syntax contract for [Q25i](../PLAN.md#q-assessment-actions),
+This is the syntax contract for [Q25i](../../PLAN.md#q-assessment-actions),
 with the selected [familiar authoring migration](#familiar-authoring-migration)
 owned by Q25z. Examples and the development parser use that surface; each
 consumer retains its declared mathematical or runtime boundary. Native fixtures
 and local diagnostics supply no hosted parser or semantic qualification.
-The [language design](verification-strategy.md#an-ideal-surface) and
-[whole-system contract](extensions/unified-source-contract.md#authoring-end-state) own the
+The [language design](../assurance/verification-strategy.md#an-ideal-surface) and
+[whole-system contract](../extensions/unified-source-contract.md#authoring-end-state) own the
 required features and their meanings. This increment accepts located syntax;
 resolution, resource checking, proofs, compilation and admission remain separate.
 
-The [metaprogramming design](extensions/metaprogramming.md) owns required-static evaluation,
+The [metaprogramming design](../extensions/metaprogramming.md) owns required-static evaluation,
 descriptions and generated definitions. Constant declarations use the
 [required-static constant contract](#required-static-constants). Generic static
 parameter binders, derivation registration and quotation/splicing need their own
@@ -36,7 +36,7 @@ schema 2 and a `surface_file` node with a module name and declarations. It has n
 translation fallback. Pure translation continues to reject wider constructs.
 All syntax nodes and names carry original-byte, half-open spans; numeric literals
 retain their spelling, including underscores between digits of one base. The
-[separator contract](authoring-tools.md#numeric-separators) owns placement and
+[separator contract](../tooling/authoring-tools.md#numeric-separators) owns placement and
 suffix boundaries; only actual digits count toward the literal bound. The
 existing UTF-8, source-byte, literal-digit, delimiter,
 syntax-depth, duration and output bounds apply to both entries.
@@ -111,7 +111,7 @@ public hardware RegisterCounter {
 ```
 
 Proof holes and theorem signatures parse without establishing a theorem. The
-[authored surface example](../examples/surface.vela) combines
+[authored surface example](../../examples/surface.vela) combines
 dependent data, contracts, loans and task cleanup;
 the independent qualification fixtures exercise every feature row above.
 
@@ -119,7 +119,7 @@ the independent qualification fixtures exercise every feature row above.
 
 ### Composable type and resource syntax
 
-The [graded foundation](extensions/graded-foundation.md#functions-and-application) and
+The [graded foundation](../extensions/graded-foundation.md#functions-and-application) and
 [borrow rules](core-design.md#loans-and-control-flow) use the same parameter,
 data and elimination forms throughout the surface:
 
@@ -162,7 +162,7 @@ supplies syntax for a future checker, not memory-safety acceptance.
 
 ### Dependent elimination and library interfaces
 
-The foundation's [dependent elimination](extensions/graded-foundation.md#dependent-data-and-elimination)
+The foundation's [dependent elimination](../extensions/graded-foundation.md#dependent-data-and-elimination)
 uses the existing record, union and pattern forms. A nonempty expression match
 has comma-separated expression arms, with one optional trailing comma, under
 the [authoring migration](#familiar-authoring-migration):
@@ -268,7 +268,7 @@ identifiers in the pure entry. These forms only preserve
 proposed obligations; proving invariant preservation, selective conjunct
 independence, lawful grades and operation effects remains an elaboration duty.
 
-The [handler lookup rules](extensions/handlers-async.md#handler-lookup-capture-and-return)
+The [handler lookup rules](../extensions/handlers-async.md#handler-lookup-capture-and-return)
 permit an explicit name for the perform capability of a handler instance:
 `handle (body()) as chosen { ... }`. The optional `as NAME` follows the handled
 expression and also applies to `handle shallow` and `rehandle`. Each `handle` or
@@ -364,7 +364,7 @@ expose a nullable `grade` field alongside `type` and `value`. Both inferred and
 explicitly typed bindings accept the same grade expression. Product-pattern
 bindings retain their existing form; component modalities belong in their data
 types. Checking the binding's allowance, evaluation effects and subsequent uses
-remains subject to the [graded foundation](extensions/graded-foundation.md#functions-and-application).
+remains subject to the [graded foundation](../extensions/graded-foundation.md#functions-and-application).
 In particular, zero demand does not erase an effectful initializer.
 
 The domain roles `carrier`, `zero`, `one`, `add`, `mul`, `admits`, `interpret`
@@ -399,7 +399,7 @@ handle (Run()) as chosen {
 
 A `disposal_clause` has a located `name` for the disposal-reason binder and a
 `body`. It composes with deep/shallow handlers and rehandlers, sharing their
-comma-delimited clause list. The [handler lifecycle](extensions/handlers-async.md#handler-lookup-capture-and-return)
+comma-delimited clause list. The [handler lifecycle](../extensions/handlers-async.md#handler-lookup-capture-and-return)
 owns its intended resource context and lexical restrictions: the handler's own
 perform capability is absent in its clauses. A disposal clause describes the
 declared disposal graph; capture and ordinary return do not invoke it. Parsing neither
@@ -417,7 +417,7 @@ bounded-lookahead exhaustion. Qualify the complete syntax and pure migration cor
 
 ### Computed types and uniform elimination
 
-The stable type-valued computations of the [graded foundation](extensions/graded-foundation.md#stable-telescope-and-dependency-bookkeeping)
+The stable type-valued computations of the [graded foundation](../extensions/graded-foundation.md#stable-telescope-and-dependency-bookkeeping)
 can appear wherever a type is expected, through `type[EXPR]`. A `computed_type`
 node stores the ordinary expression in its `value` field. This delimited form
 reuses calls, dependent matches, local indices and library operations:
@@ -547,7 +547,7 @@ every existing surface and pure qualification case.
 
 ### Explicit values, loans and absence
 
-The [permanent exclusions](verification-strategy.md#permanent-language-exclusions)
+The [permanent exclusions](../assurance/verification-strategy.md#permanent-language-exclusions)
 fix the semantic design. This syntax-only increment preserves the distinctions
 needed to check them; no grammar action performs conversion, proves exhaustive
 matching, grants write authority or repairs a missing argument modifier.
@@ -565,7 +565,7 @@ Named library types carry pointer representations; no C declarator or `T*` type
 suffix is introduced. `->` remains a function-type arrow.
 
 Member calls retain ordinary member/call syntax. The
-[receiver rule](verification-strategy.md#permanent-language-exclusions) supplies
+[receiver rule](../assurance/verification-strategy.md#permanent-language-exclusions) supplies
 the selected declaration's receiver loan, including a named view such as
 `ref this.Tail`; other arguments retain explicit loan modifiers. Resolution,
 once-only receiver evaluation, argument order and overlap remain semantic
@@ -582,7 +582,7 @@ Propagation followed by member access uses `(Read()?).Value`.
 The contiguous spelling `Read()?.Value` is refused with a diagnostic explaining
 that `?` is early-return propagation rather than C# null-conditional `?.` and
 offering `(Read()?).Value` (to propagate) or a `match` skeleton (to handle
-locally) under the [assist-don't-coerce tooling](authoring-tools.md#compiler-verified-assist-dont-coerce-tooling).
+locally) under the [assist-don't-coerce tooling](../tooling/authoring-tools.md#compiler-verified-assist-dont-coerce-tooling).
 The parser still accepts incomplete option matches, immutable writes, mistyped
 arithmetic, missing/mismatched loan modifiers and forbidden sharing as located
 syntax so the future semantic consumer can report the appropriate obligation.
@@ -614,7 +614,7 @@ surface and pure fixture, pure migration and the native qualification below.
 
 ### Concise authoring syntax
 
-The [Q25p surface](../PLAN.md#q-assessment-actions), as amended by the
+The [Q25p surface](../../PLAN.md#q-assessment-actions), as amended by the
 [Q25z migration](#familiar-authoring-migration), selects the following forms for
 examples, fixtures and prose. Q25z owns migrating the existing implementations
 and does not enlarge Q25p's frozen qualification. The syntax grants no
@@ -725,13 +725,13 @@ closers, and distinguish binding names from explicit nullary constructors.
 Qualify syntax and refusal predicates, strict conflict-free
 generation and byte-identical regeneration. Native fixtures and both authored
 examples must agree with these rules; exact locked-generator acceptance remains hosted. The editor
-part of this increment follows the [hint contract](lsp-prototype.md#authoring-hints).
+part of this increment follows the [hint contract](../tooling/lsp-prototype.md#authoring-hints).
 
 ### Familiar authoring migration
 
-[Q25z](../PLAN.md#q-assessment-actions) selects this surface refinement.
+[Q25z](../../PLAN.md#q-assessment-actions) selects this surface refinement.
 Its bounded syntax and existing-consumer migration can proceed independently of
-the [first synchronous component](../PLAN.md#vela-first-release-delivery);
+the [first synchronous component](../../PLAN.md#vela-first-release-delivery);
 represented libraries, runtime checking and production qualification retain
 that component's prerequisites.
 The surface parser accepts typed `let`/`var`, comma-separated expression arms,
@@ -842,7 +842,7 @@ diagnostics; this migration grants them no dependent or represented integers.
 Qualify strict conflict-free Menhir generation, byte-identical regeneration,
 all retained pure migration cases and mathematical kernel replay for supported
 new spellings. Native acceptance and full suites remain hosted under the
-[validation handoff](../AGENTS.md#tool-execution-and-validation).
+[validation handoff](../../AGENTS.md#tool-execution-and-validation).
 
 ### Ergonomic authoring and bounded collection iteration
 

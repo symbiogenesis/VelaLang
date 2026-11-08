@@ -2,12 +2,12 @@
 
 ## Commission and boundary
 
-[Q25k](../PLAN.md#q-assessment-actions) commissions an opt-in, bounded
-extension of the [pure prototype](vela-prototype.md). Its source means the emitted
+[Q25k](../../PLAN.md#q-assessment-actions) commissions an opt-in, bounded
+extension of the [pure prototype](pure-prototype.md). Its source means the emitted
 CIC term. It introduces no independent source semantics, production frontend,
 machine representation, resource interpretation or binary admission. The
-[full-language hold](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
-and [unified-source acceptance](extensions/unified-source-contract.md) remain outstanding.
+[full-language hold](../extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
+and [unified-source acceptance](../extensions/unified-source-contract.md) remain outstanding.
 Land this contract and its checklist predicate before implementation.
 
 The pure checker, schema-1 protocol and parser migration comparison retain
@@ -16,7 +16,7 @@ entry point and schema 2, with no second surface parser. Generated Gallina is an
 untrusted proposal until the pinned Rocq kernel checks it. A source digest binds
 bytes; it supplies no source-correspondence theorem.
 
-The [staged metaprogramming design](extensions/metaprogramming.md) extends the intended
+The [staged metaprogramming design](../extensions/metaprogramming.md) extends the intended
 language beyond this increment. Type-valued parameters, definitional reduction
 and the compositional constant interface support the bounded mathematical fragment.
 General descriptor reflection, generated declaration APIs and composition with
@@ -24,10 +24,10 @@ the refused resource/effect features remain outside it.
 
 ## Supported mathematical increment
 
-The increment uses the [surface grammar](surface-grammar.md), with mathematical
+The increment uses the [surface grammar](../language/surface-grammar.md), with mathematical
 `=>` bodies and ordinary `<...>` generic calls. Explicit `::<...>` applications
 remain available for generic values and disambiguation. The
-[familiar authoring migration](surface-grammar.md#familiar-authoring-migration)
+[familiar authoring migration](../language/surface-grammar.md#familiar-authoring-migration)
 binds each accepted spelling to exact source bytes. Native syntax and local
 consumer agreement supply no hosted kernel or source-correspondence verdict.
 
@@ -136,7 +136,7 @@ The supported increment includes:
   widening and `T.TryFrom(x)` returning `Result<T, ConversionError>`) reduce on
   closed values.
 - Typed `const` values of `Nat`, `bool`, `Unit` or fixed-width integers, at module or local scope,
-  under the [required-static contract](surface-grammar.md#required-static-constants).
+  under the [required-static contract](../language/surface-grammar.md#required-static-constants).
   Initializers use earlier constants and admitted total pure calls with static
   arguments and explicit static parameters; unmarked outer runtime parameters,
   ordinary locals and generic or ghost indices are refused before reduction,
@@ -146,7 +146,7 @@ The supported increment includes:
   A constant can index `Vec<Nat, Limit>` directly; it is a value, so `Limit()`
   is not a constant access. Represented machine types retain target prerequisites.
 - Constant-compatible function modifiers and `const` value parameters use the
-  same [compositional contract](surface-grammar.md#required-static-constants).
+  same [compositional contract](../language/surface-grammar.md#required-static-constants).
   The former preserves runtime calls; the latter requires static arguments and
   supports symbolic local constant computation. Static parameter requirements
   follow dependent function telescopes, partial applications and higher-order
@@ -164,7 +164,7 @@ The supported increment includes:
   `Span.Invalidate`, `Span.Disjoint`, `Span.CopyPrefix` and `Span.Restore`),
   together with `requires`, `where`, `ensures` (with `result` bound to the body) and
   `restores param` contract obligations on `definition` and `function`
-  declarations for the [first-slice qualification](first-release.md#first-slice-qualification).
+  declarations for the [first-slice qualification](../language/first-release.md#first-slice-qualification).
 - Pure sequence vocabulary (`Seq<T>`, `Seq.Empty`, `Seq.Singleton`, `.Count`,
   `.At`, `.Update`, `.Append`, `.Take`, `.Skip`, `.Slice`, `.Contains` over
   structurally equatable element types, `.All` and `.Any`), `.Model` domain views on
@@ -225,27 +225,27 @@ increment supplies theorem authorship and proof parameters; automatic discharge
 of `requires`/`ensures` and the full proof language remain frontend work.
 
 The implementation is decomposed across the public entry point
-([`elaborate.py`](../tools/toolchain/elaborate.py)) and cohesive
+([`elaborate.py`](../../tools/toolchain/elaborate.py)) and cohesive
 submodules for CIC terms and carrier metadata
-([`elaborate_types.py`](../tools/toolchain/elaborate_types.py)),
+([`elaborate_types.py`](../../tools/toolchain/elaborate_types.py)),
 schema-2 AST validation
-([`elaborate_protocol.py`](../tools/toolchain/elaborate_protocol.py)),
+([`elaborate_protocol.py`](../../tools/toolchain/elaborate_protocol.py)),
 strings, characters and formatting
-([`elaborate_strings.py`](../tools/toolchain/elaborate_strings.py)),
+([`elaborate_strings.py`](../../tools/toolchain/elaborate_strings.py)),
 definitional WHNF reduction and structural equality
-([`elaborate_whnf.py`](../tools/toolchain/elaborate_whnf.py)),
+([`elaborate_whnf.py`](../../tools/toolchain/elaborate_whnf.py)),
 carrier and sequence intrinsics
-([`elaborate_intrinsics.py`](../tools/toolchain/elaborate_intrinsics.py)),
+([`elaborate_intrinsics.py`](../../tools/toolchain/elaborate_intrinsics.py)),
 interval/algebraic precondition discharge
-([`elaborate_solver.py`](../tools/toolchain/elaborate_solver.py)),
+([`elaborate_solver.py`](../../tools/toolchain/elaborate_solver.py)),
 proof terms and calculational chains
-([`elaborate_proofs.py`](../tools/toolchain/elaborate_proofs.py)),
+([`elaborate_proofs.py`](../../tools/toolchain/elaborate_proofs.py)),
 pattern matching and exhaustiveness
-([`elaborate_patterns.py`](../tools/toolchain/elaborate_patterns.py)),
+([`elaborate_patterns.py`](../../tools/toolchain/elaborate_patterns.py)),
 statements, indexing and bounded loops
-([`elaborate_statements.py`](../tools/toolchain/elaborate_statements.py)),
+([`elaborate_statements.py`](../../tools/toolchain/elaborate_statements.py)),
 and module declarations, records, unions and contracts
-([`elaborate_declarations.py`](../tools/toolchain/elaborate_declarations.py)).
+([`elaborate_declarations.py`](../../tools/toolchain/elaborate_declarations.py)).
 It owns explicit finite source, syntax-depth, inference-work,
 reduction and output limits. Diagnostics retain source positions and distinguish
 unsupported syntax, names, typing, unresolved inference, protocol and limits.
@@ -309,7 +309,7 @@ python tools/run.py vela-parser elaborate examples/dependent.vela
 python tools/run.py vela-parser elaborate-qualify
 ```
 
-The [example](../examples/dependent.vela) combines a generic
+The [example](../../examples/dependent.vela) combines a generic
 identity, higher-order application, inferred vector lengths, finite-index lookup,
 a dependent callable and equality proofs. `elaborate` prints Gallina or writes
 `--output FILE` in an existing directory. It requires the parser's locked native

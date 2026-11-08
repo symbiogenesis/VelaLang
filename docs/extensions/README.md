@@ -1,12 +1,12 @@
 # Vela extension designs
 
 These non-normative documents design Vela extensions and policy proposals
-outside the [first supported release](../first-release.md#release-boundary).
+outside the [first supported release](../language/first-release.md#release-boundary).
 Each is consumer-gated: selecting one requires a named client, a comparison with
 the supported subset, a bounded implementation and qualification budget and a
 decision predicate, as the release boundary states. None of them supplies an
 implementation, a release obligation or a VerifiedOS guarantee. The
-[first-release contract](../first-release.md) and [core design](../core-design.md)
+[first-release contract](../language/first-release.md) and [core design](../language/core-design.md)
 define the release without them.
 
 | Document | Extension it designs |

@@ -1,10 +1,10 @@
 # Graded dependent foundation
 
-> Non-normative Q25a checking interfaces and schematic derivations. Start with the [primary Vela design and examples](../verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) remains authoritative. No implementation, checked metatheory, accepted axiom or qualified binary is supplied.
+> Non-normative Q25a checking interfaces and schematic derivations. Start with the [primary Vela design and examples](../assurance/verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) remains authoritative. No implementation, checked metatheory, accepted axiom or qualified binary is supplied.
 
 ## Scope and research boundary
 
-The [first supported release](../first-release.md#release-boundary) uses fixed
+The [first supported release](../language/first-release.md#release-boundary) uses fixed
 unrestricted, affine, relevant-verdict and linear-obligation cases, stable
 dependent indices and explicit runtime/erased phases. Its ownership, restoration,
 trace and target-cost laws remain mandatory; arbitrary grade algebras do not
@@ -15,10 +15,10 @@ A named client must justify the extension against the fixed discipline under
 the [delivery plan](../../PLAN.md#vela-first-release-delivery) and the
 [selection protocol](#extension-selection-and-qualification) below.
 
-The [graded design](../verification-strategy.md#graded-dependent-foundation)
+The [graded design](../assurance/verification-strategy.md#graded-dependent-foundation)
 separates computation/type dependence, lawful extensible grades and CIC
 interpretation, preserving the
-[synchronous resource interpretation](../core-design.md#judgments-and-interpretations).
+[synchronous resource interpretation](../language/core-design.md#judgments-and-interpretations).
 [Handlers](handlers-async.md) and [mutability](interior-mutability.md) consume the
 [resource interface](#resource-and-computation-interface) when their own increments
 are selected; [Q25d](full-language-review.md) records composition obligations.
@@ -35,7 +35,7 @@ generated term and reconstructed evidence. Merely renaming a source calculus or
 kernel-checking an unrelated term establishes none of those laws. Their proofs
 and the required concrete resource instance remain outstanding.
 
-Sources: Moon, Eades and Orchard's [GrTT v2](https://arxiv.org/pdf/2010.13163v2) and Gerty ESOP 2021 prototype; Choudhury, Eades, Eisenberg and Weirich's [GraD v2](https://arxiv.org/html/2011.04070v2); Abel, Danielsson and Eriksson's [ICFP 2023 erasure development](https://research.chalmers.se/en/publication/537991), [extended 30 April 2026](https://arxiv.org/abs/2603.29716). The [strategy](../verification-strategy.md#reading-the-graded-type-claims) owns the wider comparison. No source/dependency is incorporated.
+Sources: Moon, Eades and Orchard's [GrTT v2](https://arxiv.org/pdf/2010.13163v2) and Gerty ESOP 2021 prototype; Choudhury, Eades, Eisenberg and Weirich's [GraD v2](https://arxiv.org/html/2011.04070v2); Abel, Danielsson and Eriksson's [ICFP 2023 erasure development](https://research.chalmers.se/en/publication/537991), [extended 30 April 2026](https://arxiv.org/abs/2603.29716). The [strategy](../assurance/verification-strategy.md#reading-the-graded-type-claims) owns the wider comparison. No source/dependency is incorporated.
 
 GrTT supplies two use vectors and dependency bookkeeping. Its call-by-name, restricted normalization result is pen-and-paper; the external-solver prototype is unverified against it. Neither establishes Vela's effectful call-by-value calculus. GraD motivates usage-aware soundness and shows Boolean grade one need not mean unique use; its selected syntactic mechanization and heap result supply no CHERI ownership theorem. The machine-checked Agda erasure donor restricts modalities/contexts, including weak-pair erased elimination, and proves extraction value preservation for natural-number programs under a restricted modality class. It trusts Agda's checker; the MIT repository covers several papers, so the tag identifies this artifact. Vela still owes CIC erasure/elimination and mutable-computation connections.
 
@@ -65,7 +65,7 @@ Absent benefit, missing prerequisite laws or exhausted budgets retain the smalle
 qualified discipline; none permits weakening a client contract or treating
 unsupported syntax as a semantic rejection.
 
-Gerty's [substitution-skipping experiment](../verification-strategy.md#reading-the-graded-type-claims)
+Gerty's [substitution-skipping experiment](../assurance/verification-strategy.md#reading-the-graded-type-claims)
 is a separate optional optimization. It requires a proved zero-type-use
 irrelevance condition for the selected domain, agreement with ordinary checked
 substitution, and measured total checking benefit including any new solver calls.
@@ -333,7 +333,7 @@ Specialization fixes phase, convention, layout and erasure before emission. Repr
 
 ## Q25d debts and acceptance boundary
 
-These debt keys are neither Rocq constants, schedule cells nor assumptions. Q25d joins them with [Q21 packages](../core-design.md#proof-obligations-and-proposed-work-packages) and the [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md), recording owner and estimate boundaries in [pricing](full-language-review.md#reviewed-implementation-pricing). All theorem subjects below are elaborated images in the selected existing anchor. The [first-release plan](../../PLAN.md#vela-first-release-delivery) selects the fixed resource/phase/correspondence obligations it actually uses; it does not commission every generic-domain or control/mutation debt. Unestablished foundation work stays explicitly `unpriced` when a responsible range is unavailable.
+These debt keys are neither Rocq constants, schedule cells nor assumptions. Q25d joins them with [Q21 packages](../language/core-design.md#proof-obligations-and-proposed-work-packages) and the [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md), recording owner and estimate boundaries in [pricing](full-language-review.md#reviewed-implementation-pricing). All theorem subjects below are elaborated images in the selected existing anchor. The [first-release plan](../../PLAN.md#vela-first-release-delivery) selects the fixed resource/phase/correspondence obligations it actually uses; it does not commission every generic-domain or control/mutation debt. Unestablished foundation work stays explicitly `unpriced` when a responsible range is unavailable.
 
 | Debt key | Required artifact and refusal predicate |
 | --- | --- |

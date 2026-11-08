@@ -1,6 +1,6 @@
 # Assurance presets and evidence policy
 
-> Non-normative Q25 policy proposal; no preset, report, frontend or diagnostic here is implemented. Start with the [primary Vela design and examples](../verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates, Q25d prices implementation, and the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs admission.
+> Non-normative Q25 policy proposal; no preset, report, frontend or diagnostic here is implemented. Start with the [primary Vela design and examples](../assurance/verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates, Q25d prices implementation, and the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs admission.
 
 ## Scope and the governing rule
 
@@ -8,7 +8,7 @@ One authoring surface and executable implementation support three assurance pres
 
 > **Optional specifications may be omitted. An exported promise must be discharged before its interface is accepted.**
 
-The policy first applies to the [bounded synchronous release](../first-release.md#release-boundary).
+The policy first applies to the [bounded synchronous release](../language/first-release.md#release-boundary).
 Async, general handlers, extensible grade domains and other extensions need their
 own consumer and qualification; presets cannot enable unsupported features.
 
@@ -18,14 +18,14 @@ Presets classify source-closure evidence off device. The platform's [numeric ass
 
 | Concern | Question | Owner |
 | --- | --- | --- |
-| Authoring experience | Which concepts does the developer manipulate? | Application, systems and optional proof interfaces within [one language](../verification-strategy.md#feature-decisions) |
+| Authoring experience | Which concepts does the developer manipulate? | Application, systems and optional proof interfaces within [one language](../assurance/verification-strategy.md#feature-decisions) |
 | Assurance policy | Which properties must this build establish? | The preset's explicit obligation set below |
-| Execution profile | Which operations and resource behavior are permitted? | A target profile and its [required guarantee theorems](../verification-strategy.md#required-guarantees-not-feature-flags); VerifiedOS's bounded profile is the first instance. A preset cannot introduce excluded GC, threads, exceptions or dynamic allocation. A hosted target is a separate deliverable. |
-| Evidence endpoint | Which representation does the claim concern? | [Source-verified, artifact-connected or production-qualified](../verification-strategy.md#expected-developer-experience), with explicit assumptions |
+| Execution profile | Which operations and resource behavior are permitted? | A target profile and its [required guarantee theorems](../assurance/verification-strategy.md#required-guarantees-not-feature-flags); VerifiedOS's bounded profile is the first instance. A preset cannot introduce excluded GC, threads, exceptions or dynamic allocation. A hosted target is a separate deliverable. |
+| Evidence endpoint | Which representation does the claim concern? | [Source-verified, artifact-connected or production-qualified](../assurance/verification-strategy.md#expected-developer-experience), with explicit assumptions |
 
 A build reports properties, scope, assumptions and endpoint. Source-level Complete supplies no machine-code theorem; a safety-certified executable need not prove every aspect of application intent.
 
-Shared constructs retain their semantics across presets: overflow, evaluation order, ownership, exits and cancellation belong to the [language rules](../verification-strategy.md#feature-decisions). A checked operation retains its failure behavior; eliminating its check requires preservation on every admitted input.
+Shared constructs retain their semantics across presets: overflow, evaluation order, ownership, exits and cancellation belong to the [language rules](../assurance/verification-strategy.md#feature-decisions). A checked operation retains its failure behavior; eliminating its check requires preservation on every admitted input.
 
 Under the [metaprogramming contract](metaprogramming.md), generated definitions,
 specialized instances, descriptors and dependencies need the same evidence.
@@ -104,7 +104,7 @@ evidence; `Unestablished` is never an accepted contract status.
 
 Tests and measurements establish no universal theorem. A solver timeout is no counterexample; unchecked unsatisfiability is no accepted proof. Checked success promises neither universal parsing nor inexhaustible allocation: invalid input and [bounded-pool exhaustion](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-046) remain explicit outcomes.
 
-An ordinary sorter may export an array without sortedness. An opaque sorted-array invariant requires a verified algorithm, verified validation or approved assumption; disabling verification cannot manufacture that stronger value through a safe interface. Mutable abstractions must also control invalidating writes. Validation of one snapshot licenses no later write or alias, under the [snapshot rules](interior-mutability.md#snapshots-and-dependent-indices). Verus's ignored code, external specifications and assumed contracts provide a trust-accounting precedent in [the survey](../verification-strategy.md#what-the-rust-verifiers-contribute).
+An ordinary sorter may export an array without sortedness. An opaque sorted-array invariant requires a verified algorithm, verified validation or approved assumption; disabling verification cannot manufacture that stronger value through a safe interface. Mutable abstractions must also control invalidating writes. Validation of one snapshot licenses no later write or alias, under the [snapshot rules](interior-mutability.md#snapshots-and-dependent-indices). Verus's ignored code, external specifications and assumed contracts provide a trust-accounting precedent in [the survey](../assurance/verification-strategy.md#what-the-rust-verifiers-contribute).
 
 ### Evidence beside the declaration
 
@@ -150,7 +150,7 @@ authority.
 
 Postcondition validation cannot repair earlier memory corruption, disclosure or unbounded stalls. It substitutes for proof only where the predicate can be established at that boundary.
 
-Unresolved editor/scratch annotations cannot influence accepted typing or compilation as facts: [typed holes stay outside accepted packages](../verification-strategy.md#mechanically-produced-evidence). Explicit interface downgrades are source/interface changes that recheck dependents and remove unjustified theorem-dependent optimization or invariant elimination. A build flag cannot perform that downgrade.
+Unresolved editor/scratch annotations cannot influence accepted typing or compilation as facts: [typed holes stay outside accepted packages](../assurance/verification-strategy.md#mechanically-produced-evidence). Explicit interface downgrades are source/interface changes that recheck dependents and remove unjustified theorem-dependent optimization or invariant elimination. A build flag cannot perform that downgrade.
 
 ## What complete coverage must mean
 
@@ -182,9 +182,9 @@ Mutable dependencies require stable snapshots or invariant protocols under every
 
 ## A simple subset that stays simple when libraries compose
 
-Initial application interfaces cover parsing, bounded collections, iteration and errors without unexpectedly exposing separation-logic resources or grade algebras. Later structured async interfaces must meet the same ordinary-use criterion. A parser returns a valid packet or explicit failure while its library accounts for bounds and backing ownership; loop/iterator interfaces supply routine bounds facts. The [ownership-library contract](../first-release.md#ownership-libraries) defines the first client-facing initialization and borrowing cases.
+Initial application interfaces cover parsing, bounded collections, iteration and errors without unexpectedly exposing separation-logic resources or grade algebras. Later structured async interfaces must meet the same ordinary-use criterion. A parser returns a valid packet or explicit failure while its library accounts for bounds and backing ownership; loop/iterator interfaces supply routine bounds facts. The [ownership-library contract](../language/first-release.md#ownership-libraries) defines the first client-facing initialization and borrowing cases.
 
-Limits remain visible: collections fill, views cannot outlive storage, and closures retain captures. Diagnostics name the developer's operation and values and distinguish rule violation, refuted contract, unknown/timeout, unsupported feature and profile refusal. Checking proceeds through ordinary checking, a declared automatic refinement fragment, domain automation and contextual proof goals. The [proof-interaction contract](../verification-strategy.md#language-product-contract) measures that ladder; it promises no automatic-proof percentage or unbounded search at every keystroke.
+Limits remain visible: collections fill, views cannot outlive storage, and closures retain captures. Diagnostics name the developer's operation and values and distinguish rule violation, refuted contract, unknown/timeout, unsupported feature and profile refusal. Checking proceeds through ordinary checking, a declared automatic refinement fragment, domain automation and contextual proof goals. The [proof-interaction contract](../assurance/verification-strategy.md#language-product-contract) measures that ladder; it promises no automatic-proof percentage or unbounded search at every keystroke.
 
 ## Static-memory claims stay separate
 
@@ -201,7 +201,7 @@ The [research agenda](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs
 
 ## Erasure, compilation and the release record
 
-Ghost data cannot influence runtime results through unaccounted dependencies; execution-needed witnesses stay represented. Erasure, optimization and physical-resource preservation need separate theorems: source equivalence proves no stack, constant-time or capability-reuse bound. The [compiler obligations](../verification-strategy.md#mechanically-produced-evidence) retain these boundaries and validation costs.
+Ghost data cannot influence runtime results through unaccounted dependencies; execution-needed witnesses stay represented. Erasure, optimization and physical-resource preservation need separate theorems: source equivalence proves no stack, constant-time or capability-reuse bound. The [compiler obligations](../assurance/verification-strategy.md#mechanically-produced-evidence) retain these boundaries and validation costs.
 
 The existing release evidence binds source closure, contracts, target semantics, compiler configuration, artifact and accepted evidence. Semantic dependency changes reopen affected obligations even with stable names/goal IDs. Policy adds the preset, expanded obligations and each exported claim's status. Digests identify bytes and prove no behavior.
 
@@ -264,4 +264,4 @@ Acceptance requires sound assurance boundaries and useful ordinary clients under
 
 This proposal claims no usability, build-time, annotation-burden or search-scalability measurement; automatic proof of arbitrary programs; optimal compilation; proof-free unsafe primitives; or recovery of requirements from source. It amends no requirement or admission rule; changes must satisfy their normative owner's predicate.
 
-SPARK's [usage scenarios](https://docs.adacore.com/spark2014-docs/html/ug/en/usage_scenarios.html), [Dafny's contracts and ghost material](https://dafny.org/dafny/DafnyRef/DafnyRef) and [Verus's trust accounting](https://verus-lang.github.io/verus/guide/tcb.html) supply adoption patterns and vocabulary, with wider assessment in the [research landscape](../verification-strategy.md#research-landscape) and source/licence readings in the [proof inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse.md). Their conclusions transfer only to the checked artifact when its premises match; performance experiments neither establish nor invalidate those logical results. No upstream is incorporated; incorporation requires the selected artifact's [licence reading](../../THIRD-PARTY.md).
+SPARK's [usage scenarios](https://docs.adacore.com/spark2014-docs/html/ug/en/usage_scenarios.html), [Dafny's contracts and ghost material](https://dafny.org/dafny/DafnyRef/DafnyRef) and [Verus's trust accounting](https://verus-lang.github.io/verus/guide/tcb.html) supply adoption patterns and vocabulary, with wider assessment in the [research landscape](../assurance/verification-strategy.md#research-landscape) and source/licence readings in the [proof inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse.md). Their conclusions transfer only to the checked artifact when its premises match; performance experiments neither establish nor invalidate those logical results. No upstream is incorporated; incorporation requires the selected artifact's [licence reading](../../THIRD-PARTY.md).

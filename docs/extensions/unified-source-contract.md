@@ -1,6 +1,6 @@
 # Vela Whole-System Authoring Contract
 
-> Non-normative replacement criteria extending the [primary Vela design and examples](../verification-strategy.md).
+> Non-normative replacement criteria extending the [primary Vela design and examples](../assurance/verification-strategy.md).
 > [PLAN.md](../../PLAN.md#vela-whole-system-authoring-proposal) owns proposal stages;
 > the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs admission until
 > explicit amendments accept replacements. This contract supplies no implementation
@@ -8,7 +8,7 @@
 
 ## Authoring end state
 
-The [first supported Vela release](../first-release.md#release-boundary) delivers
+The [first supported Vela release](../language/first-release.md#release-boundary) delivers
 bounded synchronous software, contracts and usable proof interfaces through one
 retained backend. Its acceptance does not depend on self-hosting, a new native
 compiler, complete proof-language replacement, ISA-model migration or hardware
@@ -70,7 +70,7 @@ Initially elaborate into admitted interpretations, reconstruct evidence in
 Rocq/CIC and lower supported explicit-memory code through the selected compiler;
 generated Clight is permitted. Replacing the required verified-C or Rust producer
 needs duty-by-duty register/prose amendments under the
-[compiler replacement contract](../compiler-route-contract.md#conditional-amendment-and-reviewer-requirements).
+[compiler replacement contract](../assurance/compiler-route-contract.md#conditional-amendment-and-reviewer-requirements).
 Language unification and source-neutral admission alone retire neither.
 
 The following evidence is needed before handwritten C and component VST scripts
@@ -117,13 +117,13 @@ costs. The first software release keeps one retained backend; it owes no new
 native compiler or self-compilation result. Retained-producer interoperation
 remains available throughout qualification/migration.
 
-Development uses the [Menhir route](../verification-strategy.md#development-parser-and-grammar)
+Development uses the [Menhir route](../assurance/verification-strategy.md#development-parser-and-grammar)
 with a reviewed grammar and located AST, preserving separate lexer, parsing,
 elaboration and source-correspondence duties. The selected native Vela compiler
 includes its parser; verified bootstrap accounts for Menhir development/seed dependencies
 until retirement preserves accepted grammar and source meaning.
 
-Select [LSP, DAP and DWARF interoperability](../tooling-protocols.md) according to
+Select [LSP, DAP and DWARF interoperability](../tooling/tooling-protocols.md) according to
 actual compiler/editor and execution-backend consumers. The initial software
 release requires useful diagnostics, navigation, formatting and proof inspection;
 it does not wait for every debugger or export adapter.
@@ -171,7 +171,7 @@ application. R-05-023a decompilation/final validation remains required until a
 register/prose amendment admits composed substitutes; compiler assertions cannot
 certify output.
 
-The [Plinth/Plutus design comparison](../verification-strategy.md#compilation-and-executable-models)
+The [Plinth/Plutus design comparison](../assurance/verification-strategy.md#compilation-and-executable-models)
 informs this separation of pass implementation, relation and proof. A composed
 record identifies each actual input/output, pass and checked theorem application;
 its interfaces preserve the facts later passes consume. A missing step or
@@ -208,7 +208,7 @@ Qualify commercial use, distribution and resident rebuilding for the complete
 source/proof/helper/runtime closure. Independent infrastructure may use project
 terms; adapted passes retain their terms. CompCert/LLVM independence and removal
 of non-commercial dependencies require closure audit and consumer retirement under
-the [compiler replacement duties](../compiler-route-contract.md#conditional-amendment-and-reviewer-requirements).
+the [compiler replacement duties](../assurance/compiler-route-contract.md#conditional-amendment-and-reviewer-requirements).
 
 ## Machine model
 

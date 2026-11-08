@@ -3,13 +3,13 @@
 This reference gives each Vela construct's syntax, meaning, a short example and
 its implementation status. It covers the
 [first supported release](first-release.md#release-boundary) and lists the
-[extension designs](extensions/README.md) only as parsed or designed syntax.
+[extension designs](../extensions/README.md) only as parsed or designed syntax.
 The linked owners decide meaning: [primitive semantics](first-release.md#primitive-semantics),
 [module rules](first-release.md#modules-and-packages),
 [ownership libraries](first-release.md#ownership-libraries),
 [core loan and refinement rules](core-design.md) and the
 [development surface grammar](surface-grammar.md). Where this page summarizes a
-rule, the owner wins. The [primary design](verification-strategy.md) supplies the
+rule, the owner wins. The [primary design](../assurance/verification-strategy.md) supplies the
 rationale and longer examples.
 
 ## How to read this reference
@@ -19,8 +19,8 @@ prototype contracts:
 
 | Marker | Status | Owner |
 | --- | --- | --- |
-| **P** | Checked by the pure prototype and emitted as Gallina over `Nat` and `bool` | [Pure prototype](vela-prototype.md#source-fragment) |
-| **M** | Accepted by the opt-in mathematical elaborator, which emits CIC terms for kernel replay | [Mathematical elaborator](elaboration-prototype.md#supported-mathematical-increment) |
+| **P** | Checked by the pure prototype and emitted as Gallina over `Nat` and `bool` | [Pure prototype](../tooling/pure-prototype.md#source-fragment) |
+| **M** | Accepted by the opt-in mathematical elaborator, which emits CIC terms for kernel replay | [Mathematical elaborator](../tooling/elaboration-prototype.md#supported-mathematical-increment) |
 | **S** | Parsed as located syntax by the development parser, with no semantic consumer | [Surface grammar](surface-grammar.md#required-syntax) |
 | **D** | Specified by a design contract, not yet parsed in the spelling shown | The linked contract |
 
@@ -30,10 +30,10 @@ lowering and production qualification belong to the first-release delivery
 plan. An M marker records that the elaborator accepts and emits a construct as
 its real kernel proposition; obligations discharged by the Python solver are
 emitted and audited in the explicit solver-trust ledger rather than accepted as
-closed ([Q25af](../PLAN.md#q-assessment-actions)).
+closed ([Q25af](../../PLAN.md#q-assessment-actions)).
 
 Both parser routes enforce the settled surface spellings
-([Q25ah](../PLAN.md#q-assessment-actions)):
+([Q25ah](../../PLAN.md#q-assessment-actions)):
 `open (...) lifts ...` for invariant lifting, `let` or `var` on every local,
 bare nullary constructors, `Pattern => body,` arms in every match and `restores`
 with its returned-loan meaning.
@@ -48,15 +48,15 @@ exceeds the implemented parser or elaborator subset.
 | Element | Rule | Status |
 | --- | --- | --- |
 | Source text | Strict UTF-8; identifiers are ASCII `[A-Za-z_][A-Za-z0-9_]*`; string and character contents may be Unicode ([bytes and text](first-release.md#bytes-and-text)) | P |
-| Comments | `//` to end of line; consecutive `///` lines before a declaration are its [documentation](authoring-tools.md#documentation-comments) | P |
-| Keywords | Reserved by the [lexer](../tools/toolchain/parser/lexer.mll); extension keywords are reserved even where no consumer accepts them | S |
-| Naming | Types, constructors, members and type parameters use PascalCase; locals and parameters use camelCase ([common style](authoring-tools.md#common-style)) | M |
-| Integer literals | Decimal, `0x` hexadecimal and `0b` binary digits with `_` [separators](authoring-tools.md#numeric-separators); a representation suffix (`0usize`, `0byte`) or the expected type selects the type | P (decimal `Nat`), M |
+| Comments | `//` to end of line; consecutive `///` lines before a declaration are its [documentation](../tooling/authoring-tools.md#documentation-comments) | P |
+| Keywords | Reserved by the [lexer](../../tools/toolchain/parser/lexer.mll); extension keywords are reserved even where no consumer accepts them | S |
+| Naming | Types, constructors, members and type parameters use PascalCase; locals and parameters use camelCase ([common style](../tooling/authoring-tools.md#common-style)) | M |
+| Integer literals | Decimal, `0x` hexadecimal and `0b` binary digits with `_` [separators](../tooling/authoring-tools.md#numeric-separators); a representation suffix (`0usize`, `0byte`) or the expected type selects the type | P (decimal `Nat`), M |
 | Other literals | `true`, `false`, `()`, characters `'a'` with escapes, strings `"..."`, raw strings `"""..."""` and format templates `$"...{hole}..."` | P (`true`, `false`), M |
 
 Token shape alone decides the syntax tree: there is no symbol table, type or
 import-order input to parsing, and Menhir generation is strict and
-conflict-free ([no ambiguous syntax](verification-strategy.md#permanent-language-exclusions)).
+conflict-free ([no ambiguous syntax](../assurance/verification-strategy.md#permanent-language-exclusions)).
 In patterns, an identifier beginning with an uppercase letter is a constructor
 and a lowercase identifier binds.
 
@@ -155,7 +155,7 @@ public Nat Total<T>(T first, T second) where Sized(type T)
 There are no implicit conversions: use `T.From(x)` for infallible widening and
 `T.TryFrom(x)` for a range-checked `Result`. There is no `null`, `T?` or
 automatic `T`/`Option<T>` conversion
-([exclusions](verification-strategy.md#permanent-language-exclusions)).
+([exclusions](../assurance/verification-strategy.md#permanent-language-exclusions)).
 
 **Parsed example** (generic and dependent signatures):
 
@@ -180,7 +180,7 @@ public definition Nat Length<T, ghost Nat n>(Vec<T, n> items) => n;
 Every local starts with `let`, `var` or `const`; a bare `T name = e;` is not a
 local declaration. `let` makes the binding immutable but does not forbid writing
 through an exclusive loan it holds. Type annotation and mutability are
-independent choices ([binding table](verification-strategy.md#surface-conventions)).
+independent choices ([binding table](../assurance/verification-strategy.md#surface-conventions)).
 
 **Parsed example** (settled local spellings):
 
@@ -199,7 +199,7 @@ public Nat Sum(Option<Nat> maybe, Nat base)
 ## Expressions and operators
 
 Operators from weakest to strongest binding, as fixed by the
-[parser](../tools/toolchain/parser/parser.mly):
+[parser](../../tools/toolchain/parser/parser.mly):
 
 | Level | Operators and forms | Associativity | Status |
 | --- | --- | --- | --- |
@@ -230,7 +230,7 @@ divisor. Named `Checked*`, `Wrapping*` and `Saturating*` operations give other
 behavior explicitly ([primitive semantics](first-release.md#primitive-semantics)).
 The pure prototype's demonstration `Nat` arithmetic is total instead, with
 saturating subtraction and `n / 0 == 0`
-([natural division](vela-prototype.md#natural-division-and-remainder)); it
+([natural division](../tooling/pure-prototype.md#natural-division-and-remainder)); it
 discharges no release obligation.
 
 | Form | Meaning | Status |
@@ -329,13 +329,13 @@ inserts `in`, `ref`, `out` or `move`. A loan ends at its last use, branch by
 branch, and restoration is inferred rather than written. A receiver loan starts
 before the explicit arguments are evaluated, and the first release has no
 two-phase receiver borrows and no loans carried across loop iterations
-([product costs](verification-strategy.md#language-product-contract)). The
+([product costs](../assurance/verification-strategy.md#language-product-contract)). The
 [loan-analysis diagnostic](loan-analysis.md) experiments with inferred loan
 ends over supplied flow facts; source loan checking is design work under the
 [borrow-analysis promotion contract](core-design.md#borrow-analysis-promotion).
 
 **Design example** (a place-named result view, after the
-[primary design](verification-strategy.md#dependent-results-and-place-named-loans)):
+[primary design](../assurance/verification-strategy.md#dependent-results-and-place-named-loans)):
 
 ```text
 module Reference.Loans;
@@ -358,7 +358,7 @@ public Result<PacketView<'input>, ParseError> ParsePrefix(in Span<byte> input)
 | `requires P` | Entry condition the caller proves | M |
 | `ensures P` | Exit condition; `result` names the returned value and `old(e)` evaluates `e` at entry | M |
 | `where Interface(type T)` | Interface constraint or precontract on generic parameters | M |
-| `restores P` | Predicate over the lender that holds when a returned loan ends; `final(x)` is the value the loan leaves behind | D ([restoration contracts](verification-strategy.md#flow-sensitive-loans-and-restoration-contracts)) |
+| `restores P` | Predicate over the lender that holds when a returned loan ends; `final(x)` is the value the loan leaves behind | D ([restoration contracts](../assurance/verification-strategy.md#flow-sensitive-loans-and-restoration-contracts)) |
 | `invariant Name: P` | Named record or struct invariant conjunct, or a loop invariant | M |
 | `decreases m` | Termination measure of a recursive definition or loop | M |
 | `effects reads(a), writes(b), calls(f)` | Closed upper bound on reads, writes and calls, including transitive callees and captures; no allocation | S |
@@ -471,16 +471,16 @@ public Result<u32, ArithmeticError> AddTwice(u32 a, u32 b)
 ## Extensions outside the first release
 
 These constructs are parsed or designed for consumer-gated extensions. They
-define nothing in the first release; the [extension index](extensions/README.md)
+define nothing in the first release; the [extension index](../extensions/README.md)
 lists their owners.
 
 | Construct | Extension | Status |
 | --- | --- | --- |
-| `x @ q`, `grade q : D`, `domain` declarations | [Graded foundation](extensions/graded-foundation.md) | S |
-| `effect`, `handle`, `resume`, `dispose`, `rehandle`, `shallow` | [Handlers](extensions/handlers-async.md) | S |
-| `async`, `scope`, `spawn`, `await`, `commit`, `on cancel` | [Structured tasks](extensions/handlers-async.md) | S |
-| Cells, snapshots and local aliases | [Interior mutability](extensions/interior-mutability.md) | D |
-| Descriptors, derivation and generated declarations | [Metaprogramming](extensions/metaprogramming.md) | D |
-| `machine`, `hardware`, `state`, `register`, `transition`, `rule`, `schedule` | [Whole-system authorship](extensions/unified-source-contract.md) | S |
+| `x @ q`, `grade q : D`, `domain` declarations | [Graded foundation](../extensions/graded-foundation.md) | S |
+| `effect`, `handle`, `resume`, `dispose`, `rehandle`, `shallow` | [Handlers](../extensions/handlers-async.md) | S |
+| `async`, `scope`, `spawn`, `await`, `commit`, `on cancel` | [Structured tasks](../extensions/handlers-async.md) | S |
+| Cells, snapshots and local aliases | [Interior mutability](../extensions/interior-mutability.md) | D |
+| Descriptors, derivation and generated declarations | [Metaprogramming](../extensions/metaprogramming.md) | D |
+| `machine`, `hardware`, `state`, `register`, `transition`, `rule`, `schedule` | [Whole-system authorship](../extensions/unified-source-contract.md) | S |
 
 `scope` names only a structured task scope; invariant lifting uses `open`.

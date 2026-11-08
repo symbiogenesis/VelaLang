@@ -806,7 +806,7 @@ def translate(source: bytes) -> Translation:
 def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEvaluation:
     """Check the original source and one closed compiler constant initializer.
 
-    The [playground contract](../../docs/playground.md#browser-behavior)
+    The [playground contract](../../docs/tooling/playground.md#browser-behavior)
     restricts this development service to the existing bounded static evaluator.
     """
     elaborator = _Elaborator()

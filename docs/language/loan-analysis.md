@@ -1,10 +1,10 @@
 # Vela loan-analysis diagnostic
 
-This is [Q25j's](../PLAN.md#q-assessment-actions) bounded experimental
+This is [Q25j's](../../PLAN.md#q-assessment-actions) bounded experimental
 contract. It commissions inference over supplied flow facts, independently of
 source elaboration. The [core loan rules](core-design.md#loans-and-control-flow),
-[capture rules](extensions/graded-foundation.md#functions-and-application) and
-[frontend disposition](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
+[capture rules](../extensions/graded-foundation.md#functions-and-application) and
+[frontend disposition](../extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
 retain their meanings and prerequisites. This diagnostic supplies no source
 acceptance, checked interpretation, memory-safety theorem or machine law.
 
@@ -30,7 +30,7 @@ cycles and exhausted node/path/work budgets refuse analysis. No partial
 exploration may produce a complete result. Reducible natural loops with an exit
 edge are analyzed by Kleene fixpoint iteration over the loop header.
 
-The current [implementation](../tools/toolchain/loans.py) computes backward
+The current [implementation](../../tools/toolchain/loans.py) computes backward
 demand over the control-flow graph and performs forward abstract interpretation
 with join-point state merging at join nodes and loop headers. Compatible branch
 states merge at join points rather than enumerating $2^k$ paths across sequential
@@ -69,7 +69,7 @@ The API must not expose an admitted-program or memory-safe verdict.
 
 ## Using the diagnostic
 
-[loans.py](../tools/toolchain/loans.py) exposes immutable graph/event
+[loans.py](../../tools/toolchain/loans.py) exposes immutable graph/event
 records and `analyze(owners, graph, limits)`. Run its focused behavioral checks
 with `python tools/run.py test --only test_vela_loans --jobs 1` on Windows.
 An explicit result split can be modeled as follows:
@@ -103,11 +103,11 @@ extraction from the Menhir tree.
 
 ## Acceptance
 
-The design inputs have separate jobs. [Ante-style invalidation](extensions/interior-mutability.md#ante-as-a-candidate-for-static-invalidation)
+The design inputs have separate jobs. [Ante-style invalidation](../extensions/interior-mutability.md#ante-as-a-candidate-for-static-invalidation)
 distinguishes address validity from current-content facts;
-[Granule/Gerty and the graded foundation](verification-strategy.md#reading-the-graded-type-claims)
+[Granule/Gerty and the graded foundation](../assurance/verification-strategy.md#reading-the-graded-type-claims)
 inform lawful demand without creating memory permission;
-[Polonius](verification-strategy.md#research-that-changes-the-experiments)
+[Polonius](../assurance/verification-strategy.md#research-that-changes-the-experiments)
 informs branch-sensitive lifetime inference; and
 [borrow-end reasoning](core-design.md#reuse-decisions) informs restoration.
 This increment implements only the explicit flow/capture/restoration experiment.
@@ -138,9 +138,9 @@ superiority to Polonius.
 
 The independent source and fixture review on 2026-11-03 accepts the bounded
 explicit-flow diagnostic at this contract's boundary. The reviewed implementation
-is [loans.py](../tools/toolchain/loans.py) at
+is [loans.py](../../tools/toolchain/loans.py) at
 `007a54832aeeb89c12047ca21be9df8724a451d8`; the accompanying
-[branch-demand oracle](../tools/tests/test_vela_loans.py#_generated_branch_demand_oracle)
+[branch-demand oracle](../../tools/tests/test_vela_loans.py#_generated_branch_demand_oracle)
 adds independently expected last-read and conflict decisions across mutually
 exclusive alternatives. It uses no analyzer internals to calculate expectations.
 
@@ -168,7 +168,7 @@ A comparison commissioned through the existing
 reviewed client behavior, expected decisions and the compared guarantee
 endpoints. Pin the compiler/analyzer revision and configuration, explicitly
 distinguishing original Polonius from Polonius Alpha. Pin the selected
-[Ante design](extensions/interior-mutability.md#ante-as-a-candidate-for-static-invalidation)
+[Ante design](../extensions/interior-mutability.md#ante-as-a-candidate-for-static-invalidation)
 and identify its implemented subset; a design example supplies no compiler
 verdict. Supplied graph diagnostics and source checking have different endpoints.
 
@@ -179,7 +179,7 @@ without weakening ownership, dependent facts, effects or required guarantees.
 Retain manual rewrites, annotations and the first intended diagnostic; an
 unrelated parse/type failure supplies no borrowing rejection evidence.
 
-Reuse the applicable [measurement record and sampling](workflow-contract.md#measurement-record-and-sampling)
+Reuse the applicable [measurement record and sampling](../assurance/workflow-contract.md#measurement-record-and-sampling)
 for diagnostic latency, elapsed/CPU time, peak memory and environment identity.
 Record graph size, branching, captures, configured budgets and budget refusals
 alongside successful cases. State each claimed improvement's objective and

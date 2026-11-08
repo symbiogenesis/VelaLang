@@ -2,10 +2,10 @@
 
 This contract owns the first supported Vela software release's scope, primitive
 semantics, module boundary and required library behavior. The
-[primary design](verification-strategy.md) supplies rationale and examples, and
+[primary design](../assurance/verification-strategy.md) supplies rationale and examples, and
 the [language reference](reference.md) gives each construct's syntax, meaning,
 example and implementation status;
-[PLAN.md](../PLAN.md#vela-first-release-delivery) owns commissioning,
+[PLAN.md](../../PLAN.md#vela-first-release-delivery) owns commissioning,
 budgets and delivery order. The [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md)
 remains normative for VerifiedOS. These are design decisions and acceptance
 predicates, not a claim that the current prototypes implement them.
@@ -36,8 +36,8 @@ loop iterations. [Qualification](#qualification) measures each cost.
 Specifications and proofs may use the admitted mathematical definitions and
 libraries in the existing kernel. A mathematical definition's expressiveness
 does not imply a runtime representation or admission to executable type
-conversion. The [mathematical prototype](elaboration-prototype.md) retains its
-own supported subset; the [pure prototype](vela-prototype.md) and
+conversion. The [mathematical prototype](../tooling/elaboration-prototype.md) retains its
+own supported subset; the [pure prototype](../tooling/pure-prototype.md) and
 [surface parser](surface-grammar.md) retain theirs. Parsing a larger feature does
 not make it part of this release.
 
@@ -46,7 +46,7 @@ uses explicit `let`/`var` local conventions, ordinary numeric aliases, concise
 expression matches, one function-expression body marker and ordinary generic
 calls. Q25z migrates syntax and existing consumers independently; represented
 libraries and runtime qualification follow the first synchronous slice under
-the [delivery order](../PLAN.md#vela-first-release-delivery). Typed
+the [delivery order](../../PLAN.md#vela-first-release-delivery). Typed
 immutable locals, canonical generic calls, expression arms and mathematical
 bodies have development parser support; collection modes remain syntax-only.
 Their adoption preserves this release's semantic scope and
@@ -71,14 +71,14 @@ general reflection/generation, concurrent interior mutation, native self-hosting
 ISA replacement or hardware authorship. Async and one-shot control capture need
 a separately accepted consumer and their own resource/lowering slice.
 
-The [extension designs](extensions/README.md), including the
-[extended grade dossier](extensions/graded-foundation.md),
-[control dossier](extensions/handlers-async.md), [mutation dossier](extensions/interior-mutability.md),
-[metaprogramming design](extensions/metaprogramming.md) and
-[whole-system contract](extensions/unified-source-contract.md), retain their extension
+The [extension designs](../extensions/README.md), including the
+[extended grade dossier](../extensions/graded-foundation.md),
+[control dossier](../extensions/handlers-async.md), [mutation dossier](../extensions/interior-mutability.md),
+[metaprogramming design](../extensions/metaprogramming.md) and
+[whole-system contract](../extensions/unified-source-contract.md), retain their extension
 obligations and define no part of this release. Selecting an extension requires a named client, a comparison with
 the supported subset, a bounded implementation/qualification budget and a
-decision predicate. Grading follows the [incremental selection protocol](extensions/graded-foundation.md#extension-selection-and-qualification),
+decision predicate. Grading follows the [incremental selection protocol](../extensions/graded-foundation.md#extension-selection-and-qualification),
 with type-use accounting and generated usability tools justified separately.
 A proposal's syntax or a demonstration assembled to exercise
 the proposal is insufficient evidence of product need. Its omission changes no
@@ -100,7 +100,7 @@ binds that policy as follows; the target bridge must prove the binding.
 | Standard numeric aliases | The standard library module `Vela.Numerics` exports ordinary public aliases `int = i32`, `uint = u32`, `long = i64` and `ulong = u64`. Each denotes exactly its target type, including representation, arithmetic and proof obligations. Width-named spellings remain available. |
 | `usize` | Unsigned index/count arithmetic at the target's declared XLEN width. This is not a capability's representation, permission to address all values of that width, or a pointer/integer conversion. Target specialization fixes the width and its representability obligations. |
 | Mathematical `Nat` and integers | Specification/static values with their mathematical operations. Runtime use needs a selected finite representation and a proved range relation; there is no implicit arbitrary-precision runtime. |
-| Integer literals | Decimal, binary and hexadecimal digits with the [separator rules](authoring-tools.md#numeric-separators) denote exact mathematical magnitudes. A suffix or expected type determines the representation; an unconstrained runtime literal needs an annotation. No machine-default integer type is guessed. A syntactic negative integer literal is checked as one signed value, admitting the signed minimum; negation of an already typed expression obeys the ordinary range rule. An out-of-range literal is a compile-time error. |
+| Integer literals | Decimal, binary and hexadecimal digits with the [separator rules](../tooling/authoring-tools.md#numeric-separators) denote exact mathematical magnitudes. A suffix or expected type determines the representation; an unconstrained runtime literal needs an annotation. No machine-default integer type is guessed. A syntactic negative integer literal is checked as one signed value, admitting the signed minimum; negation of an already typed expression obeys the ordinary range rule. An out-of-range literal is a compile-time error. |
 | Ordinary `+`, `-`, `*` and unary `-` | Exact mathematical result with a proof that it is representable in the result type. Failure to discharge the premise is an unresolved obligation, not wrapping, trapping or a debug/release distinction. Operands have one explicitly determined type. |
 | Ordinary `/` and `%` | Division truncates toward zero. For the mathematical quotient `q`, `a = q*b + r`, with `r` zero or of the dividend's sign and `abs(r) < abs(b)`. Both operations require a nonzero divisor; division additionally requires a representable quotient, excluding signed `MIN / -1`. Signed `MIN % -1` is exactly zero. A pair of runtime quotient/remainder results satisfies the equation only when the quotient is representable; the mathematical equation also describes the exceptional division input. |
 | Checked arithmetic | Named `CheckedAdd`, `CheckedSub`, `CheckedMul`, `CheckedNeg`, `CheckedDiv` and `CheckedRem` return `Result<T, ArithmeticError>` with the ordinary value on `Ok`, otherwise the named `Overflow` or `ZeroDivisor` case. Division checks zero before signed quotient overflow; `CheckedRem(MIN, -1)` returns `Ok(0)`. They do not mutate their inputs or expose a partial result. |
@@ -272,7 +272,7 @@ element bodies discharge in the
 rather than open quantifier instantiation or polymorphic LINQ dispatch. No
 runtime `IQueryable<T>` or reflection-based expression-tree interface is
 introduced; contract checking inspects `Seq<T>` predicate lambdas statically, and
-compile-time query specialization is an extension under the [staging design](extensions/metaprogramming.md#evaluation-and-phase-boundaries).
+compile-time query specialization is an extension under the [staging design](../extensions/metaprogramming.md#evaluation-and-phase-boundaries).
 Iterators carry their bounds and loan contracts; they do not require ordinary
 users to reconstruct a separation-logic proof at each element. Codecs retain the
 platform's required format-description and
@@ -348,15 +348,15 @@ No diagnostic may silently reorder effectful arguments or insert hidden loans.
 
 Use type-first declarations, PascalCase members, camelCase locals, `this`, ordinary
 generic calls, expression bodies and inferred lambdas consistently. The
-[authoring style](authoring-tools.md#common-style) and
-[binding guidance](authoring-tools.md#lint-policy) keep `let`/`var` visible whether
+[authoring style](../tooling/authoring-tools.md#common-style) and
+[binding guidance](../tooling/authoring-tools.md#lint-policy) keep `let`/`var` visible whether
 the type is inferred or explicit. These familiar spellings retain Vela's rules:
 
 | Surface | Vela meaning to explain |
 | --- | --- |
 | `let T value` | Immutable binding (bare `T value = ...;` is refused, directing authors to `let` or `var`); writing through an eligible exclusive loan is a separate operation |
 | `var T value` | Mutable binding, with no implicit shared-write permission |
-| `in`, `ref`, `out` | Explicit shared-read, initialized-exclusive and initialization-exclusive loans; ordinary calls repeat their mode, and [assist-don't-coerce tooling](authoring-tools.md#compiler-verified-assist-dont-coerce-tooling) offers a checked insertion of `in`/`ref`/`out` (such as `ref buffer`) when omitted |
+| `in`, `ref`, `out` | Explicit shared-read, initialized-exclusive and initialization-exclusive loans; ordinary calls repeat their mode, and [assist-don't-coerce tooling](../tooling/authoring-tools.md#compiler-verified-assist-dont-coerce-tooling) offers a checked insertion of `in`/`ref`/`out` (such as `ref buffer`) when omitted |
 | `out T` with a fallible result | `T` is initialized on every normal return, including errors; partial construction uses outcome-indexed owned storage |
 | Labeled arguments | Labels name the next declared parameter, preserving dependent substitution and left-to-right evaluation; no reordering or defaults |
 | `int` and ordinary arithmetic | Explicitly imported exact alias; representability obligations and checked-result alternatives retain the primitive contract, and conversion diagnostics suggest `long.From(x)` when infallibly wider or `usize.TryFrom(x)` when range-checked |
@@ -380,12 +380,12 @@ both accesses and may offer a preceding immutable snapshot only when evaluation,
 effects and lifetimes preserve meaning. Completion can offer exhaustive
 `Option`/`Result` arms and explicit propagation only from the current resolved
 type and resource exits. These wider editor features require their qualified
-[compiler facts](tooling-protocols.md#language-server-protocol); the pure language
+[compiler facts](../tooling/tooling-protocols.md#language-server-protocol); the pure language
 server cannot infer a borrow verdict or advertise unsupported code actions.
 
 ## Qualification
 
-The [delivery plan](../PLAN.md#vela-first-release-delivery) selects a real
+The [delivery plan](../../PLAN.md#vela-first-release-delivery) selects a real
 bounded byte-buffer consumer and an independently chosen second client before
 implementation. Their contracts must identify actual formats, entry states and
 independently expected success/failure results. A candidate that only parses,
@@ -405,20 +405,20 @@ recurring authoring/maintenance benefit and eventual economic adoption are
 separate decisions. Charge setup and shared maintenance fully, without requiring
 the first two small clients to repay the entire language foundation. Any accepted
 size/speed trade has a declared target envelope and per-case evidence; no average
-hides a missed hard bound. The canceled [workflow comparison](workflow-contract.md)
+hides a missed hard bound. The canceled [workflow comparison](../assurance/workflow-contract.md)
 retains its frozen experiment's identity and verdict, and supplies no current
 product acceptance by implication.
 
 ### First-slice component and concrete `Span<byte>` carrier <a id="first-slice-qualification"></a>
 
-[examples/first_slice.vela](../examples/first_slice.vela)
+[examples/first_slice.vela](../../examples/first_slice.vela)
 authors the bounded packet/manifest validator `PrepareAndValidatePacket(ref Span<byte> dst, in Span<byte> pkt) -> Result<ValidatedPacket<'dst>, ValidationError>`
 and its slot-backed round-trip pipeline (`DecodePacketIntoFrame`,
 `PrepareSliceHeader`, `RunRoundTripPipeline`) over the concrete `Span<byte>` and
 `Slots<T, Cap>` carriers in
-[tools/toolchain/elaborate.py](../tools/toolchain/elaborate.py) and the
+[tools/toolchain/elaborate.py](../../tools/toolchain/elaborate.py) and the
 CompCert Clight/C and purecap CHERI-RISC-V target harness in
-[tools/toolchain/first_slice.py](../tools/toolchain/first_slice.py).
+[tools/toolchain/first_slice.py](../../tools/toolchain/first_slice.py).
 Obligations the elaborator cannot kernel-prove reach Rocq with their real
 statements as named solver-trust axioms recorded in `solver_trust`, so
 `Print Assumptions` and the harness report kernel-proved definitions and

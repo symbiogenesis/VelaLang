@@ -1,8 +1,8 @@
 # Vela compiler, editor and debugger interoperability
 
-The [primary language design](verification-strategy.md#language-product-contract)
+The [primary language design](../assurance/verification-strategy.md#language-product-contract)
 selects useful diagnostics, navigation, formatting and proof inspection for the
-[first supported release](first-release.md#release-boundary). Language Server
+[first supported release](../language/first-release.md#release-boundary). Language Server
 Protocol (LSP) and shared compiler facts support that workflow. Debug Adapter
 Protocol (DAP), DWARF and the wider interchange surfaces below are separately
 selected extensions with actual consumers. This contract defines their
@@ -13,7 +13,7 @@ are standards; SCIP, editor grammars, BSP, LLVM remarks and trace formats have
 their own ecosystem specifications rather than a shared standards status.
 
 This is a non-normative design contract. The
-[plan](../PLAN.md#vela-whole-system-authoring-proposal) owns implementation
+[plan](../../PLAN.md#vela-whole-system-authoring-proposal) owns implementation
 stages and commissioning. The [first host LSP increment](lsp-prototype.md)
 uses the pure prototype as its diagnostic producer. The separately commissioned
 [pure navigation increment](lsp-prototype.md#pure-navigation-increment) exposes
@@ -39,7 +39,7 @@ consumer and demonstrated diagnostic, review or maintenance value. Prefer a smal
 shared schema over simultaneous public exposure of every compiler layer. A later
 adapter reuses existing judgments and snapshot identities; its schema does not
 justify creating a second semantic producer. New functionality beyond the basic
-workflow follows the [first-release delivery gates](../PLAN.md#vela-first-release-delivery).
+workflow follows the [first-release delivery gates](../../PLAN.md#vela-first-release-delivery).
 
 Native DWARF follows an
 executable producer and fixed ABI; DAP follows a qualified simulator backend and
@@ -62,17 +62,17 @@ Use [DWARF 5 and its errata](https://dwarfstd.org/dwarf5std.html) for native deb
 information. A later format revision requires its own consumer qualification;
 [DWARF 6 remains a working draft](https://dwarfstd.org/download.html). Read the
 selected implementation's licences before incorporating libraries, generators
-or debugger code, under the [upstream rules](../THIRD-PARTY.md).
+or debugger code, under the [upstream rules](../../THIRD-PARTY.md).
 
 The compiler owns located syntax, name resolution, types, elaboration and source
 maps. The language server consumes those services; it must not introduce another
 parser, type system or proof acceptance path. Reuse
-[contextual diagnostic judgments](core-design.md#typed-holes-and-invalidation)
+[contextual diagnostic judgments](../language/core-design.md#typed-holes-and-invalidation)
 from `core-diagnostics`. The existing Rocq editor and
 [R-05-018a workflow](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-018a) retain their own subject and scope;
 their qualification is not Vela-server qualification.
 
-The [compiler-service contract](extensions/metaprogramming.md#compiler-services-and-runtime-information)
+The [compiler-service contract](../extensions/metaprogramming.md#compiler-services-and-runtime-information)
 constrains versioned semantic snapshots selected for analysis, refactoring and generation
 clients. Diagnostics and navigation connect a generated definition to its request,
 generator, concrete instantiation and source inputs; debug mappings additionally
@@ -137,7 +137,7 @@ syntax diagnostics and syntax symbols, but must label semantic/proof operations
 unsupported. Incomplete editor input may produce partial syntax for navigation;
 it cannot become accepted source or emitted production code.
 
-For the [familiar authoring surface](surface-grammar.md#ergonomic-authoring-and-bounded-collection-iteration),
+For the [familiar authoring surface](../language/surface-grammar.md#ergonomic-authoring-and-bounded-collection-iteration),
 resolved signatures show receiver loan modes/views and explicit argument modes.
 Resource conflicts identify both accesses and the outstanding exit obligation.
 A snapshot suggestion is a version-bound proposed source edit, checked for
@@ -164,7 +164,7 @@ invalidate the affected closure until precise dependency analysis is qualified.
 Clear or mark old diagnostics when a file closes or a dependency disappears;
 out-of-order worker replies cannot republish superseded diagnostics or edits.
 
-Convert the [parser's half-open UTF-8 byte spans](vela-parser.md#bounded-increment)
+Convert the [parser's half-open UTF-8 byte spans](parser.md#bounded-increment)
 explicitly to LSP's zero-based positions; identify the source API's coordinate
 units rather than copying its one-based diagnostic columns.
 Support UTF-16 positions, the LSP default; use UTF-8 only when negotiated with the
@@ -188,7 +188,7 @@ Vela to implement. [ESTree](https://github.com/estree/estree) describes JavaScri
 syntax; [Clang's interfaces](https://clang.llvm.org/docs/Tooling.html) expose
 Clang-specific information with different stability boundaries. Define Vela's
 public views through versioned schemas owned by the compiler services in
-[the metaprogramming contract](extensions/metaprogramming.md#compiler-services-and-runtime-information).
+[the metaprogramming contract](../extensions/metaprogramming.md#compiler-services-and-runtime-information).
 Do not expose an accidental serialization of implementation objects as a stable API.
 
 | View | Information to expose for the declared supported subset |
@@ -231,7 +231,7 @@ for syntax-aware consumers and a
 [TextMate grammar](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide)
 for lexical highlighting clients. These are editor assets, separate from LSP
 semantic tokens and from the compiler's typed trees. The
-[Menhir development grammar](vela-parser.md) remains the syntax owner: generate
+[Menhir development grammar](parser.md) remains the syntax owner: generate
 secondary assets where possible and otherwise check them against the same
 versioned corpus. An editor parser cannot authorize semantic acceptance or
 replace the compiler frontend used by LSP.
@@ -438,14 +438,14 @@ ECMA-426 export duty. Lowering and source provenance remain compiler-owned once.
 
 ## Generated development tests
 
-[Q25x](../PLAN.md#q-assessment-actions) owns a bounded qualification of
+[Q25x](../../PLAN.md#q-assessment-actions) owns a bounded qualification of
 [Hypothesis](https://hypothesis.readthedocs.io/en/latest/stateful.html) as an
 optional development instrument for the existing Python source API, synchronous
 LSP overlays and pure formatter. Its generators and shrinking can reduce
 handwritten sequence construction and failure reduction. This selects a trial,
 not a permanent dependency or a new semantic producer. Read the selected
 release's own licence and dependency notices and record its use in
-[THIRD-PARTY.md](../THIRD-PARTY.md) before provisioning it. Pin and qualify
+[THIRD-PARTY.md](../../THIRD-PARTY.md) before provisioning it. Pin and qualify
 the exact package closure with the manifest's Python minor version on Windows
 and Ubuntu; a published wheel is not a host verdict. Keep the candidate outside
 the ordinary tool environment until the adoption decision, and reuse the existing
@@ -503,10 +503,10 @@ neither a test count nor discovery of a production bug is the success criterion.
 Otherwise retain useful explicit regressions and record rejection or unresolved
 prerequisites without promoting the candidate into the ordinary tool closure.
 
-`python tools/run.py vela generated-tests` ([`generated_tests.py`](../tools/toolchain/generated_tests.py))
+`python tools/run.py vela generated-tests` ([`generated_tests.py`](../../tools/toolchain/generated_tests.py))
 qualifies `hypothesis==6.170.14` and `sortedcontainers==2.4.0` under the
 `2026-10-31T07:17:33Z` dependency cooldown recorded in
-[THIRD-PARTY.md](../THIRD-PARTY.md) inside a disposable Python 3.14 virtual
+[THIRD-PARTY.md](../../THIRD-PARTY.md) inside a disposable Python 3.14 virtual
 environment on both Windows ARM64 (Python `3.14.10`, `_native` SHA-256
 `b7722a385d97a5ce0e0a5800770516ce5557f4abed4503b12b7f8e6c6a202c3b`, 4.7 s wall
 time) and Ubuntu ARM64 (Python `3.14.7`, `_native` SHA-256
@@ -516,38 +516,38 @@ time). Under deterministic seed `20261107` (`max_examples=64`,
 `database=None`, `derandomize=True`), the campaign passes all four subjects
 (`source_coordinates`: 848 examples; `synchronous_overlays` and
 `supported_requests`: 3,224 state-machine steps; `pure_formatting`: 64 examples)
-against [`OracleTextModel`](../tools/toolchain/generated_tests.py),
-[`OracleOverlayModel`](../tools/toolchain/generated_tests.py) and
-[`FormatTemplate`](../tools/toolchain/generated_tests.py), kills all three
+against [`OracleTextModel`](../../tools/toolchain/generated_tests.py),
+[`OracleOverlayModel`](../../tools/toolchain/generated_tests.py) and
+[`FormatTemplate`](../../tools/toolchain/generated_tests.py), kills all three
 executable seeded defects (`utf16-codepoint-confusion`,
 `edit-against-original-document`, and held-out
 `publish-early-edit-before-rollback`), and shrinks nonminimal failing traces
 (`21 -> 10` coordinate-case units and `8 -> 2` overlay actions) into explicit
 JSON-serializable replays verified by
-[`test_vela_generated_tests.py`](../tools/tests/test_vela_generated_tests.py)
+[`test_vela_generated_tests.py`](../../tools/tests/test_vela_generated_tests.py)
 under the existing `Case` runner. Compared with the frozen manual baseline
-([`test_vela_lsp.py`](../tools/tests/test_vela_lsp.py),
-[`test_vela_lsp_services.py`](../tools/tests/test_vela_lsp_services.py) and
-[`test_vela_format.py`](../tools/tests/test_vela_format.py)), the state-machine
+([`test_vela_lsp.py`](../../tools/tests/test_vela_lsp.py),
+[`test_vela_lsp_services.py`](../../tools/tests/test_vela_lsp_services.py) and
+[`test_vela_format.py`](../../tools/tests/test_vela_format.py)), the state-machine
 rules and structural shrinker replace bespoke multi-step edit/invalidation/recovery
 sequence construction and reduce 8-step failing traces to 2-step minimal replays
 automatically. Because `hypothesis==6.170.14` is licensed under `MPL-2.0` and
 ships a compiled Rust/PyO3 `_native` extension whose wheel metadata omits
 separate crate license notices for its 14-crate Rust closure, the project
 declines promoting `hypothesis` into the permanent
-[`tools/pyproject.toml`](../tools/pyproject.toml) and
-[`tools/uv.lock`](../tools/uv.lock) closure, keeps `vela generated-tests` as an
+[`tools/pyproject.toml`](../../tools/pyproject.toml) and
+[`tools/uv.lock`](../../tools/uv.lock) closure, keeps `vela generated-tests` as an
 isolated on-demand qualification command, and retains the independent models,
 fault controls and shrunk explicit regression cases in the Apache-2.0 test suite.
 
 [QCheck](https://github.com/c-cube/qcheck) is an alternative for a separately
 selected native OCaml consumer; no OCaml framework is added beside Hypothesis
 without such a consumer. The parser first uses its
-[existing Menhir facilities](vela-parser.md#generated-syntax-campaigns).
+[existing Menhir facilities](parser.md#generated-syntax-campaigns).
 These campaigns supply development falsification only. Checked source
 correspondence, kernel evidence and independent-client qualification retain their
 existing duties. Hosted verdicts and any benchmark comparisons follow the
-[validation handoff](../AGENTS.md#tool-execution-and-validation).
+[validation handoff](../../AGENTS.md#tool-execution-and-validation).
 
 ## Qualification and delivery
 
@@ -558,7 +558,7 @@ Language meaning, contextual diagnostics, lowering and protocol adapters retain
 their separate owners; charge shared work once. Preserve full-frontend admission
 prerequisites and existing compiler duties. The first release qualifies its basic
 workflow on the independent software clients in the
-[release contract](first-release.md#qualification); broader protocols add no
+[release contract](../language/first-release.md#qualification); broader protocols add no
 implicit prerequisite to that acceptance. An unsupported adapter remains
 unadvertised. Existing prototype features retain their current qualification
 status rather than becoming accepted through this priority decision.
@@ -575,6 +575,6 @@ transcripts, expected results and verdicts. Independent review checks that the
 displayed source and values match the executed artifact, including telling
 negative neighbors. Protocol conformance alone establishes no compiler theorem,
 proof acceptance or measured productivity benefit. Complete the repository's
-[validation handoff](../AGENTS.md#tool-execution-and-validation): finish
+[validation handoff](../../AGENTS.md#tool-execution-and-validation): finish
 local integration and record the recommended checks; the user owns publication,
 Host CI and Guest CI. No hosted verdict is supplied until its evidence exists.

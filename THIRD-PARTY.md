@@ -10,7 +10,7 @@ This file records third-party dependencies, development tools, and reference rea
 
 ## Browser playground assets
 
-The local [Vela playground](docs/playground.md) loads
+The local [Vela playground](docs/tooling/playground.md) loads
 `monaco-editor` 0.55.1's browser distribution from the version-pinned jsDelivr
 package URL. The selected release's own
 [LICENSE.txt](https://github.com/microsoft/monaco-editor/blob/v0.55.1/LICENSE.txt)
@@ -27,7 +27,7 @@ copied or redistributed.
 
 ### Vela parser support library
 
-Vela's [Q25h support-library prerequisite](docs/vela-parser.md#rocq-support-prerequisite)
+Vela's [Q25h support-library prerequisite](docs/tooling/parser.md#rocq-support-prerequisite)
 builds `coq-menhirlib` from the same authenticated Menhir 20260209 archive the
 table below records. Its root `LICENSE` was re-read on 2026-10-31 at SHA-256
 `9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`;
@@ -45,7 +45,7 @@ separate terms qualification.
 
 | Package | Version | License | Role |
 | --- | --- | --- | --- |
-| Menhir | 20260209 | Generator `GPL-2.0-only`; `MenhirLib`, `MenhirSdk`, `MenhirCST` and `MenhirGLR` `LGPL-2.0-only WITH OCaml-LGPL-linking-exception` | Parser generator installed in the Sail, QuickChick, CertiRocq and contained compiler snapshots at 20260209, each installing all five packages. The `LICENSE` that release installs, SHA-256 `9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`, puts the generator under GPL version 2, its runtime libraries and SDK under the Library General Public License version 2 with the static-linking exception, and its separately packaged Rocq library `coq-menhirlib`, which the CertiRocq snapshot installs for CompCert, as the private Q35e `vst2` qualification switch does ([its record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/c-refinement-qualification-switches.md)), under `LGPL-3.0-or-later`. Q39 builds the contained compiler's parser from that release and reads its vendored Rocq runtime terms in the [license receipt](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/implementation/evidence/q39-20261010-license-readings.json); the source and compiled parser stay contained. The generator and generated parser sources remain outside the tracked tree. Vela Q25g uses its code backend only in native build directories, links no Menhir runtime, and retains JSON receipts rather than generated source or binaries. The 20260209 source archive was re-read for this use on 2026-10-31: its `LICENSE` has the SHA-256 above and its archive has the [opam-recorded SHA-512](https://opam.ocaml.org/packages/menhir/menhir.20260209/) `aafad186f328ae8dd4cc69af0f30c1a0b208cf5148a7a94c150099be03838503c5ec12918de26cd7f794b5a72f114bc1bae8d81058bd0ea10372a3b06818687e`. GPL section 0 conditions coverage of output on whether it constitutes a work based on the program; this reading grants no blanket licence to generated artifacts. Distribution of generated sources, binaries or a compiler bootstrap closure needs its own terms qualification under [Q25h](docs/vela-parser.md#promotion-and-retirement). |
+| Menhir | 20260209 | Generator `GPL-2.0-only`; `MenhirLib`, `MenhirSdk`, `MenhirCST` and `MenhirGLR` `LGPL-2.0-only WITH OCaml-LGPL-linking-exception` | Parser generator installed in the Sail, QuickChick, CertiRocq and contained compiler snapshots at 20260209, each installing all five packages. The `LICENSE` that release installs, SHA-256 `9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`, puts the generator under GPL version 2, its runtime libraries and SDK under the Library General Public License version 2 with the static-linking exception, and its separately packaged Rocq library `coq-menhirlib`, which the CertiRocq snapshot installs for CompCert, as the private Q35e `vst2` qualification switch does ([its record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/c-refinement-qualification-switches.md)), under `LGPL-3.0-or-later`. Q39 builds the contained compiler's parser from that release and reads its vendored Rocq runtime terms in the [license receipt](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/implementation/evidence/q39-20261010-license-readings.json); the source and compiled parser stay contained. The generator and generated parser sources remain outside the tracked tree. Vela Q25g uses its code backend only in native build directories, links no Menhir runtime, and retains JSON receipts rather than generated source or binaries. The 20260209 source archive was re-read for this use on 2026-10-31: its `LICENSE` has the SHA-256 above and its archive has the [opam-recorded SHA-512](https://opam.ocaml.org/packages/menhir/menhir.20260209/) `aafad186f328ae8dd4cc69af0f30c1a0b208cf5148a7a94c150099be03838503c5ec12918de26cd7f794b5a72f114bc1bae8d81058bd0ea10372a3b06818687e`. GPL section 0 conditions coverage of output on whether it constitutes a work based on the program; this reading grants no blanket licence to generated artifacts. Distribution of generated sources, binaries or a compiler bootstrap closure needs its own terms qualification under [Q25h](docs/tooling/parser.md#promotion-and-retirement). |
 
 ### Vela development and proof-reuse candidates
 
@@ -103,16 +103,16 @@ temporary virtual environment by `vela generated-tests`; no upstream source,
 wheel, native extension or reproduction blob is copied, distributed or added to
 `tools/pyproject.toml` or `tools/uv.lock`, while minimized counterexamples are
 retained as explicit Apache-2.0 regression data under the
-[test contract](docs/tooling-protocols.md#generated-development-tests).
+[test contract](docs/tooling/tooling-protocols.md#generated-development-tests).
 Q25y reuses the selected Menhir and its
 [generator and output reading](#development-tools-contained-by-use); it still reads the actual
 outputs its additional facilities would retain.
 
-[CoqEAL and Trocq](docs/verification-strategy.md#existing-tooling-and-implementation-owners)
+[CoqEAL and Trocq](docs/assurance/verification-strategy.md#existing-tooling-and-implementation-owners)
 remain conditional proof-transfer references. A concrete consumer and separately
 priced qualification must select the revision and read its own complete licence
 and dependency closure; neither is installed or incorporated by this decision.
 QCheck is similarly conditional on an actual OCaml test consumer and has no
-selected package. The [Plinth/Plutus paper](docs/verification-strategy.md#compilation-and-executable-models)
+selected package. The [Plinth/Plutus paper](docs/assurance/verification-strategy.md#compilation-and-executable-models)
 is a compiler-architecture reference only. No software source is taken from its
 artifact, and the paper's publication licence supplies no software grant.

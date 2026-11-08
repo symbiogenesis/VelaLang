@@ -1,17 +1,17 @@
 # The Language Workflow and Artifact Comparison Contract
 
-> Q20a's non-normative comparison protocol. Start with the [primary Vela design and examples](verification-strategy.md); its [language product contract](verification-strategy.md#language-product-contract) supplies the objective. [PLAN.md](../PLAN.md) owns execution state and the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations. The inspection below lacks the copying implementations, qualified CHERI instance and complete artifact connections needed to run this trial; this contract records no productivity, performance or production result.
+> Q20a's non-normative comparison protocol. Start with the [primary Vela design and examples](verification-strategy.md); its [language product contract](verification-strategy.md#language-product-contract) supplies the objective. [PLAN.md](../../PLAN.md) owns execution state and the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations. The inspection below lacks the copying implementations, qualified CHERI instance and complete artifact connections needed to run this trial; this contract records no productivity, performance or production result.
 
 ## Commissioning disposition
 
-Q19c, Q20b and Q20c are canceled in [PLAN.md](../PLAN.md); their roles below belong to the retained protocol. Re-entry needs a concrete consumer blocked by the existing route, checked foundations, a usable environment, priced missing work and a finite stop threshold in a new suffixed checklist item. Q2b/Q3b, M1, M6 and M7 retain their backend, proof, admission and final-artifact duties.
+Q19c, Q20b and Q20c are canceled in [PLAN.md](../../PLAN.md); their roles below belong to the retained protocol. Re-entry needs a concrete consumer blocked by the existing route, checked foundations, a usable environment, priced missing work and a finite stop threshold in a new suffixed checklist item. Q2b/Q3b, M1, M6 and M7 retain their backend, proof, admission and final-artifact duties.
 
-The [whole-system proposal](extensions/unified-source-contract.md) separately covers proof, ISA and hardware authorship and Sail retirement. This software trial targets the pinned Sail model; it qualifies neither a replacement model nor a hardware backend.
+The [whole-system proposal](../extensions/unified-source-contract.md) separately covers proof, ISA and hardware authorship and Sail retirement. This software trial targets the pinned Sail model; it qualifies neither a replacement model nor a hardware backend.
 
 ## First-release qualification and adoption
 
-The [bounded first release](first-release.md#release-boundary) follows
-[its own delivery sequence](../PLAN.md#vela-first-release-delivery).
+The [bounded first release](../language/first-release.md#release-boundary) follows
+[its own delivery sequence](../../PLAN.md#vela-first-release-delivery).
 Q19c/Q20b/Q20c remain canceled; this sequence neither reruns nor changes their
 frozen experiment. Separate three decisions:
 
@@ -72,7 +72,7 @@ Inspection revision: `e6391c6aacb5a89141250d133f8875efa41a994e`. The table descr
 | [The ring declaration](https://github.com/symbiogenesis/VerifiedOS/blob/main/interfaces/ring-reference.json), [RingContract.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/proofs/RingContract.v), and `CopyRingService.svc_op_record` | Generated encoding and capacity inputs; the service's staging and slack fields | Demo values are no composed device or staging-lifetime decision | Freeze actual selected declaration and composition at trial entry; M6.4/M7.1 retain ownership |
 | [Q1's product gate](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/implementation/contracts/product-gate.md) | Product limits, clock separation and report rejection rules | No ratified physical envelope or measurements for these components | Apply relevant limits only at the endpoint that can decide them |
 
-The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) assigns missing representation, primitive and machine connections; trial entry requires their checked artifacts. The [core design](core-design.md) scopes wider source mechanisms, and the [compiler-route contract](compiler-route-contract.md) owns route comparison and conditional amendments. This protocol selects no route or changed compiler duty.
+The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) assigns missing representation, primitive and machine connections; trial entry requires their checked artifacts. The [core design](../language/core-design.md) scopes wider source mechanisms, and the [compiler-route contract](compiler-route-contract.md) owns route comparison and conditional amendments. This protocol selects no route or changed compiler duty.
 
 ### Freeze and independence
 
@@ -80,7 +80,7 @@ Before adapting P, Q2b freezes its manual baseline's operational definition, int
 
 Before adapting S, Q19c freezes and hashes the interface, generic theorem statements, concrete instance, qualified environment and review. M7.1 may independently develop S's baseline, but S supplies no pre-freeze API feedback. If it does, classify S as another development client and keep the held-out trial unopened until an independently reviewed Q20a amendment names a fresh consumer, owner, baseline and budget. Renaming S, concealing feedback or choosing a replacement after seeing results is invalid.
 
-Name the experiment author, baseline author and a reviewer who authored neither the compared implementation nor its expected-behavior checks. Review the frozen cases and cost ledger under [the checklist conventions](../PLAN.md#checklist-conventions). Q19 or the existing compiler owner qualifies newly incorporated upstreams from their pinned licences and dependency notices; this contract imports no code.
+Name the experiment author, baseline author and a reviewer who authored neither the compared implementation nor its expected-behavior checks. Review the frozen cases and cost ledger under [the checklist conventions](../../PLAN.md#checklist-conventions). Q19 or the existing compiler owner qualifies newly incorporated upstreams from their pinned licences and dependency notices; this contract imports no code.
 
 ## Operational subset and observations
 
@@ -140,7 +140,7 @@ Before candidate proofs are authored, an independent reviewer freezes expected b
 
 Freeze wrong-store, off-by-one, omitted-fill, bad failure-result and second-image variants that are syntactically valid and reach the intended obligation. Distinguish malformed/stillborn construction, intended kill, unrelated failure, timeout, unsupported and survivor. Parse/type/compile failures elsewhere supply no ownership/specification evidence; any required survivor prevents success.
 
-Use [oracle, seed and QuickChick](../tools/README.md#the-three-generators-and-what-each-answers) where supported; retain independent specification review and keep test guards out of theorem premises. Name each guarantee's theorem. Removing a required frame-preservation theorem while retaining operation laws must make P's frame-requiring client fail for that omission. Profile flags and source ownership alone establish no adversarial-context isolation.
+Use [oracle, seed and QuickChick](../../tools/README.md#the-three-generators-and-what-each-answers) where supported; retain independent specification review and keep test guards out of theorem premises. Name each guarantee's theorem. Removing a required frame-preservation theorem while retaining operation laws must make P's frame-requiring client fail for that omission. Profile flags and source ownership alone establish no adversarial-context isolation.
 
 ### Change and weakening probes
 

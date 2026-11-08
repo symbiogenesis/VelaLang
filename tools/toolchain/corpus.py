@@ -418,12 +418,13 @@ def find_root(start: Path | None = None) -> Path:
     here = (start or Path(__file__)).resolve()
     for candidate in [here, *here.parents]:
         if (candidate / ".git").exists() and (
-            (candidate / "docs" / "reference.md").exists()
+            (candidate / "docs" / "language" / "reference.md").exists()
+            or (candidate / "docs" / "reference.md").exists()
             or (candidate / "docs" / "requirements-register.md").exists()
         ):
             return candidate
     raise SystemExit(
-        f"no repository root above '{here}': expected a .git and docs/reference.md"
+        f"no repository root above '{here}': expected a .git and docs/language/reference.md"
     )
 
 
