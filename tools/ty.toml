@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+#:schema ./ty-config.schema.json
+# Editors and CI share this configuration; its schema holds the reviewed policy.
+
+[rules]
+all = "error"
+
+[environment]
+# Infer the target version from pyproject.toml's requires-python in editors.
+# The gate passes the same derived value explicitly.
+
+# The tools are one lane but not one platform: `check.py` and its groups run on the
+# Windows host, while the build, model and proof commands run in WSL and call
+# POSIX-only APIs such as `resource.setrlimit`, `os.wait4`, `os.killpg` and
+# `fcntl.flock`. ty reports nothing in a branch the platform makes unreachable, so
+# no one platform reaches every branch, and the gate runs ty under
+# `--python-platform linux` and again under `win32`. The second run types the
+# branches the tools take only when `sys.platform` is `win32`, and holds every call
+# typeshed declares absent on Windows behind a `sys.platform` check. An editor's
+# server reads this one value, linux, which types the guest's POSIX-only code.
+python-platform = "linux"
+
+# `tools/` is the import root: every tool puts its own directory on `sys.path`
+# before importing `vos`, so that a tool is runnable from anywhere without the
+# package being installed.
+extra-paths = ["."]
+
+[src]
+exclude = ["**/__pycache__/**"]
+# ty otherwise skips whatever a `.gitignore`, `.ignore`, `.git/info/exclude` or
+# global gitignore matches, so an ignore pattern matching a tracked module, one in
+# a file this tree does not carry included, would take it out of the run.
+respect-ignore-files = false
+
+[terminal]
+output-format = "concise"

@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: Apache-2.0
+#:schema ./ruff-config.schema.json
+# Editors and CI share this configuration; its schema holds the reviewed policy.
+
+line-length = 100          # E501 is not selected; this only sizes the few rules that read it
+
+# ruff otherwise skips whatever a `.gitignore`, `.ignore`, `.git/info/exclude` or
+# global gitignore matches, so an ignore pattern matching a tracked module, one in
+# a file this tree does not carry included, would take it out of the run. The gate
+# also passes `--no-respect-gitignore`, so its run does not depend on this line.
+respect-gitignore = false
+
+[lint]
+select = [
+    "F",      # pyflakes: undefined names, redefinitions, unused imports
+    "I",      # import order, so a guarded import cannot drift out of its group
+    "E4",     # imports: E402 keeps the deliberate post-sys.path imports annotated
+    "E7",     # statement-level errors: comparisons to None/True, bare `l` names
+    "E9",     # syntax and IO errors
+    "ANN",    # annotation coverage, the group ty cannot supply
+    "B",      # bugbear: zip without strict, mutable defaults, loop-variable capture
+    "A",      # a name shadowing a builtin
+    "C4",     # comprehension and collection-call shape
+    "N",      # pep8 naming
+    "UP",     # constructs the supported Python version makes obsolete
+    "RET",    # return-statement consistency
+    "PIE",    # redundant code
+    "PERF",   # loops that are a builtin
+    "FURB",   # refurbishment: modernizations pyupgrade does not carry
+    "PTH",    # os.path where pathlib is the current idiom
+    "RUF",    # ruff's own
+    "PLE",    # pylint errors: these are always defects
+    "PLW",    # pylint warnings
+    "PLC",    # pylint conventions, including imports below the top of a file
+    "SIM",    # simplifications that are also clarifications
+    "S",      # bandit, less the two process rules below
+    "TRY",    # exception handling, less the message-shape rule below
+    "SLOT",   # __slots__ on the classes that want them
+    "INT",    # printf-string correctness
+    "TID",    # tidy imports: absolute over relative-from-a-parent, platform modules deferred
+    "PGH",    # a blanket `# noqa` or `# type: ignore`: a suppression names its rule, as above
+]
+
+ignore = [
+    # Bandit's two process rules, refused because neither has a fix short of a
+    # suppression in a program whose purpose is to drive an external toolchain.
+    # Every `subprocess` call here runs sail, cmake, ninja, ctest, git or an
+    # emulator on an argument vector written in this directory: `S603` fires on any
+    # call whose argv is not a literal, which is all of them, and `S607`'s fix is to
+    # name each executable by absolute path, which is what a directory running on
+    # two lanes with two toolchains cannot do. PATH lookup is the resolution here,
+    # and it is deliberate.
+    "S603",
+    "S607",
+
+    # tryceratops' rule that an exception carry its message in its class rather than
+    # at the raise site. The standard library does not work that way and neither
+    # does most Python: `raise ValueError("what went wrong")` is the idiom, and an
+    # exception class per message trades a readable diagnostic for a taxonomy with
+    # one member per site and no reader.
+    "TRY003",
+]
+
+# `RUF001` stays on for every confusable but these two. The documents this checker
+# parses spell a minus sign U+2212 and an en dash U+2013, so its patterns quote them
+# literally; naming the pair is what keeps the rule live against every homoglyph
+# nobody put there on purpose.
+allowed-confusables = ["−", "–"]
+
+[lint.flake8-annotations]
+# A function that returns nothing still says so. The point of the group here is that
+# coverage has no exemptions, because the exempted case is exactly where an
+# unannotated signature hides.
+suppress-none-returning = false
+suppress-dummy-args = false
+allow-star-arg-any = false
+mypy-init-return = false
+
+[lint.flake8-tidy-imports]
+# Each standard-library module the interpreter cannot import on Windows or on Linux, the
+# two platforms the tools run on, that ty resolves under both of its platforms because
+# typeshed stubs it for both: neither ty run sees an import of one fail, and it fails at
+# run time on the platform that lacks it. A banned name covers its submodules. A module
+# ty resolves under neither platform, such as `_overlapped` or `_posixshmem`, is ty's own
+# `unresolved-import` finding and is not listed, and a module whose import fails for want
+# of one that did not load and that configure records as built, missing or disabled, any
+# state but n/a, one a build left out for want of an optional library or whose shared
+# library is absent at run time, is the build's rather than the platform's and is not
+# listed either. `tests/test_typecheck.py` holds the list on each lane against every
+# standard-library module and submodule the running interpreter cannot import, under the
+# gate's own ty runs, so the Windows lane holds the half Windows lacks and the Linux lane
+# the other. It decides the list only on an interpreter carrying its build's whole
+# standard library, as the interpreters Host CI's setup-python installs do: on one short
+# of tkinter, which python.org's Windows installer makes optional and Debian and Ubuntu
+# ship apart, or of ensurepip, which Debian and Ubuntu ship apart too, it fails as short
+# of that library rather than asking for a ban.
+# TID253 refuses an unnested module-level import of a listed module, and
+# `vela/cli/typecheck.py` reads this list and refuses one anywhere else outside a function
+# body that both platforms reach, reading each enclosing `if` that compares `sys.platform`
+# with string literals for the platforms each branch takes. That holds that no listed
+# module is imported on both platforms, not which one has it, so on each lane it also
+# refuses one the running platform reaches whose top-level module the interpreter cannot
+# find, as Windows cannot find `fcntl`; a submodule such as `asyncio.unix_events` or a
+# module found that fails to import, such as `pty` on Windows, is not caught that way.
+banned-module-level-imports = [
+    # Windows lacks these.
+    "_curses", "_curses_panel", "_dbm", "_gdbm", "_posixsubprocess", "asyncio.unix_events",
+    "curses", "dbm.gnu", "dbm.ndbm", "fcntl", "grp", "multiprocessing.popen_fork",
+    "multiprocessing.popen_forkserver", "multiprocessing.popen_spawn_posix", "posix", "pty",
+    "pwd", "readline", "resource", "syslog", "termios", "tty",
+    # Linux lacks these.
+    "_winapi", "asyncio.windows_events", "asyncio.windows_utils", "encodings.mbcs",
+    "encodings.oem", "msvcrt", "multiprocessing.popen_spawn_win32", "nt", "winreg",
+    "winsound",
+]
