@@ -109,6 +109,77 @@ nonterminal/terminal trees inspected in memory, and retained replay cases store
 only Apache-2.0 terminal sequences, rendered Vela sources and expected
 observations without linking `menhirLib`, enabling `--table`, or retaining
 `--list-errors` / `.messages` catalogs.
+[Q25n](PLAN.md#q-assessment-actions), [Q25o](PLAN.md#q-assessment-actions), and
+[Q25u](PLAN.md#q-assessment-actions) qualify two independent editor clients
+against `vela-lsp` via `python tools/run.py vela-lsp --qualify-clients`
+([`lsp_clients.py`](tools/toolchain/lsp_clients.py)). The 2026-11-08 reading
+inspected Neovim `v0.11.0` (`Apache-2.0 AND Vim`, copyright 2014-present Neovim
+contributors and 1994-2023 Bram Moolenaar), whose root `LICENSE.txt`
+(`e1ff044cabc90a87faf9356618a5c43078c020c3c5e98a4dee570dd098da043d`, `Apache-2.0`
+plus the Vim license notice) and bundled `netrw` runtime notice
+(`share/nvim/runtime/pack/dist/opt/netrw/LICENSE.txt`, Windows
+`0dac5aa0e9035a9624a8310aaf5749a94a767651263faadbf85d566dc726a9a4`, Linux
+`9c65b12c2e22ab4e628508c7baf96ecbf7016eaa608756ddd8476b5b23e46037`) were
+verified across the official
+[Windows archive](https://github.com/neovim/neovim/releases/download/v0.11.0/nvim-win64.zip)
+(`00ea1a0fd3252a883974a3411159087196924f214000583257188b205d173a23`,
+`bin/nvim.exe`
+`9f1ef87c6e9222e513bc920246e67ea8e99be1b66f59e25aea6f11801fa9ee3d`,
+`bin/lua51.dll`
+`d64fae51493f47ec066890cc9e938415648919292a961577040f3df3f356206d`,
+`share/nvim/runtime/lua/vim/lsp.lua`
+`7afd6fd4d07619dfaf76f3e13c50571f5a5ae6f1a1172710483a5acd2c8a9abd`),
+[Linux ARM64 archive](https://github.com/neovim/neovim/releases/download/v0.11.0/nvim-linux-arm64.tar.gz)
+(`6959583f45042da20e0a082dc65108725629a4739ab91246c678fd084ecaf50e`, `bin/nvim`
+`5f4e2752e39bdf160d621302bb568b66ae6170ce81048abb43b348ed41c54a3f`,
+`share/nvim/runtime/lua/vim/lsp.lua`
+`8fe04154882cee269190126d67f9b44c276bf710f00ed6dabc5b621bf97bb24d`), and
+[Linux x86_64 archive](https://github.com/neovim/neovim/releases/download/v0.11.0/nvim-linux-x86_64.tar.gz)
+(`fe0a5bc79e64c5e4d9f844cd96157ebd3919ef1343b329e9ebc3f455924cc7d6`, `bin/nvim`
+`1d6c61d3290f4e78c5a0fa10ddb522a1fc6e3ee5cbd71dc294cdd1c73de58384`). The second
+independent client combines Vim `9.1.2141` (`Vim AND ISC`, copyright 1994-2023
+Bram Moolenaar and 2013-2024 Frank Denis) with `yegappan/lsp` commit
+`58eac06e81bad174cfa897614ae01adf0d31d10a` (`MIT`, copyright 2021 Yegappan
+Lakshmanan). `yegappan/lsp`'s
+[pinned archive](https://codeload.github.com/yegappan/lsp/zip/58eac06e81bad174cfa897614ae01adf0d31d10a)
+(`3c7d0eeb410708b0096251401da4a4290e10b3aff233a75358468b69c0f1d9cb`) carries
+`LICENSE`
+(`1cd90ab40fd08eeff7573eecc935d076e45c7e01e7a86ff96c89f8a58b6094f6`),
+`plugin/lsp.vim`
+(`3d8d083485fdc56009cfbaee42f2e76f85d87f01d4dc536cb7619dfaa10d04e3`), and
+`autoload/lsp/lspserver.vim`
+(`816d57d2f5620e22e57ba8ccd63eb60bbabfcf765eca62abc99d870668183b6c`). On
+Windows, `lsp_clients.py` authenticates the official
+[Vim `v9.1.2141` ARM64 archive](https://github.com/vim/vim-win32-installer/releases/download/v9.1.2141/gvim_9.1.2141_arm64.zip)
+(`7d2236366ae48b908b24e098e3cb1983e1cd6e3587ea121b261ecb71aed063ff`, `vim.exe`
+`0e6ac7181288b7f880efd03f342c9699124cb8424a2c6f9998832b3bc6297426`, `vim64.dll`
+`92a13be885e0b9ce06f69cefd4194b5d37dff306cc7ea4123a635f9afcbd7a26`,
+`libsodium.dll`
+`515d8f360540fa2a18e9b4402b738a7572cb3ec0b010f446f7a8facf47eeb96a`,
+`LICENSE.txt`
+`85b94ff37491a7c25873c8b18ba3cb843c7ced100712788e16d80d629d5d5f0d`) or
+[x86_64 archive](https://github.com/vim/vim-win32-installer/releases/download/v9.1.2141/gvim_9.1.2141_x64.zip)
+(`85ea6c1955770d6a12cf919d279af1c44c7fe48a2e86f767ac9f6c6ba36fb73c`, `vim.exe`
+`f79a4bcd8bbcb01d9ce9938ef1890afc35a09d8db85bbb609c84043fe1b66e62`, `vim64.dll`
+`0ed4298eda1f55b2f2ed655fc9216c3a5c48f1e1391619fabeed92346a65f131`,
+`libsodium.dll`
+`f1b56eb55a86edee37a2614c8bd38272ac325ec6fa6fa7a4088a4d1a42815c4c`,
+`LICENSE.txt`
+`0b3f1f330cb1b179bb17c7c687d4cec601e0aa3462bc7f890ad4c3888d37d720`) with
+`doc/uganda.txt`
+(`2368b1d5cb54728c1f689130175706dfb43f9798ecf60730f486b44d8944446e`), extracting
+only those allowlisted files and `runtime/` into a temporary staging directory
+and never extracting the archive's optional `diff.exe`, `libiconv-2.dll`, or
+`libintl-8.dll` helpers. On Ubuntu 24.04 (`aarch64`), it authenticates the
+system `vim-common` / `vim` `2:9.1.0016-1ubuntu7.10` binary (`/usr/bin/vim.basic`
+`600795c5eaa3320daa68a7b56e14efce25bd3bf4bb2181a02a28344f587137a6`,
+`/usr/share/vim/vim91/doc/uganda.txt`
+`e8863e53a3a6e4e2ae33c4465f189f439d3125a5099865f7b0233d03e13e8226`,
+`/usr/share/doc/vim-common/copyright`
+`302e996bdc0ed227fafe0531c2b6fb5359c69efe1592f34ba22186be2497c3c9`). Both
+clients execute only in ephemeral directories during
+`vela-lsp --qualify-clients`; no third-party editor source, plugin, or binary is
+copied into the tracked repository.
 
 [CoqEAL and Trocq](docs/assurance/verification-strategy.md#existing-tooling-and-implementation-owners)
 remain conditional proof-transfer references. A concrete consumer and separately

@@ -570,6 +570,22 @@ status rather than becoming accepted through this priority decision.
 | DWARF | Independent verifier/reader plus an end-to-end DAP consumer check unoptimized and optimized images with inlining, generic instances, relocated/removed code, spills, changing locations, CHERI values and unwinding; corrupt/truncate sections and alter source/image/layout to require bounded refusal of false mappings |
 | LSP and DAP transport | Fragmented/coalesced frames, byte lengths with Unicode, malformed JSON, unknown requests, unsupported capabilities, limits, cancellation and clean shutdown; logs never corrupt the protocol stream and no rejected input publishes accepted artifacts |
 
+For the pure LSP subset ([Q25n](../../PLAN.md#q-assessment-actions),
+[Q25o](../../PLAN.md#q-assessment-actions), and
+[Q25u](../../PLAN.md#q-assessment-actions)),
+`python tools/run.py vela-lsp --qualify-clients`
+([`lsp_clients.py`](../../tools/toolchain/lsp_clients.py)) stages the two
+pinned independent editor clients recorded in
+[THIRD-PARTY.md](../../THIRD-PARTY.md#vela-development-and-proof-reuse-candidates)
+— Neovim `0.11.0` (`vim.lsp`, incremental sync) and Vim `9.1.2141` +
+`yegappan/lsp` (`58eac06e81bad174cfa897614ae01adf0d31d10a`, both full and
+incremental sync) — and runs a six-stage headless session against
+`vela-lsp --transcript` covering UTF-16 supplementary-character positions,
+formatting, navigation (`hover`, `definition`, `references`, `documentSymbol`),
+inlay hints, semantic tokens, incremental edits, `check_failure` and
+`unsupported` diagnostics, recovery, and clean `shutdown`/`exit`, verified by
+[`test_vela_lsp_clients.py`](../../tools/tests/test_vela_lsp_clients.py).
+
 Retain exact source, tool, client, backend and final-image identities with
 transcripts, expected results and verdicts. Independent review checks that the
 displayed source and values match the executed artifact, including telling

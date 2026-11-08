@@ -24,7 +24,9 @@ URI's file. Diagnostics and navigation cover only the pure subset linked above.
 For Neovim 0.11's built-in LSP client, adapt these absolute paths in `init.lua`
 and reopen a `.vela` file. This configuration uses the
 [documented client configuration API](https://github.com/neovim/neovim/blob/v0.11.0/runtime/doc/lsp.txt);
-it is a setup example, with two-client qualification still outstanding.
+`python tools/run.py vela-lsp --qualify-clients`
+([`lsp_clients.py`](../../tools/toolchain/lsp_clients.py)) qualifies both
+Neovim `0.11.0` and Vim `9.1.2141` + `yegappan/lsp` against `vela-lsp`.
 
 ```lua
 vim.filetype.add({ extension = { vela = 'vela' } })
@@ -318,9 +320,16 @@ or clearing a real producer diagnostic with the new document version.
 Run focused host tests and Python type/lint checks, then the shared Host CI and
 selected Guest CI handoff. No native build is required for this host increment.
 
-This is a prototype checkpoint. Q25n remains open until two independent editor
-clients have pinned revisions, retained transcripts and independent expected
-diagnostics for the advertised subset under the broader protocol contract.
-The wire harness alone supplies no two-client qualification. Broader asynchronous
-services require explicit cancellation and deliberately late-result controls
-before advertising them. DAP and DWARF implementation remain separately unpriced.
+`python tools/run.py vela-lsp --qualify-clients`
+([`lsp_clients.py`](../../tools/toolchain/lsp_clients.py)) executes the two
+pinned independent editor clients recorded in
+[THIRD-PARTY.md](../../THIRD-PARTY.md#vela-development-and-proof-reuse-candidates)
+— Neovim `0.11.0` (`vim.lsp`, incremental sync) and Vim `9.1.2141` +
+`yegappan/lsp` (`58eac06e81bad174cfa897614ae01adf0d31d10a`, both full and
+incremental sync) — against `vela-lsp --transcript`, verifying bidirectional
+wire transcripts and client observations against independent expected oracles in
+[`test_vela_lsp_clients.py`](../../tools/tests/test_vela_lsp_clients.py).
+User-managed Host CI and Guest CI verdicts remain required before closing Q25n,
+Q25o, and Q25u. Broader asynchronous services require explicit cancellation and
+deliberately late-result controls before advertising them. DAP and DWARF
+implementation remain separately unpriced.
