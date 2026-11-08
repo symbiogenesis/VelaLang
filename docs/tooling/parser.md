@@ -203,22 +203,72 @@ fixtures retain their categories and locations.
 
 ### Rocq support prerequisite
 
-`python tools/run.py vela-parser support` authenticates the Menhir 20260209 release
-archive, builds its Rocq support library in the existing locked proof switch and
-runs the recursive kernel checker. An optional `--archive FILE` uses the same
-authenticated bytes without downloading them. The bounded source adaptation moves
-only the three late `Proof` commands identified in the
-[same-prover compatibility record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/certirocq-compatibility.md#native-trial-verdict).
-Source hashes guard both sides of that transformation. A diagnostic reference
-deletes just those commands; its frozen public types, universes, executable bodies
-and assumptions must match the candidate at the same prover. No source is installed
-into the switch. The release's `Version.v` stays byte-identical, and positive and
-negative guard clients test its release identity.
+[`python tools/run.py vela-parser support`](../../tools/toolchain/parser_checked.py)
+authenticates the Menhir 20260209 release archive
+(`69f0414b047d1d5b3507eb8277cd328a60d430bdff51de912b47adb2c25de4f3`), builds its
+Rocq support library in `verifiedos-rocq-9.3.0-ocaml-5.4.1`, generates the concrete
+pure grammar from [`parser.mly`](../../tools/toolchain/parser/parser.mly) with
+`menhir 20260209 --coq --strict` in `verifiedos-sail-0.20.3-ocaml-5.4.1`, proves its
+concrete parser theorems, runs the recursive kernel checker across all 14 modules,
+extracts and compiles `vela-checked-parser`, and verifies runtime correspondence. An
+optional `--archive FILE` uses the same authenticated bytes without downloading them.
 
-Guest CI's proofs lane runs this prerequisite and retains its qualification
-receipt. The receipt names the theorem assumptions in an uninstantiated abstract
-automaton context; it grants no concrete grammar's assumption or parser verdict.
-The exact generator/library pair, Vela's generated Rocq grammar and checked
-correctness/completeness, lexer and span evidence, extraction/runtime connection
-and both host platforms' replacement route remain Q25h's outstanding predicates.
-Support-library build and kernel evidence alone cannot retire Python parsing.
+Two bounded source adaptations are guarded by exact SHA-256 digests:
+
+1. `Interpreter.v` (`4891ad9d65843fefa4d9d424e0d065e241760f705464efc233796d445b16294f`
+   to `69cfbdd086858ef37fa50eed10866379a51bd858113a9716331d88f9e46e7fde`) relocates the
+   three late `Proof` commands (`pop`, `reduce_step`, `parse`) identified in the
+   [same-prover compatibility record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/certirocq-compatibility.md#native-trial-verdict),
+   compared against the diagnostic reference twin
+   (`04aa7bda193a67219fea99ee6f1b86eb7db3da735b04e32f662ac1e5c041b02c`).
+2. `Validator_complete.v` (`c7e1f4f25be2a4371d06dd1d01ea2adb21d889c1c18739ebf74afca8408b4f64`
+   to `1a284ece0e5b547e2b816c0f7623ee1ee628d30385f5d3dde4dd1a180589cb66`) keeps the
+   `IsItemsMap im` parameter abstract across `StateProdPosMap.fold_1` in the opaque
+   `is_validator_forall_items` proof (`intros Him ... rewrite -Him in Hlookahead`) so
+   `rocqchk` does not unroll `List.fold_left` over the concrete 665-entry `items_map ()`
+   AVL tree when checking functor instantiations.
+
+Both trees' frozen public types, universes, executable bodies and assumptions match
+byte-for-byte (`17c1e9beb756127c9079803fc99e6273c0515188ab8c4d42d36bc3ffafb85ae9`). No
+source is installed into either switch. The release's `Version.v`
+(`3746feeefa899fe0d43e4db0ec53f2d7ddd72076d9fab29cdcc9ecb0250072e6`) stays
+byte-identical, and positive and negative guard clients test `require_20260209`.
+
+[`_pure_grammar_view`](../../tools/toolchain/parser_checked.py) extracts and checks
+all `37` pure terminals and `29` reachable pure productions from the single owner
+[`parser.mly`](../../tools/toolchain/parser/parser.mly)
+(`c249a367a6c7cadae2caf42d613afccb54173270ed453d97593c301c561373d2`), expanding the
+single `%inline ioption(CONST)` modifier in `pure_declaration` into its two explicit
+branches to emit `VelaPureGrammar.mly`
+(`71325e79c1c655d83210bf5c1589373ef827841b6f668f9b73cafea085004aca`). Two fresh runs
+of `menhir --coq --strict` produce byte-identical `VelaPureGrammar.v`
+(`27a38fdde4322a39e056ba89a1b0d0b2470338e55d91c37c4b584e27753ed1e9`) preserving
+`MenhirLib.Version.require_20260209`. Over `VelaPureAst.v`
+(`84185bbcefd234f97361476d1b491437ae8a7d252dde981574ed5e019dbb8a67`) and
+`VelaPureGrammar.v`, `VelaPureProofs.v`
+(`f6dbcd0a4aa8f0de1d940e2d96412a261a764ebe9f55c5c27752659c72a06e9c`) proves nine
+concrete theorems (`vela_file_safe`, `vela_file_complete_validator`,
+`vela_file_correct`, `vela_file_complete`, `vela_file_unambiguity`,
+`vela_file_positive_precedence`, `vela_file_bare_local_refused`,
+`vela_file_empty_module_rejected`, and `vela_file_zero_fuel_timeout`), each verified
+as `Closed under the global context` (`0` axioms, reading SHA-256
+`308b14375eb599e10c9320eefc5e0fef85a89b5ebeee30d98ec395be842e7d86`) and checked by
+recursive `rocqchk` across all 14 `MenhirLib.*` modules.
+
+`VelaPureExtraction.v`
+(`55036ec0e9a8713d1d8878808e3320a243615fbc787d289a32775392fe2b1987` / deterministic
+`vela_checked_parser.ml`
+`0cb4541b65af4a606b075bd6dee0450929ea887ae3d60a3b2a9251a56b0050bd` and
+`vela_checked_parser.mli`
+`fe89d4abf4193f1b54e428e95b9be8d6d2f671521b7bb851de67bf5aa2af610b`) extracts
+`VelaPureGrammar.file` to OCaml and links it with `ast.ml`, `lexer.mll`, a token-only
+`parser.ml` stub (linking zero code-backend Menhir tables) and `checked_main.ml` into
+`vela-checked-parser`
+(`4b52eb88eea5804795bd688ddc54806b45a8a302da02d72a0a299921dce51eba`). The extracted
+executable passes all `70` pure qualification fixtures, matches `vela-parser`
+byte-for-byte on [`examples/pure.vela`](../../examples/pure.vela),
+[`examples/constants.vela`](../../examples/constants.vela) and
+[`examples/expressions.vela`](../../examples/expressions.vela), and agrees with the
+Python baseline on all `173` migration fixtures (`0` differences). The Windows host
+replacement route, Python parser retirement and hosted CI verdicts remain Q25h's
+outstanding items.

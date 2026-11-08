@@ -27,17 +27,20 @@ copied or redistributed.
 
 ### Vela parser support library
 
-Vela's [Q25h support-library prerequisite](docs/tooling/parser.md#rocq-support-prerequisite)
+Vela's [Q25h checked-parser and support-library qualification](docs/tooling/parser.md#rocq-support-prerequisite)
 builds `coq-menhirlib` from the same authenticated Menhir 20260209 archive the
 table below records. Its root `LICENSE` was re-read on 2026-10-31 at SHA-256
 `9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`;
 `coq-menhirlib/LICENSE`, SHA-256
 `218c42550a9b4ff6e48bf38218908755fe156b2e5c586531c2eb8893248a102d`,
-states `LGPL-3.0-or-later`. The bounded proof-command adaptation, original and
-modified sources and compiled Rocq library remain in native build directories.
-Only JSON receipts are exported; this use conveys no upstream source, library,
-generator or runtime binary. Parser or bootstrap distribution retains Q25h's
-separate terms qualification.
+states `LGPL-3.0-or-later`. The bounded `Interpreter.v` proof-command relocation and
+`Validator_complete.v` abstract `IsItemsMap` proof adaptation, the generated
+`VelaPureGrammar.v`, the compiled Rocq library and the extracted `vela-checked-parser`
+executable remain in isolated native build directories with `LICENSE.generator` and
+`LICENSE.support` staged alongside them. Only JSON receipts are exported; this use
+conveys no upstream source, library, generator or runtime binary into the tracked
+tree. Host distribution of generated sources or binaries retains Q25h's separate
+terms qualification.
 
 ### Development tools, contained by use
 
