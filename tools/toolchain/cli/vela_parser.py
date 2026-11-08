@@ -29,6 +29,9 @@ from toolchain import (
 from toolchain import (
     parser_checked as vela_parser_checked,
 )
+from toolchain import (
+    syntax_campaigns as vela_syntax_campaigns,
+)
 from toolchain.atomic import atomic_path
 from toolchain.authoring import Finding
 
@@ -60,6 +63,28 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("build", help="make a fresh native parser and receipt")
     commands.add_parser("qualify", help="check independent AST/refusal fixtures and regeneration")
     commands.add_parser("migration", help="compare generated AST translation with the retained prototype")
+    syntax_campaigns = commands.add_parser(
+        "syntax-campaigns",
+        help="qualify Menhir-generated syntax campaigns and independent AST/span oracles",
+    )
+    syntax_campaigns.add_argument(
+        "--seed-start",
+        type=int,
+        default=vela_syntax_campaigns.DEFAULT_SEED_START,
+        help="starting seed for Menhir --random-sentence generation",
+    )
+    syntax_campaigns.add_argument(
+        "--count",
+        type=int,
+        default=vela_syntax_campaigns.DEFAULT_CAMPAIGN_COUNT,
+        help="number of deterministic sentences to generate",
+    )
+    syntax_campaigns.add_argument(
+        "--goal-length",
+        type=int,
+        default=vela_syntax_campaigns.DEFAULT_GOAL_LENGTH,
+        help="goal sentence length passed to Menhir --random-sentence-length",
+    )
     commands.add_parser("elaborate-qualify", help="replay pure and mathematical elaboration through the locked kernel")
     first_slice = commands.add_parser(
         "first-slice",
@@ -110,6 +135,13 @@ def main(argv: list[str] | None = None) -> int:
             output = vela_parser_checked.qualify(root, archive=args.archive)
         elif args.command == "migration":
             output = vela_migration.qualify(root)
+        elif args.command == "syntax-campaigns":
+            output = vela_syntax_campaigns.qualify(
+                root,
+                seed_start=args.seed_start,
+                count=args.count,
+                goal_length=args.goal_length,
+            )
         elif args.command == "qualify":
             output = vela_parser.qualify(root)
         elif args.command == "build":
