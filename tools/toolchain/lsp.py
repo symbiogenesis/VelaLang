@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Untrusted host LSP adapter for the existing pure Vela diagnostic producer."""
+"""Untrusted host LSP adapter for the pure Vela diagnostic producer."""
 
 import subprocess
 import sys

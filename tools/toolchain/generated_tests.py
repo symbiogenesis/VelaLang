@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Independent coordinate/overlay/formatter oracles and isolated Hypothesis qualification (Q25x).
+"""Independent coordinate, overlay, and formatter oracles and isolated Hypothesis qualification.
 
 See [Generated development tests](../../docs/tooling/tooling-protocols.md#generated-development-tests)
 for the campaign bounds, independent oracle rules, seeded defect controls, and adoption disposition.
@@ -2114,7 +2114,7 @@ def qualify_isolated_campaign(
     step_count: int = DEFAULT_STEP_COUNT,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> dict[str, object]:
-    """Provision `hypothesis==6.170.14` in a disposable venv and run the bounded Q25x campaign."""
+    """Provision `hypothesis==6.170.14` in a disposable venv and run the bounded campaign."""
     if sys.version_info[:2] != (3, 14):
         raise ValueError(f"Q25x requires Python 3.14, got {sys.version.split()[0]}")
     uv_bin = shutil.which("uv")
