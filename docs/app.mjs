@@ -3088,7 +3088,8 @@ export const VELA_GRAMMAR = Object.freeze({
 });
 
 const VELA_GRAMMAR_KEYWORD_SET = new Set(VELA_GRAMMAR.keywords);
-const VELA_GRAMMAR_TYPE_SET = new Set(VELA_GRAMMAR.typeKeywords);
+const VELA_GRAMMAR_TYPE_KEYWORD_SET = new Set(VELA_GRAMMAR.typeKeywords);
+const VELA_GRAMMAR_CONSTANT_SET = new Set(VELA_GRAMMAR.constants);
 
 const MATH_MULTI_SYMBOLS = [...VELA_GRAMMAR.multiOperators];
 
@@ -4042,8 +4043,9 @@ class MathParser {
       this.expect("word", "in");
       const rangeExpr = this.parseExpression();
       this.expect("symbol", ")");
+      const invariants = [];
       while (this.match("word", "invariant")) {
-        this.parseExpression();
+        invariants.push(this.parseExpression());
       }
       const body = this.parseBlock();
       return {
@@ -4051,6 +4053,7 @@ class MathParser {
         binder: binder.text,
         binderSite: binder.site,
         range: rangeExpr,
+        invariants,
         body,
         site: tok.site,
       };
@@ -4059,11 +4062,19 @@ class MathParser {
       this.expect("symbol", "(");
       const condition = this.parseExpression();
       this.expect("symbol", ")");
-      while (this.match("word", "invariant") || this.match("word", "decreases")) {
-        this.parseExpression();
+      const invariants = [];
+      const decreases = [];
+      for (;;) {
+        if (this.match("word", "invariant")) {
+          invariants.push(this.parseExpression());
+        } else if (this.match("word", "decreases")) {
+          decreases.push(this.parseExpression());
+        } else {
+          break;
+        }
       }
       const body = this.parseBlock();
-      return { kind: "while_stmt", condition, body, site: tok.site };
+      return { kind: "while_stmt", condition, invariants, decreases, body, site: tok.site };
     }
     if (this.match("word", "open")) {
       if (this.match("symbol", "(")) {
@@ -4892,9 +4903,18 @@ export function projectGrammarSemanticTokens(sourceText) {
             readonly: true,
           });
         }
+        for (const inv of stmt.invariants || []) {
+          walkExpr(inv, typeParams, valueParams, loopLocals);
+        }
         walkBlock(stmt.body, typeParams, valueParams, loopLocals);
       } else if (stmt.kind === "while_stmt") {
         walkExpr(stmt.condition, typeParams, valueParams, blockLocals);
+        for (const inv of stmt.invariants || []) {
+          walkExpr(inv, typeParams, valueParams, blockLocals);
+        }
+        for (const dec of stmt.decreases || []) {
+          walkExpr(dec, typeParams, valueParams, blockLocals);
+        }
         walkBlock(stmt.body, typeParams, valueParams, new Map(blockLocals));
       } else if (stmt.kind === "open_stmt") {
         walkBlock(stmt.body, typeParams, valueParams, new Map(blockLocals));
@@ -8087,15 +8107,37 @@ function initPlaygroundUi() {
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.src = `${MONACO_ROOT}/loader.js`;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("Monaco assets could not be loaded."));
+        const timer = setTimeout(
+          () => reject(new Error("Monaco assets took too long to load.")),
+          12000
+        );
+        script.onload = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        script.onerror = () => {
+          clearTimeout(timer);
+          reject(new Error("Monaco assets could not be loaded."));
+        };
         document.head.append(script);
-        setTimeout(() => reject(new Error("Monaco assets took too long to load.")), 12000);
       });
       window.require.config({ paths: { vs: MONACO_ROOT } });
       await new Promise((resolve, reject) => {
-        window.require(["vs/editor/editor.main"], resolve, reject);
-        setTimeout(() => reject(new Error("The code editor took too long to initialize.")), 15000);
+        const timer = setTimeout(
+          () => reject(new Error("The code editor took too long to initialize.")),
+          15000
+        );
+        window.require(
+          ["vs/editor/editor.main"],
+          (module) => {
+            clearTimeout(timer);
+            resolve(module);
+          },
+          (error) => {
+            clearTimeout(timer);
+            reject(error);
+          }
+        );
       });
       registerLanguage();
       state.model = window.monaco.editor.createModel(
@@ -8496,13 +8538,17 @@ function initPlaygroundUi() {
     if (state.session) closeSession(state.session, { keepalive: true });
   });
 
-  document.querySelectorAll(".compact-code code").forEach((codeEl) => {
-    codeEl.innerHTML = highlightVelaCodeHtml(codeEl.textContent || "");
-  });
   renderSuggestions(EXAMPLES.squares.suggestions);
   updateServiceUI();
   void connect();
   void loadEditor();
+  document.querySelectorAll(".compact-code code").forEach((codeEl) => {
+    try {
+      codeEl.innerHTML = highlightVelaCodeHtml(codeEl.textContent || "");
+    } catch {
+      // Keep the raw code text if decorative card highlighting fails.
+    }
+  });
 }
 
 if (typeof document !== "undefined") {
