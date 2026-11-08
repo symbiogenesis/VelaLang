@@ -416,9 +416,9 @@ authors the bounded packet/manifest validator `PrepareAndValidatePacket(ref Span
 and its slot-backed round-trip pipeline (`DecodePacketIntoFrame`,
 `PrepareSliceHeader`, `RunRoundTripPipeline`) over the concrete `Span<byte>` and
 `Slots<T, Cap>` carriers in
-[tools/vela/elaborate.py](../tools/vela/elaborate.py) and the
+[tools/toolchain/elaborate.py](../tools/toolchain/elaborate.py) and the
 CompCert Clight/C and purecap CHERI-RISC-V target harness in
-[tools/vela/first_slice.py](../tools/vela/first_slice.py).
+[tools/toolchain/first_slice.py](../tools/toolchain/first_slice.py).
 Obligations the elaborator cannot kernel-prove reach Rocq with their real
 statements as named solver-trust axioms recorded in `solver_trust`, so
 `Print Assumptions` and the harness report kernel-proved definitions and

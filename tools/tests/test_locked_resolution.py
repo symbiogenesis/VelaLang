@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from tests.harness import Case, ensure
-from vela import corpus, toolenv
+from toolchain import corpus, toolenv
 
 INDEPENDENT_CASES = True
 

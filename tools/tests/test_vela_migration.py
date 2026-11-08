@@ -9,11 +9,11 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import TOOLS, Case, ensure
-from vela import migration
-from vela import parser as vela_parser
-from vela.cli import vela_parser as cli
+from toolchain import migration
+from toolchain import parser as vela_parser
+from toolchain.cli import vela_parser as cli
 
 
 def _comparison() -> None:

@@ -54,7 +54,7 @@ def ensure(cond: bool, msg: str) -> None:
 def with_env(name: str, value: str | None, fn: Callable[[], None]) -> None:
     """Run `fn` with one environment override in place, restoring whatever stood.
 
-    The hook the tools' own call-time overrides are written for: `vela.env` reads each
+    The hook the tools' own call-time overrides are written for: `toolchain.env` reads each
     of its `VOS_*` settings where it uses them rather than at import, so a case can
     name the build root, the lane or the administrative directory a run is to answer
     about. Shared here because three modules want it, and the restore is what keeps a

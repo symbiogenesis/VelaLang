@@ -2,7 +2,7 @@
 """Behavioral tests for the Vela solver-trust ledger and its assumption audit."""
 
 from tests.harness import Case, ensure
-from vela import solver_ledger
+from toolchain import solver_ledger
 
 INDEPENDENT_CASES = True
 

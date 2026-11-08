@@ -503,7 +503,7 @@ neither a test count nor discovery of a production bug is the success criterion.
 Otherwise retain useful explicit regressions and record rejection or unresolved
 prerequisites without promoting the candidate into the ordinary tool closure.
 
-`python tools/run.py vela generated-tests` ([`generated_tests.py`](../tools/vela/generated_tests.py))
+`python tools/run.py vela generated-tests` ([`generated_tests.py`](../tools/toolchain/generated_tests.py))
 qualifies `hypothesis==6.170.14` and `sortedcontainers==2.4.0` under the
 `2026-10-31T07:17:33Z` dependency cooldown recorded in
 [THIRD-PARTY.md](../THIRD-PARTY.md) inside a disposable Python 3.14 virtual
@@ -516,9 +516,9 @@ time). Under deterministic seed `20261107` (`max_examples=64`,
 `database=None`, `derandomize=True`), the campaign passes all four subjects
 (`source_coordinates`: 848 examples; `synchronous_overlays` and
 `supported_requests`: 3,224 state-machine steps; `pure_formatting`: 64 examples)
-against [`OracleTextModel`](../tools/vela/generated_tests.py),
-[`OracleOverlayModel`](../tools/vela/generated_tests.py) and
-[`FormatTemplate`](../tools/vela/generated_tests.py), kills all three
+against [`OracleTextModel`](../tools/toolchain/generated_tests.py),
+[`OracleOverlayModel`](../tools/toolchain/generated_tests.py) and
+[`FormatTemplate`](../tools/toolchain/generated_tests.py), kills all three
 executable seeded defects (`utf16-codepoint-confusion`,
 `edit-against-original-document`, and held-out
 `publish-early-edit-before-rollback`), and shrinks nonminimal failing traces

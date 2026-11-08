@@ -8,9 +8,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import pyversion
-from vela.cli import typecheck
-from vela.report import Reporter
+from toolchain import pyversion
+from toolchain.cli import typecheck
+from toolchain.report import Reporter
 
 INDEPENDENT_CASES = True
 

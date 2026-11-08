@@ -49,7 +49,7 @@ exceeds the implemented parser or elaborator subset.
 | --- | --- | --- |
 | Source text | Strict UTF-8; identifiers are ASCII `[A-Za-z_][A-Za-z0-9_]*`; string and character contents may be Unicode ([bytes and text](first-release.md#bytes-and-text)) | P |
 | Comments | `//` to end of line; consecutive `///` lines before a declaration are its [documentation](authoring-tools.md#documentation-comments) | P |
-| Keywords | Reserved by the [lexer](../tools/vela/parser/lexer.mll); extension keywords are reserved even where no consumer accepts them | S |
+| Keywords | Reserved by the [lexer](../tools/toolchain/parser/lexer.mll); extension keywords are reserved even where no consumer accepts them | S |
 | Naming | Types, constructors, members and type parameters use PascalCase; locals and parameters use camelCase ([common style](authoring-tools.md#common-style)) | M |
 | Integer literals | Decimal, `0x` hexadecimal and `0b` binary digits with `_` [separators](authoring-tools.md#numeric-separators); a representation suffix (`0usize`, `0byte`) or the expected type selects the type | P (decimal `Nat`), M |
 | Other literals | `true`, `false`, `()`, characters `'a'` with escapes, strings `"..."`, raw strings `"""..."""` and format templates `$"...{hole}..."` | P (`true`, `false`), M |
@@ -199,7 +199,7 @@ public Nat Sum(Option<Nat> maybe, Nat base)
 ## Expressions and operators
 
 Operators from weakest to strongest binding, as fixed by the
-[parser](../tools/vela/parser/parser.mly):
+[parser](../tools/toolchain/parser/parser.mly):
 
 | Level | Operators and forms | Associativity | Status |
 | --- | --- | --- | --- |

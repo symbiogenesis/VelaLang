@@ -9,10 +9,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import (
+from toolchain import (
     VelaError,
 )
-from vela import (
+from toolchain import (
     elaboration_check as replay,
 )
 

@@ -9,9 +9,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import VelaError
-from vela.cli import vela_parser as cli
-from vela.mathematical import Compilation
+from toolchain import VelaError
+from toolchain.cli import vela_parser as cli
+from toolchain.mathematical import Compilation
 
 SOURCE = b"module Demo; definition Nat Value() => 3;"
 GALLINA = "(* unqualified test term *)\nDefinition value : nat := 3.\n"

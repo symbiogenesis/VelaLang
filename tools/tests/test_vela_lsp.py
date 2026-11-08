@@ -13,9 +13,9 @@ from typing import cast, override
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela.lsp import Server, diagnose, serve
-from vela.protocol_json import decode_message, encode_message, read_frame
-from vela.source import SourceSnapshot
+from toolchain.lsp import Server, diagnose, serve
+from toolchain.protocol_json import decode_message, encode_message, read_frame
+from toolchain.source import SourceSnapshot
 
 _URI = "file:///workspace/unsaved.vela"
 _GOOD = "module Demo; public Nat Answer() { return 42; }"
@@ -459,7 +459,7 @@ def _incremental_process_transcript() -> None:
                 _request("shutdown", identity=21), _notice("exit")]
     tools = str(Path(__file__).resolve().parents[1])
     script = (f"import sys; sys.path.insert(0, {tools!r}); "
-              "from vela.cli.vela_lsp import main; raise SystemExit(main())")
+              "from toolchain.cli.vela_lsp import main; raise SystemExit(main())")
     completed = subprocess.run([sys.executable, "-I", "-c", script],
                                input=b"".join(_wire(message) for message in messages),
                                capture_output=True, timeout=30, check=False)

@@ -4,19 +4,19 @@
 import copy
 from typing import cast
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
 from tests.test_vela_ast import _fixture, _literal
 from tests.test_vela_elaborate import _NAT, Form, Node, _call, _Fixture, _type
-from vela import (
+from toolchain import (
     ast as vela_ast,
 )
-from vela import (
+from toolchain import (
     surface as vela_surface,
 )
-from vela.ast import MAX_LITERAL_DIGITS, VelaError
-from vela.elaborate import elaborate
-from vela.parser import Json
+from toolchain.ast import MAX_LITERAL_DIGITS, VelaError
+from toolchain.elaborate import elaborate
+from toolchain.parser import Json
 
 
 def _body(gallina: str) -> str:

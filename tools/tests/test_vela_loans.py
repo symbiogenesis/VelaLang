@@ -6,7 +6,7 @@ from itertools import product
 from typing import cast
 
 from tests.harness import Case, ensure
-from vela.loans import (
+from toolchain.loans import (
     Access,
     AnalysisRefusalError,
     Bind,

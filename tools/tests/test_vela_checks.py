@@ -5,8 +5,8 @@ import tempfile
 from pathlib import Path
 
 from tests.harness import Case, ensure
-from vela import checks, corpus, markdown
-from vela.cli import prepare
+from toolchain import checks, corpus, markdown
+from toolchain.cli import prepare
 
 INDEPENDENT_CASES = True
 

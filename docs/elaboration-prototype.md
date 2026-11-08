@@ -225,27 +225,27 @@ increment supplies theorem authorship and proof parameters; automatic discharge
 of `requires`/`ensures` and the full proof language remain frontend work.
 
 The implementation is decomposed across the public entry point
-([`elaborate.py`](../tools/vela/elaborate.py)) and cohesive
+([`elaborate.py`](../tools/toolchain/elaborate.py)) and cohesive
 submodules for CIC terms and carrier metadata
-([`elaborate_types.py`](../tools/vela/elaborate_types.py)),
+([`elaborate_types.py`](../tools/toolchain/elaborate_types.py)),
 schema-2 AST validation
-([`elaborate_protocol.py`](../tools/vela/elaborate_protocol.py)),
+([`elaborate_protocol.py`](../tools/toolchain/elaborate_protocol.py)),
 strings, characters and formatting
-([`elaborate_strings.py`](../tools/vela/elaborate_strings.py)),
+([`elaborate_strings.py`](../tools/toolchain/elaborate_strings.py)),
 definitional WHNF reduction and structural equality
-([`elaborate_whnf.py`](../tools/vela/elaborate_whnf.py)),
+([`elaborate_whnf.py`](../tools/toolchain/elaborate_whnf.py)),
 carrier and sequence intrinsics
-([`elaborate_intrinsics.py`](../tools/vela/elaborate_intrinsics.py)),
+([`elaborate_intrinsics.py`](../tools/toolchain/elaborate_intrinsics.py)),
 interval/algebraic precondition discharge
-([`elaborate_solver.py`](../tools/vela/elaborate_solver.py)),
+([`elaborate_solver.py`](../tools/toolchain/elaborate_solver.py)),
 proof terms and calculational chains
-([`elaborate_proofs.py`](../tools/vela/elaborate_proofs.py)),
+([`elaborate_proofs.py`](../tools/toolchain/elaborate_proofs.py)),
 pattern matching and exhaustiveness
-([`elaborate_patterns.py`](../tools/vela/elaborate_patterns.py)),
+([`elaborate_patterns.py`](../tools/toolchain/elaborate_patterns.py)),
 statements, indexing and bounded loops
-([`elaborate_statements.py`](../tools/vela/elaborate_statements.py)),
+([`elaborate_statements.py`](../tools/toolchain/elaborate_statements.py)),
 and module declarations, records, unions and contracts
-([`elaborate_declarations.py`](../tools/vela/elaborate_declarations.py)).
+([`elaborate_declarations.py`](../tools/toolchain/elaborate_declarations.py)).
 It owns explicit finite source, syntax-depth, inference-work,
 reduction and output limits. Diagnostics retain source positions and distinguish
 unsupported syntax, names, typing, unresolved inference, protocol and limits.

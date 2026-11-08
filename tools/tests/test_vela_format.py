@@ -2,8 +2,8 @@
 """Independent canonical-layout and source-preservation controls for pure Vela."""
 
 from tests.harness import Case, ensure
-from vela import VelaError, translate
-from vela.authoring import STYLE_VERSION, format_source
+from toolchain import VelaError, translate
+from toolchain.authoring import STYLE_VERSION, format_source
 
 INDEPENDENT_CASES = True
 

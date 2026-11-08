@@ -277,9 +277,9 @@ after the [first release](first-release.md#qualification).
 ## Pure formatting and lint disposition
 
 Q25t's pure implementation meets its local predicate. Independent review covers
-the complete [formatter and lints](../tools/vela/authoring.py),
-[compiler command](../tools/vela/cli/vela.py) and
-[publication helper](../tools/vela/atomic.py) at
+the complete [formatter and lints](../tools/toolchain/authoring.py),
+[compiler command](../tools/toolchain/cli/vela.py) and
+[publication helper](../tools/toolchain/atomic.py) at
 `bd51161f7858b55cb1a3e854730998c1c22c3204`, with the acceptance controls added by
 this landing. Ordered token/comment fingerprints, documentation-break tracking,
 location-erased reparsed syntax and stable second rendering preserve the source

@@ -30,7 +30,7 @@ cycles and exhausted node/path/work budgets refuse analysis. No partial
 exploration may produce a complete result. Reducible natural loops with an exit
 edge are analyzed by Kleene fixpoint iteration over the loop header.
 
-The current [implementation](../tools/vela/loans.py) computes backward
+The current [implementation](../tools/toolchain/loans.py) computes backward
 demand over the control-flow graph and performs forward abstract interpretation
 with join-point state merging at join nodes and loop headers. Compatible branch
 states merge at join points rather than enumerating $2^k$ paths across sequential
@@ -69,7 +69,7 @@ The API must not expose an admitted-program or memory-safe verdict.
 
 ## Using the diagnostic
 
-[loans.py](../tools/vela/loans.py) exposes immutable graph/event
+[loans.py](../tools/toolchain/loans.py) exposes immutable graph/event
 records and `analyze(owners, graph, limits)`. Run its focused behavioral checks
 with `python tools/run.py test --only test_vela_loans --jobs 1` on Windows.
 An explicit result split can be modeled as follows:
@@ -138,7 +138,7 @@ superiority to Polonius.
 
 The independent source and fixture review on 2026-11-03 accepts the bounded
 explicit-flow diagnostic at this contract's boundary. The reviewed implementation
-is [loans.py](../tools/vela/loans.py) at
+is [loans.py](../tools/toolchain/loans.py) at
 `007a54832aeeb89c12047ca21be9df8724a451d8`; the accompanying
 [branch-demand oracle](../tools/tests/test_vela_loans.py#_generated_branch_demand_oracle)
 adds independently expected last-read and conflict decisions across mutually

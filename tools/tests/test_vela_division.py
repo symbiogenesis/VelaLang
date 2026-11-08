@@ -6,10 +6,10 @@ import hashlib
 from typing import cast
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
-from vela import ast as vela_ast
-from vela.authoring import format_source
+from toolchain import ast as vela_ast
+from toolchain.authoring import format_source
 
 _NAT = "Corelib.Init.Datatypes.nat"
 _BASE = b"module M; public Nat Id(Nat value) => value;"

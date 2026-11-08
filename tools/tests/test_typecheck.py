@@ -18,12 +18,12 @@ from typing import cast
 from unittest.mock import MagicMock, patch
 
 from tests.harness import Case, ensure
-from vela.cli import typecheck
-from vela.report import Reporter
+from toolchain.cli import typecheck
+from toolchain.report import Reporter
 
 # Each case writes its fixtures only under directories it creates and patches only
 # inside a `with`, so the cases share no state, and a sharded run spreads them over
-# every shard (vela/cli/test.py).
+# every shard (toolchain/cli/test.py).
 INDEPENDENT_CASES = True
 
 # The fake executable's version banner, independent of installed checkers.
@@ -1587,7 +1587,7 @@ def _live_tree_reaches_every_tracked_module() -> None:
     # refused for the missing verdict and the pin gate's own line.
     root = Path(typecheck.__file__).resolve().parents[3]
     tracked = typecheck._tracked(root)
-    ensure({"vela/cli/typecheck.py", "tests/test_typecheck.py"} <= tracked,
+    ensure({"toolchain/cli/typecheck.py", "tests/test_typecheck.py"} <= tracked,
            f"the live index must track the gate and its tests: {len(tracked)} module(s)")
     rep = _live_runs(root, tracked)
     ensure(not _unreached(rep.out),

@@ -4,11 +4,11 @@
 from typing import cast
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
-from vela import VelaError
-from vela.authoring import LINT_CODES, RETIRED_LINT_CODES, lint_source
-from vela.facts import MAX_SYMBOLS
+from toolchain import VelaError
+from toolchain.authoring import LINT_CODES, RETIRED_LINT_CODES, lint_source
+from toolchain.facts import MAX_SYMBOLS
 
 INDEPENDENT_CASES = True
 

@@ -34,10 +34,10 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import elaborate_whnf, env, proofenv
-from vela.elaborate import _Elaborator
-from vela.elaborate_protocol import _Protocol
-from vela.elaborate_types import (
+from toolchain import elaborate_whnf, env, proofenv
+from toolchain.elaborate import _Elaborator
+from toolchain.elaborate_protocol import _Protocol
+from toolchain.elaborate_types import (
     _GALLINA,
     _INT_SPECS,
     _PRELUDE,

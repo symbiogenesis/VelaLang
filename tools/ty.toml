@@ -21,7 +21,7 @@ all = "error"
 python-platform = "linux"
 
 # `tools/` is the import root: every tool puts its own directory on `sys.path`
-# before importing `vos`, so that a tool is runnable from anywhere without the
+# before importing `toolchain`, so that a tool is runnable from anywhere without the
 # package being installed.
 extra-paths = ["."]
 

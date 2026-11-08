@@ -7,15 +7,15 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import inspect_source
-from vela.lsp_services import (
+from toolchain import inspect_source
+from toolchain.lsp_services import (
     METHODS,
     SEMANTIC_TOKEN_MODIFIERS,
     SEMANTIC_TOKEN_TYPES,
     InspectionError,
     project,
 )
-from vela.source import SourceSnapshot
+from toolchain.source import SourceSnapshot
 
 INDEPENDENT_CASES = True
 
@@ -152,7 +152,7 @@ def _inspection_bounds_are_complete_refusals() -> None:
     snapshot = SourceSnapshot(_URI, 1, text, 1)
     raw = inspect_source(text.encode())
     for name, bound in (("MAX_SYMBOLS", 1), ("MAX_OCCURRENCES", 2)):
-        with patch(f"vela.lsp_services.{name}", bound):
+        with patch(f"toolchain.lsp_services.{name}", bound):
             _refuses(lambda: project(snapshot, raw, _METHOD, None),
                      "inspection bound truncated rather than refused semantic tokens")
     changed = copy.deepcopy(raw)

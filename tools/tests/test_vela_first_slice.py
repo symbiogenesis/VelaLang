@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import cast
 
 from tests.harness import TOOLS, Case, ensure
-from vela import compiler_diff as cd
-from vela import (
+from toolchain import compiler_diff as cd
+from toolchain import (
     elaborate as vela_elaborate,
 )
-from vela import (
+from toolchain import (
     first_slice as vela_first_slice,
 )
-from vela.ast import VelaError
+from toolchain.ast import VelaError
 
 INDEPENDENT_CASES = True
 

@@ -397,7 +397,7 @@ machine-logic blockers keep full machine-refinement closure and subsequent
 delivery stages closed:
 
 1. **Concrete `Span<byte>` carrier, inhabited byte case and contract elaboration
-   ([tools/vela/elaborate.py](../tools/vela/elaborate.py),
+   ([tools/toolchain/elaborate.py](../tools/toolchain/elaborate.py),
    [examples/first_slice.vela](../examples/first_slice.vela)):**
    `Span<byte>` elaborates to `vela_Span` over `vela_ByteStore` (`nat -> vela_u8`)
    paired with `Base`, `Length`, `Tag`, `PermRead`, `PermWrite` and derived
@@ -442,7 +442,7 @@ delivery stages closed:
    [Q25af and Q25ag](critique.md#vela-evidence-and-surface-review)
    own honest emission and slice conformance.
 3. **Capacity-invariance gate, semantic negative controls and target execution
-   ([tools/vela/first_slice.py](../tools/vela/first_slice.py)):**
+   ([tools/toolchain/first_slice.py](../tools/toolchain/first_slice.py)):**
    checking at static capacity $N = 8$ (`8usize`) and $N = 10^9$
    (`1_000_000_000usize`) produces identical obligation counts (`9`), inference
    work steps (`11765`), reduction steps (`79`) and emitted Gallina size (`86299`
@@ -585,10 +585,10 @@ compiler/protocol/browser evidence accept this bounded local increment.
 Accepted on 2026-11-07 under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a), the
 [evidence review](critique.md#vela-evidence-and-surface-review)
 and the [primitive contract](first-release.md#primitive-semantics).
-The mathematical elaborator ([tools/vela/elaborate.py](../tools/vela/elaborate.py),
-[elaborate_declarations.py](../tools/vela/elaborate_declarations.py),
-[elaborate_types.py](../tools/vela/elaborate_types.py) and
-[solver_ledger.py](../tools/vela/solver_ledger.py)) emits the real
+The mathematical elaborator ([tools/toolchain/elaborate.py](../tools/toolchain/elaborate.py),
+[elaborate_declarations.py](../tools/toolchain/elaborate_declarations.py),
+[elaborate_types.py](../tools/toolchain/elaborate_types.py) and
+[solver_ledger.py](../tools/toolchain/solver_ledger.py)) emits the real
 source proposition for every contract `ensures`, `restores` and theorem
 obligation instead of substituting `true = true` or reflexive `x = x`
 tautologies. Obligations for which the elaborator constructs a kernel proof term
@@ -600,7 +600,7 @@ entry in `solver_trust`. Exclusive `ref` parameters emit kernel post-state
 images (`_post_<param>`) so postconditions and restoration obligations state the
 callable's actual effect.
 
-In the Gallina prelude ([elaborate_types.py](../tools/vela/elaborate_types.py)),
+In the Gallina prelude ([elaborate_types.py](../tools/toolchain/elaborate_types.py)),
 fixed-width integers (`u8`..`u64`, `i8`..`i64`, `usize`, `byte`) are represented
 over little-endian bit lists of width `vela_int_bits k`. Wrapping, saturating
 and checked addition, subtraction, multiplication, division, remainder, negation
@@ -628,7 +628,7 @@ accounting, bit-list Gallina primitive definitions and local kernel replay.
 Accepted on 2026-11-07 under the [synchronous core](core-design.md#loans-and-control-flow)
 and [first-slice qualification contract](first-release.md#first-slice-qualification).
 [examples/first_slice.vela](../examples/first_slice.vela)
-and [tools/vela/first_slice.py](../tools/vela/first_slice.py) conform
+and [tools/toolchain/first_slice.py](../tools/toolchain/first_slice.py) conform
 to the synchronous design:
 
 - `PrepareAndValidatePacket(ref Span<byte> dst, in Span<byte> pkt) -> Result<ValidatedPacket<'dst>, ValidationError>`
@@ -672,8 +672,8 @@ qualification.
 
 Accepted on 2026-11-07 under the [evidence review](critique.md#vela-evidence-and-surface-review)
 and [surface grammar](surface-grammar.md). Across the Menhir
-grammar ([tools/vela/parser/parser.mly](../tools/vela/parser/parser.mly)),
-lexer ([lexer.mll](../tools/vela/parser/lexer.mll)), pure and mathematical
+grammar ([tools/toolchain/parser/parser.mly](../tools/toolchain/parser/parser.mly)),
+lexer ([lexer.mll](../tools/toolchain/parser/lexer.mll)), pure and mathematical
 elaborators, formatter and lints:
 
 1. Selective record-invariant lifting uses `open (ref this) lifts Clause, ... { ... }`,

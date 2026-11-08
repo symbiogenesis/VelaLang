@@ -18,9 +18,9 @@
 | [docs/playground.md](docs/playground.md) | Local browser playground with Monaco editor, pure and dependent elaboration, and expression console |
 | [docs/extensions/](docs/extensions/README.md) | Extension dossiers: graded foundation, handlers/async, interior mutability, metaprogramming, assurance profiles, unified source |
 | [examples/](examples/) | Authored `.vela` examples (`pure.vela`, `constants.vela`, `expressions.vela`, `surface.vela`, `dependent.vela`, `first_slice.vela`) |
-| [tools/vela/parser/](tools/vela/parser/) | Menhir grammar (`parser.mly`), OCaml lexer (`lexer.mll`), AST, and native driver |
-| [tools/vela/playground/](tools/vela/playground/) | Browser playground UI (`index.html`, `app.mjs`, `style.css`) |
-| [tools/vela/](tools/vela/) | Vela compiler, elaborator, loan analysis, formatter, linter, LSP server, playground worker, and first-slice harness |
+| [tools/toolchain/parser/](tools/toolchain/parser/) | Menhir grammar (`parser.mly`), OCaml lexer (`lexer.mll`), AST, and native driver |
+| [tools/toolchain/playground/](tools/toolchain/playground/) | Browser playground UI (`index.html`, `app.mjs`, `style.css`) |
+| [tools/toolchain/](tools/toolchain/) | Vela compiler, elaborator, loan analysis, formatter, linter, LSP server, playground worker, and first-slice harness |
 | [tools/tests/](tools/tests/) | Behavioral test suite (`test_vela*.py`) |
 | [THIRD-PARTY.md](THIRD-PARTY.md) | Third-party dependencies, parser generator readings, and development tool licenses |
 

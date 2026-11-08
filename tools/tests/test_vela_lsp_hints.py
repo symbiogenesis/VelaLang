@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import cast
 
 from tests.harness import Case, ensure
-from vela import VelaError, inspect_source
-from vela.lsp import Server
-from vela.lsp_services import InspectionError, project
-from vela.protocol_json import MAX_BODY_BYTES, encode_message
-from vela.source import SourceSnapshot
+from toolchain import VelaError, inspect_source
+from toolchain.lsp import Server
+from toolchain.lsp_services import InspectionError, project
+from toolchain.protocol_json import MAX_BODY_BYTES, encode_message
+from toolchain.source import SourceSnapshot
 
 INDEPENDENT_CASES = True
 
@@ -307,7 +307,7 @@ def _real_process_hints_and_unsaved_edits() -> None:
                 _request("shutdown", identity=6), _notice("exit")]
     tools = str(Path(__file__).resolve().parents[1])
     script = (f"import sys; sys.path.insert(0, {tools!r}); "
-              "from vela.cli.vela_lsp import main; raise SystemExit(main())")
+              "from toolchain.cli.vela_lsp import main; raise SystemExit(main())")
     completed = subprocess.run([sys.executable, "-I", "-c", script],
                                input=b"".join(_wire(message) for message in messages),
                                capture_output=True, timeout=30, check=False)

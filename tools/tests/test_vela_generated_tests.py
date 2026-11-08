@@ -8,8 +8,8 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela.cli import vela as vela_cli
-from vela.generated_tests import (
+from toolchain.cli import vela as vela_cli
+from toolchain.generated_tests import (
     CANDIDATE_VERSIONS,
     EXPECTED_LICENSE_SHA256,
     EXPECTED_NATIVE_SHA256,

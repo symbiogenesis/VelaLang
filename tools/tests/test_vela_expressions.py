@@ -3,7 +3,7 @@
 
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
 
 _NAT = "Corelib.Init.Datatypes.nat"

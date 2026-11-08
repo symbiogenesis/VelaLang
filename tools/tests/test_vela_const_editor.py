@@ -4,13 +4,13 @@
 import copy
 from typing import cast
 
-import vela
+import toolchain as vela
 from tests.harness import TOOLS, Case, ensure
-from vela import inspect_source
-from vela.ast import MAX_LITERAL_DIGITS
-from vela.lsp import Server
-from vela.lsp_services import InspectionError, project
-from vela.source import SourceSnapshot
+from toolchain import inspect_source
+from toolchain.ast import MAX_LITERAL_DIGITS
+from toolchain.lsp import Server
+from toolchain.lsp_services import InspectionError, project
+from toolchain.source import SourceSnapshot
 
 INDEPENDENT_CASES = True
 

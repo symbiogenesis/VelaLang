@@ -21,7 +21,7 @@ from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from vela import pyversion
+from toolchain import pyversion
 
 if __name__ == "__main__":
     try:
@@ -29,9 +29,9 @@ if __name__ == "__main__":
     except (OSError, ValueError) as error:
         raise SystemExit(str(error)) from error
 
-from vela import corpus as corpus_mod
-from vela import toolenv
-from vela.commands import BY_NAME, COMMANDS, Command
+from toolchain import corpus as corpus_mod
+from toolchain import toolenv
+from toolchain.commands import BY_NAME, COMMANDS, Command
 
 type Main = Callable[[list[str]], int]
 

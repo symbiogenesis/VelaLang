@@ -22,14 +22,14 @@ from tests.test_vela_elaborate import (
     _type,
     _variable,
 )
-from vela import (
+from toolchain import (
     VelaError,
     authoring,
 )
-from vela import (
+from toolchain import (
     elaborate as language,
 )
-from vela import (
+from toolchain import (
     mathematical as adapter,
 )
 

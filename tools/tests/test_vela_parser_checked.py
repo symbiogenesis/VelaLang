@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import parser_checked as checked
+from toolchain import parser_checked as checked
 
 
 def _tar(files: dict[str, bytes]) -> bytes:

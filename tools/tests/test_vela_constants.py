@@ -6,7 +6,7 @@ import hashlib
 from typing import cast
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
 
 

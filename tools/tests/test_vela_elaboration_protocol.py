@@ -18,8 +18,8 @@ from tests.test_vela_elaborate import (
     _type,
     _variable,
 )
-from vela.ast import VelaError
-from vela.elaborate import elaborate
+from toolchain.ast import VelaError
+from toolchain.elaborate import elaborate
 
 
 def _quantifier(word: str) -> Form:

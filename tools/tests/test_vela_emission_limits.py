@@ -7,9 +7,9 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
-from vela.cli import vela as cli
+from toolchain.cli import vela as cli
 
 INDEPENDENT_CASES = True
 

@@ -124,7 +124,7 @@ mypy-init-return = false
 # ship apart, or of ensurepip, which Debian and Ubuntu ship apart too, it fails as short
 # of that library rather than asking for a ban.
 # TID253 refuses an unnested module-level import of a listed module, and
-# `vela/cli/typecheck.py` reads this list and refuses one anywhere else outside a function
+# `toolchain/cli/typecheck.py` reads this list and refuses one anywhere else outside a function
 # body that both platforms reach, reading each enclosing `if` that compares `sys.platform`
 # with string literals for the platforms each branch takes. That holds that no listed
 # module is imported on both platforms, not which one has it, so on each lane it also

@@ -9,10 +9,10 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela.lsp import Server
-from vela.lsp_services import InspectionError, inspect_document, project
-from vela.protocol_json import MAX_BODY_BYTES, encode_message
-from vela.source import SourceSnapshot
+from toolchain.lsp import Server
+from toolchain.lsp_services import InspectionError, inspect_document, project
+from toolchain.protocol_json import MAX_BODY_BYTES, encode_message
+from toolchain.source import SourceSnapshot
 
 _URI = "untitled:projection.vela"
 _TEXT = "module Demo;\r\n// 😀\rpublic Nat Id(Nat value) { return value; }\n"
@@ -130,7 +130,7 @@ def _producer_refusals() -> None:
 
 def _worker_boundary() -> None:
     done = subprocess.CompletedProcess(["fixed"], 0, b'{"status":"unavailable","reason":"syntax"}', b"")
-    with patch("vela.lsp_services.subprocess.run", return_value=done) as run:
+    with patch("toolchain.lsp_services.subprocess.run", return_value=done) as run:
         ensure(inspect_document(b"source") == {"status": "unavailable", "reason": "syntax"},
                "worker JSON was not consumed")
         command = run.call_args.args[0]
@@ -141,9 +141,9 @@ def _worker_boundary() -> None:
     for done in (subprocess.CompletedProcess(["fixed"], 1, b"", b""),
                  subprocess.CompletedProcess(["fixed"], 0, b"x" * (MAX_BODY_BYTES + 1), b""),
                  subprocess.CompletedProcess(["fixed"], 0, b'{"status":"ok","status":"ok"}', b"")):
-        with patch("vela.lsp_services.subprocess.run", return_value=done):
+        with patch("toolchain.lsp_services.subprocess.run", return_value=done):
             _refuses(lambda: inspect_document(b"source"), "bad worker output accepted")
-    with patch("vela.lsp_services.subprocess.run", side_effect=subprocess.TimeoutExpired("fixed", 5)):
+    with patch("toolchain.lsp_services.subprocess.run", side_effect=subprocess.TimeoutExpired("fixed", 5)):
         _refuses(lambda: inspect_document(b"source"), "worker timeout accepted")
 
 

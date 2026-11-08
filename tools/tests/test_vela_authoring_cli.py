@@ -11,8 +11,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import MAX_SOURCE_BYTES, Translation, VelaError, translate
-from vela.cli import vela as cli
+from toolchain import MAX_SOURCE_BYTES, Translation, VelaError, translate
+from toolchain.cli import vela as cli
 
 INDEPENDENT_CASES = True
 

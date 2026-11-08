@@ -11,7 +11,7 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela.lsp import Server
+from toolchain.lsp import Server
 
 INDEPENDENT_CASES = True
 
@@ -324,7 +324,7 @@ def _process_wire_services_and_unsaved_edit() -> None:
                 _request("shutdown", identity=8), _notice("exit")]
     tools = str(Path(__file__).resolve().parents[1])
     script = (f"import sys; sys.path.insert(0, {tools!r}); "
-              "from vela.cli.vela_lsp import main; raise SystemExit(main())")
+              "from toolchain.cli.vela_lsp import main; raise SystemExit(main())")
     completed = subprocess.run([sys.executable, "-I", "-c", script],
                                input=b"".join(_wire(message) for message in messages),
                                capture_output=True, timeout=30, check=False)

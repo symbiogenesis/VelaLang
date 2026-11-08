@@ -13,12 +13,12 @@ from unittest.mock import patch
 
 from tests.harness import Case, ensure
 from tests.test_vela_playground import _http, _post, _running
-from vela import StaticEvaluation, VelaError, playground
-from vela.authoring import Finding
-from vela.cli import vela_playground as playground_cli
-from vela.commands import COMMANDS
-from vela.mathematical import Compilation
-from vela.playground_worker import compile_request
+from toolchain import StaticEvaluation, VelaError, playground
+from toolchain.authoring import Finding
+from toolchain.cli import vela_playground as playground_cli
+from toolchain.commands import COMMANDS
+from toolchain.mathematical import Compilation
+from toolchain.playground_worker import compile_request
 
 _PURE = "module Simple; public Nat Value() => 42;"
 _SOURCE = ("module Indexed;\n// supplementary comment: \U0001f680\n"
@@ -181,7 +181,7 @@ def _changed_parser_refuses() -> None:
 def _worker_mathematical_routing() -> None:
     parser = Path("/prepared/native/vela-parser")
     compile_input: dict[str, object] = {"source": _SOURCE, "action": "compile"}
-    with patch("vela.mathematical.compile_source", return_value=Compilation("Indexed", "actual Gallina", ())) as compile_math:
+    with patch("toolchain.mathematical.compile_source", return_value=Compilation("Indexed", "actual Gallina", ())) as compile_math:
         response = compile_request(compile_input, mathematical_parser=parser)
     ensure(response == {"ok": True, "sourceHash": _DIGEST,
                         "module": "Indexed", "gallina": "actual Gallina", "editorServices": False, "findings": []},
@@ -189,22 +189,22 @@ def _worker_mathematical_routing() -> None:
     ensure(compile_math.call_args.args == (_SOURCE.encode(), parser),
            "worker did not forward the exact source bytes and server-owned parser")
     finding = Finding("VELA105", "generic type parameter 'element' should use PascalCase", 3, 36)
-    with patch("vela.mathematical.compile_source",
+    with patch("toolchain.mathematical.compile_source",
                return_value=Compilation("Indexed", "actual Gallina", (finding,))):
         response = compile_request(compile_input, mathematical_parser=parser)
     ensure(response["findings"] == [{"code": "VELA105", "message": finding.message, "line": 3, "column": 36}],
            "worker lost the mathematical producer's original naming finding")
     evaluate_input: dict[str, object] = {"source": _SOURCE, "action": "evaluate",
                                        "expression": "Last()", "valueType": "Nat"}
-    with patch("vela.mathematical.evaluate_source", return_value=StaticEvaluation("Nat", 8)) as evaluate_math:
+    with patch("toolchain.mathematical.evaluate_source", return_value=StaticEvaluation("Nat", 8)) as evaluate_math:
         response = compile_request(evaluate_input, mathematical_parser=parser)
     ensure(response == _result(), "worker fabricated a mathematical console value")
     ensure(evaluate_math.call_args.args == (_SOURCE.encode(), "Last()", "Nat", parser),
            "worker changed the selected expression, result type or parser identity")
-    with patch("vela.mathematical.evaluate_source", return_value=StaticEvaluation("bool", False)):
+    with patch("toolchain.mathematical.evaluate_source", return_value=StaticEvaluation("bool", False)):
         response = compile_request({**evaluate_input, "valueType": "bool"}, mathematical_parser=parser)
     ensure(response == _result("false", "bool"), "false mathematical result was confused with no result")
-    with patch("vela.mathematical.compile_source", side_effect=VelaError("type", 3, 12, "wrong length")):
+    with patch("toolchain.mathematical.compile_source", side_effect=VelaError("type", 3, 12, "wrong length")):
         response = compile_request(compile_input, mathematical_parser=parser)
     ensure(response == {"ok": False, "sourceHash": _DIGEST, "editorServices": False,
                         "error": {"kind": "type", "message": "wrong length", "line": 3, "column": 12}},
@@ -213,7 +213,7 @@ def _worker_mathematical_routing() -> None:
 
 def _automatic_selection_preserves_refusals() -> None:
     parser = Path("/prepared/native/vela-parser")
-    with patch("vela.mathematical.compile_source") as mathematical:
+    with patch("toolchain.mathematical.compile_source") as mathematical:
         pure = compile_request({"source": _PURE, "action": "compile"}, mathematical_parser=parser)
         ensure(pure["ok"] is True and pure["editorServices"] is True and pure["findings"] == []
                and not mathematical.called,
@@ -226,14 +226,14 @@ def _automatic_selection_preserves_refusals() -> None:
                    and not mathematical.called,
                    "a pure semantic refusal was retried through mathematical elaboration")
         for kind in ("name", "type", "encoding", "limit"):
-            with patch("vela.playground_worker.translate", side_effect=VelaError(kind, 2, 3, "original refusal")):
+            with patch("toolchain.playground_worker.translate", side_effect=VelaError(kind, 2, 3, "original refusal")):
                 refused = compile_request({"source": _PURE, "action": "compile"}, mathematical_parser=parser)
             ensure(refused == {"ok": False, "sourceHash": hashlib.sha256(_PURE.encode()).hexdigest(),
                                "editorServices": True,
                                "error": {"kind": kind, "message": "original refusal", "line": 2, "column": 3}}
                    and not mathematical.called,
                    "automatic selection replaced a retained source judgment")
-    with patch("vela.mathematical.evaluate_source") as mathematical:
+    with patch("toolchain.mathematical.evaluate_source") as mathematical:
         for expression, kind in (("true", "type"), ("Missing()", "name"),
                                  ("1; public const Nat Injected = 7", "syntax"),
                                  ("9" * 4097, "limit")):
@@ -350,7 +350,7 @@ def _native_cli_startup() -> None:
     commands = [command for command in COMMANDS if command.name.startswith("vela-playground")]
     ensure(len(commands) == 1 and commands[0].guest_only([]),
            "unified playground did not select exactly one native-backed launch")
-    with patch("vela.parser.build") as build, patch.object(playground_cli, "PlaygroundServer") as factory:
+    with patch("toolchain.parser.build") as build, patch.object(playground_cli, "PlaygroundServer") as factory:
         prepared = build.return_value
         prepared.executable = Path("/native/lane/build/vela-parser")
         server = factory.return_value.__enter__.return_value
@@ -362,7 +362,7 @@ def _native_cli_startup() -> None:
                "native parser was rebuilt per request or not supplied to the local server")
         ensure(server.serve_forever.call_count == 1,
                "prepared mathematical playground did not enter its HTTP service")
-    with patch("vela.parser.build", side_effect=RuntimeError("native tools unavailable")), \
+    with patch("toolchain.parser.build", side_effect=RuntimeError("native tools unavailable")), \
             patch.object(playground_cli, "PlaygroundServer") as factory:
         ensure(playground_cli.main(["--port", "0"]) == 1 and not factory.called,
                "unavailable native toolchain started a mathematical service without its parser")
@@ -387,8 +387,8 @@ def _pure_authoring_rejects_mathematical_lint() -> None:
 
 def _playground_formatting_example_assets() -> None:
     root = Path(__file__).resolve().parents[2]
-    html = (root / "tools/vela/playground/index.html").read_text(encoding="utf-8")
-    script = (root / "tools/vela/playground/app.mjs").read_text(encoding="utf-8")
+    html = (root / "tools/toolchain/playground/index.html").read_text(encoding="utf-8")
+    script = (root / "tools/toolchain/playground/app.mjs").read_text(encoding="utf-8")
     ensure('<option value="formatting">Raw strings &amp; checked formatting</option>' in html,
            "playground selector omitted the raw-strings and checked-formatting example")
     ensure("formatting: {" in script and "Format.Write(ref " in script and '"""' in script,

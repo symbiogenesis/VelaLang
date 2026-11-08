@@ -9,8 +9,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.harness import TOOLS, Case, ensure
-from vela import MAX_SOURCE_BYTES, VelaError, translate
-from vela.cli import vela as cli
+from toolchain import MAX_SOURCE_BYTES, VelaError, translate
+from toolchain.cli import vela as cli
 
 _NAT = "Corelib.Init.Datatypes.nat"
 _BOOL = "Corelib.Init.Datatypes.bool"

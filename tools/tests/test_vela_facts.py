@@ -9,12 +9,12 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import (
+from toolchain import (
     VelaError,
     inspect_source,
     translate,
 )
-from vela import (
+from toolchain import (
     lsp_worker as vela_lsp_worker,
 )
 

@@ -3,17 +3,17 @@
 
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
-from vela import (
+from toolchain import (
     Translation,
     VelaError,
     translate,
 )
-from vela import (
+from toolchain import (
     authoring as vela_authoring,
 )
-from vela.authoring import (
+from toolchain.authoring import (
     RETIRED_LINT_CODES,
     assist_effects_clause,
     assist_loan_argument,

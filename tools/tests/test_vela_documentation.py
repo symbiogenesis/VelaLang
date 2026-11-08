@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import cast
 
 from tests.harness import Case, ensure
-from vela import VelaError, inspect_source, translate
-from vela.authoring import format_source
-from vela.documentation import MAX_DOCUMENTATION_BYTES
-from vela.lsp import Server
-from vela.lsp_services import InspectionError, project
-from vela.source import SourceSnapshot
+from toolchain import VelaError, inspect_source, translate
+from toolchain.authoring import format_source
+from toolchain.documentation import MAX_DOCUMENTATION_BYTES
+from toolchain.lsp import Server
+from toolchain.lsp_services import InspectionError, project
+from toolchain.source import SourceSnapshot
 
 INDEPENDENT_CASES = True
 _URI = "untitled:documentation.vela"
@@ -278,7 +278,7 @@ def _real_stdio_documentation() -> None:
         wire.extend(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
     tools = str(Path(__file__).resolve().parents[1])
     script = (f"import sys; sys.path.insert(0, {tools!r}); "
-              "from vela.cli.vela_lsp import main; raise SystemExit(main())")
+              "from toolchain.cli.vela_lsp import main; raise SystemExit(main())")
     done = subprocess.run([sys.executable, "-I", "-c", script], input=bytes(wire),
                           capture_output=True, timeout=30, check=False)
     ensure(done.returncode == 0 and done.stderr == b"", f"documentation stdio failed: {done.stderr!r}")

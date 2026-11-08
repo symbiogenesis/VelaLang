@@ -6,9 +6,9 @@ import hashlib
 from typing import cast
 from unittest.mock import patch
 
-import vela
+import toolchain as vela
 from tests.harness import Case, ensure
-from vela import ast as vela_ast
+from toolchain import ast as vela_ast
 
 
 def _node(kind: str, start: int, end: int, **fields: object) -> dict[str, object]:

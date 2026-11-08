@@ -4,8 +4,8 @@
 from typing import cast
 
 from tests.harness import Case, ensure
-from vela import inspect_source
-from vela.lsp import Server
+from toolchain import inspect_source
+from toolchain.lsp import Server
 
 INDEPENDENT_CASES = True
 

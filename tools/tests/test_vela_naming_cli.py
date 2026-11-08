@@ -8,13 +8,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from vela import VelaError
-from vela.authoring import (
+from toolchain import VelaError
+from toolchain.authoring import (
     Finding,
     assist_refusal,
 )
-from vela.cli import vela_parser as cli
-from vela.mathematical import Compilation
+from toolchain.cli import vela_parser as cli
+from toolchain.mathematical import Compilation
 
 SOURCE = b"module Named;\npublic definition element Identity<element>(element value) => value;\n"
 GALLINA = "(* unchanged unqualified translation *)\nDefinition identity := fun value => value.\n"
