@@ -6,7 +6,7 @@ semantics, module boundary and required library behavior. The
 the [language reference](reference.md) gives each construct's syntax, meaning,
 example and implementation status;
 [PLAN.md](../PLAN.md#vela-first-release-delivery) owns commissioning,
-budgets and delivery order. The [requirements register](requirements-register.md)
+budgets and delivery order. The [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md)
 remains normative for VerifiedOS. These are design decisions and acceptance
 predicates, not a claim that the current prototypes implement them.
 
@@ -54,7 +54,7 @@ does not become a prerequisite for its concrete foundation investigation or
 first executable slice.
 
 All language laws concern the elaborated image in an existing semantic anchor
-under [the untrusted-elaboration boundary](spec.md#r-05-020a). Located source
+under [the untrusted-elaboration boundary](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a). Located source
 syntax, binding and resource derivations are inputs to checked interpretation
 and source correspondence, not an independently authoritative operational
 semantics. The kernel must check the interpretation and requested laws for the
@@ -89,7 +89,7 @@ VerifiedOS guarantee or mandatory compiler obligation.
 Every operation below has the same meaning in constant evaluation and runtime
 code and under every assurance preset. Runtime representations come from the
 selected target, never the build host. The
-[existing integer policy](spec.md#r-05-144) requires explicit conversions,
+[existing integer policy](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-144) requires explicit conversions,
 total ordinary arithmetic and named modular/saturating operations. The language
 binds that policy as follows; the target bridge must prove the binding.
 
@@ -276,7 +276,7 @@ compile-time query specialization is an extension under the [staging design](ext
 Iterators carry their bounds and loan contracts; they do not require ordinary
 users to reconstruct a separation-logic proof at each element. Codecs retain the
 platform's required format-description and
-[boundary initialization obligations](spec.md#r-05-124).
+[boundary initialization obligations](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-124).
 
 The [collection-loop surface](surface-grammar.md#ergonomic-authoring-and-bounded-collection-iteration)
 uses a law-carrying `IBoundedIterable<T>` interface refining `ISequenceModel<T>`
@@ -331,7 +331,7 @@ vacant destination prefix to transition source `[0..count)` to vacant and
 destination `[0..count)` to live initialized `T` in one capacity-independent range
 step. No allocation, emergency capacity or cleanup retry is
 implicit. A later explicit bounded-pool library additionally satisfies the
-[pool declaration and exhaustion contracts](spec.md#r-08-046), with
+[pool declaration and exhaustion contracts](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-046), with
 reuse/quiescence proof before returned backing is lent again.
 
 The receiver loan starts before explicit argument evaluation, using its declared
@@ -496,7 +496,7 @@ the slice unaccepted as a closed kernel proof.
   blocking-dependency inventory (`inventory` in `vela-parser first-slice`).
   Whole-term canonical Sail machine-term compilation (`rv64d.v` at Rocq 9.3.0;
   `Q35b`/`Q35o`/`Q35p`), machine-logic `byte-instance` laws over `rv64d.v`
-  (`Q35c`/`Q35m`/`Q35k`/`Q35l` and [cheri-foundation-map.md](hardware/cheri-foundation-map.md)),
+  (`Q35c`/`Q35m`/`Q35k`/`Q35l` and [cheri-foundation-map.md](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md)),
   `Q2b`'s flat `BasicC64Semantics` decoder scope, mechanized Sail-to-Clight/CompCert
   refinement (`Q35d`, `M1.2g`, `Q35j`), broader frontend/admission closure and
   user-managed Host CI and Guest CI verdicts remain separate open obligations.

@@ -1,6 +1,6 @@
 # Interior mutability and interference contract
 
-> Non-normative Q25c extension contract. Start with the [primary Vela design and examples](../verification-strategy.md) and [first-release boundary](../first-release.md#release-boundary). The [requirements register](../requirements-register.md) governs these proposed cell interfaces and qualification cases; the [delivery plan](../../PLAN.md#vela-first-release-delivery) owns commissioning. These rules/predicates supply no implemented library, proved calculus, admitted executable or accepted axiom.
+> Non-normative Q25c extension contract. Start with the [primary Vela design and examples](../verification-strategy.md) and [first-release boundary](../first-release.md#release-boundary). The [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs these proposed cell interfaces and qualification cases; the [delivery plan](../../PLAN.md#vela-first-release-delivery) owns commissioning. These rules/predicates supply no implemented library, proved calculus, admitted executable or accepted axiom.
 
 ## Scope and shared interface
 
@@ -10,11 +10,11 @@ Use Q25a's [resource/computation interface](graded-foundation.md#resource-and-co
 
 `Capture`, `Dup`, `Dispose`, `Suspend`, `Transfer` and `Share` need semantic evidence. A grade counts invocations only through its trace interpretation; it creates neither ownership, access authority nor release. `Own(r,shape,snapshot)` belongs in `Delta`; stable identity `r` and historical snapshots may index `Gamma`, never unsynchronized current contents.
 
-The retained concurrent qualification candidate uses private packets/tasks and a shared scalar counter within the [atomic profile](../spec.md#r-15-026) and [exclusive-access constraints](../spec.md#r-05-096a). It is commissioned only if an actual consumer needs that protocol. It adds no shared mutable capability, CAS, blocking mutex, retry loop, inner scheduler or unwinding. Ordinary libraries and a service using one structured child do not acquire a shared-counter dependency.
+The retained concurrent qualification candidate uses private packets/tasks and a shared scalar counter within the [atomic profile](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-026) and [exclusive-access constraints](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-096a). It is commissioned only if an actual consumer needs that protocol. It adds no shared mutable capability, CAS, blocking mutex, retry loop, inner scheduler or unwinding. Ordinary libraries and a service using one structured child do not acquire a shared-counter dependency.
 
 ### Interpretation commitment
 
-All predicates and transition laws in this dossier apply to the checked elaboration's image in an existing semantic anchor under [R-05-020a](../spec.md#r-05-020a). The schematic notation specifies proof obligations for the untrusted elaborator and kernel-checked resource derivations; it is not an independent source reduction or a new authoritative memory model. Local operations are interpreted by the selected existing resource logic, while target operations and interference refer to the one pinned Sail subject. Substitution, capture, exit preservation and erasure statements quantify over those interpreted computations and their actual representations, connected to exact source by checked correspondence. No rule can obtain a concrete CHERI instance merely by naming its predicate. The [composition review](full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows) retains those implementation prerequisites.
+All predicates and transition laws in this dossier apply to the checked elaboration's image in an existing semantic anchor under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a). The schematic notation specifies proof obligations for the untrusted elaborator and kernel-checked resource derivations; it is not an independent source reduction or a new authoritative memory model. Local operations are interpreted by the selected existing resource logic, while target operations and interference refer to the one pinned Sail subject. Substitution, capture, exit preservation and erasure statements quantify over those interpreted computations and their actual representations, connected to exact source by checked correspondence. No rule can obtain a concrete CHERI instance merely by naming its predicate. The [composition review](full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows) retains those implementation prerequisites.
 
 ## Representation, authority and open invariants
 
@@ -37,7 +37,7 @@ These proof transitions cannot extract resources from duplicable propositions. P
 
 A local opening permits no interfering activation before close. A concurrent invariant opens only for a proved logically atomic operation or a proved exclusive ownership phase; an indivisible AMO does not make surrounding code atomic. Close consumes its debt once, restores the current representation and ends interior loans before return.
 
-Seal representation primitives against forged handles, casts, exposed fields and untyped bypasses in source and final code. Load/store capability permission alone proves no ownership state. [R-05-096b](../spec.md#r-05-096b) still requires binary splits and the manifest join. Shared scalar capabilities are privately injected at composition; a received integer identity grants none.
+Seal representation primitives against forged handles, casts, exposed fields and untyped bypasses in source and final code. Load/store capability permission alone proves no ownership state. [R-05-096b](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-096b) still requires binary splits and the manifest join. Shared scalar capabilities are privately injected at composition; a received integer identity grants none.
 
 ## Local cells
 
@@ -94,7 +94,7 @@ snapshot facts remain stable. The [borrow-analysis promotion contract](../core-d
 connects these obligations to source checking without selecting shared mutation
 for the synchronous release.
 
-Selection still needs ownership, open/close and capture laws over all exits, suspension/cancellation, the local-domain boundary and artifact-level exclusivity. The [producer evaluation](../background/architectural-alternatives.md#ante-place-sensitive-mutation-and-invalidation) retains this candidate without commissioning selection or qualification.
+Selection still needs ownership, open/close and capture laws over all exits, suspension/cancellation, the local-domain boundary and artifact-level exclusivity. The [producer evaluation](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/background/architectural-alternatives.md#ante-place-sensitive-mutation-and-invalidation) retains this candidate without commissioning selection or qualification.
 
 ## Transfer, sharing and lifecycle eligibility
 
@@ -109,7 +109,7 @@ Eligibility is transitive through fields, instantiated parameters, environments,
 | `Transfer(v,d1,d2)` | Sender loses access before receiver gains it; every retained field is transferable and remains live. Cross-compartment transfer conforms to the fixed grant/manifest protocol. |
 | `Share(v,D)` | All participants have separately justified operation rights; the contents representation, permitted interference and observation policy remain sound under simultaneous use. |
 
-Default `LocalCell`/`BorrowCell` have no cross-domain `Share`. Moving a quiescent cell requires no guards, loans or open debt, loss of old-domain handles, and proved domain/storage transfer/rebinding. Wrappers, grades, callbacks and hidden local/thread-local state bypass none of these. [Ambient-state exclusion](../spec.md#r-05-039) includes caches, registries and lazy initialization behind pure-looking methods.
+Default `LocalCell`/`BorrowCell` have no cross-domain `Share`. Moving a quiescent cell requires no guards, loans or open debt, loss of old-domain handles, and proved domain/storage transfer/rebinding. Wrappers, grades, callbacks and hidden local/thread-local state bypass none of these. [Ambient-state exclusion](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-039) includes caches, registries and lazy initialization behind pure-looking methods.
 
 Shared scalar capabilities stay in private participant environments. Shared mutable memory holds only declared scalars, never capabilities, capability-bearing closures/continuations or task frames. Private stable storage may hold a capability-bearing continuation; transferring it needs a proved fixed-authority-graph protocol, not a pointer serialized into a shared cell.
 
@@ -117,19 +117,19 @@ Shared scalar capabilities stay in private participant environments. Shared muta
 
 `ConcurrentCell(c,g,S,P)` declares state machine `P`, interference, participant roles, scalar representation `S`, rights and linearization/release points. Each operation proves its functional relation, invariant preservation, published resource transfer and observations. An atomic success is one transition at its proved point; failures establish declared unchanged/partial state, not implicit rollback.
 
-The target is [Ztso](../spec.md#r-15-004) with [whole-path ordering](../spec.md#r-15-015a). The [Sail AMO implementation](../../model/model/extensions/A/zaamo_insts.sail) decodes `AMOADD`, adds a word and writes it; [memory access](../../model/model/sys/mem.sail) classifies accesses. These are inspected subjects, not checked Vela atomic laws or a concurrent-logic instance.
+The target is [Ztso](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-004) with [whole-path ordering](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-015a). The [Sail AMO implementation](https://github.com/symbiogenesis/VerifiedOS/blob/main/model/model/extensions/A/zaamo_insts.sail) decodes `AMOADD`, adds a word and writes it; [memory access](https://github.com/symbiogenesis/VerifiedOS/blob/main/model/model/sys/mem.sail) classifies accesses. These are inspected subjects, not checked Vela atomic laws or a concurrent-logic instance.
 
 Lowering names the same pinned Sail term, width/alignment, capability load/store permissions, PMA support, tags, `aq`/`rl` and observations. Distinguish ordinary memory, MMIO and DMA. Forbid widening across neighbors, synthesized CAS/LR-SC, locking `libatomic`, unsupported capability atomics and non-atomic aliases into atomic footprints.
 
 ### Immutable publication and reclamation
 
-The [SPSC lifecycle](../spec.md#r-12-094) permits exclusive initialization, consumes writing at publication, grants immutable reader access and restores writing only after all readers/device holders end or are revoked with quiescence. Shared descriptors contain scalar indices/lengths; receivers resolve private tables and validate generation, extent and rights.
+The [SPSC lifecycle](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-094) permits exclusive initialization, consumes writing at publication, grants immutable reader access and restores writing only after all readers/device holders end or are revoked with quiescence. Shared descriptors contain scalar indices/lengths; receivers resolve private tables and validate generation, extent and rights.
 
-Publication orders payload stores and producer loads before the publication-index store; consumption orders the observing load before subsequent descriptor/payload loads and consumer stores. Prove these store-to-store/load-to-store and load-to-load/load-to-store edges from Ztso, compiler preservation and per-hart fabric ordering. The [fence-free ring contract](../spec.md#r-12-008) requires that proof; annotations supply none.
+Publication orders payload stores and producer loads before the publication-index store; consumption orders the observing load before subsequent descriptor/payload loads and consumer stores. Prove these store-to-store/load-to-store and load-to-load/load-to-store edges from Ztso, compiler preservation and per-hart fabric ordering. The [fence-free ring contract](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-008) requires that proof; annotations supply none.
 
 Ztso lacks general store-to-later-load ordering. Reclamation needs terminal acknowledgments and ownership transitions; local store-then-load proves no peer stop. A protocol needing that edge must prove a legal drain fence's semantics/bound or use another protocol. Fences cannot repair overlapping non-atomic authority. Guard release, publication, cancel acceptance, terminal completion and reuse remain distinct.
 
-[R-12-099](../spec.md#r-12-099) changes generation before restart/revocation reuse, invalidating old handles/queued indices. Equal indices/counts prove no freshness: retire all old-generation rights. [R-08-046](../spec.md#r-08-046) also retains quarantine, revocation and sweep where applicable.
+[R-12-099](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-099) changes generation before restart/revocation reuse, invalidating old handles/queued indices. Equal indices/counts prove no freshness: retire all old-generation rights. [R-08-046](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-046) also retains quarantine, revocation and sweep where applicable.
 
 ## Concrete scalar service and composed client
 
@@ -156,7 +156,7 @@ An entry candidate fixes `N = 4`, `n = 2`, private backing `[1,2,0,0]` with pref
 
 ### Cancellation, completion and reset
 
-Under [R-12-097](../spec.md#r-12-097), the final checkpoint, AMO and private committed-receipt store form one bounded region without suspension, capture, reentry or source-fallible operations. Cancellation stays sticky. A request arriving between checkpoint and AMO is decided afterward as postcommit, not accepted preemptively.
+Under [R-12-097](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-097), the final checkpoint, AMO and private committed-receipt store form one bounded region without suspension, capture, reentry or source-fallible operations. Cancellation stays sticky. A request arriving between checkpoint and AMO is decided afterward as postcommit, not accepted preemptively.
 
 | Reachable outcome | Cell and resource result |
 | --- | --- |
@@ -190,7 +190,7 @@ Outcome-indexed ordinary exits restore the invariant and end all guards. Release
 | Cleanup failure | The default local close/release primitives are total under their premises. An API with fallible external cleanup needs an explicit quarantined terminal state and a proved containment path; it cannot return ordinary reusable ownership. |
 | Panic, trap or environmental fail-stop | No language exception/unwinding rule is added. Prove absence of unexpected traps under operation premises; external faults stop the affected domain/session and retain its revocation/quiescence obligations without asserting successful source closing. |
 
-Declare local steps, checkpoint distance, cleanup/publication work, joins and external quiescence. Map them to the [reaction graph](../spec.md#r-07-037a) and [schedule](../spec.md#r-11-006). Compose comparable elapsed-time bounds `Lcheckpoint`, `Lcleanup`, `Ljoin`, `Lterminal` for accepted cancellation; prove the composition instead of merely adding them. A directly awaited helper contributes to the same task's state and bound, including cleanup, without an extra child term. Postcommit work has its own remaining bound. The no-checkpoint AMO region must fit locally and cannot defer requests indefinitely.
+Declare local steps, checkpoint distance, cleanup/publication work, joins and external quiescence. Map them to the [reaction graph](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-07-037a) and [schedule](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-11-006). Compose comparable elapsed-time bounds `Lcheckpoint`, `Lcleanup`, `Ljoin`, `Lterminal` for accepted cancellation; prove the composition instead of merely adding them. A directly awaited helper contributes to the same task's state and bound, including cleanup, without an extra child term. Postcommit work has its own remaining bound. The no-checkpoint AMO region must fit locally and cannot defer requests indefinitely.
 
 Progress names admitted activations and service/HAL response bounds, with no hidden fairness, spin or eventual-response premise. Adversarial failure takes the specified fail-stop path. Capacity exhaustion returns an immediate typed result with bounded handling; hardware recovery remains separate from source progress.
 
@@ -233,7 +233,7 @@ The example permits public lengths, scheduling and count while contents stay pri
 
 The [sharing/disposal survey](../verification-strategy.md#effect-handlers-sharing-and-protocol-logics) records mechanized temporary guarding for `MUT-CELL` and a non-leaking resource-accounting adequacy result for `MUT-EXIT`. The [Rust survey](../verification-strategy.md#rust-and-low-level-verification) records semantic soundness for a proof tool's cell/invariant/storage subset via guarding plus lifetime logic, and checked Cell/Mutex specifications over a Rust-core model. Each uses another language, trusted base and prover edition, retaining erasure/solver/compiler trust. None constructs this concrete representation, pinned-Sail atomic law or inhabited cell instance.
 
-Q25d records these unproved implementation-law families. The [delivery plan](../../PLAN.md#vela-first-release-delivery) selects and prices only the slice a consumer needs; the deferred combined fixture assigns no first-release duty. Every theorem below is over the checked interpretation image and its source-correspondence relation. The [foundation map](../hardware/cheri-foundation-map.md), Q2b/M7.1 target work and Q21 contracts retain their owners; charge shared work once.
+Q25d records these unproved implementation-law families. The [delivery plan](../../PLAN.md#vela-first-release-delivery) selects and prices only the slice a consumer needs; the deferred combined fixture assigns no first-release duty. Every theorem below is over the checked interpretation image and its source-correspondence relation. The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md), Q2b/M7.1 target work and Q21 contracts retain their owners; charge shared work once.
 
 | Debt | Concrete acceptance predicate and ownership boundary |
 | --- | --- |

@@ -1,6 +1,6 @@
 # Vela compile-time metaprogramming
 
-> Non-normative language contract refining the [primary design](../verification-strategy.md#language-product-contract). The [plan](../../PLAN.md#vela-whole-system-authoring-proposal) owns implementation stages; the [requirements register](../requirements-register.md) governs admission. This contract supplies no implementation, new semantic anchor, kernel extension or accepted performance result.
+> Non-normative language contract refining the [primary design](../verification-strategy.md#language-product-contract). The [plan](../../PLAN.md#vela-whole-system-authoring-proposal) owns implementation stages; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs admission. This contract supplies no implementation, new semantic anchor, kernel extension or accepted performance result.
 
 ## Product and scope
 
@@ -143,8 +143,8 @@ length remains represented in the generated program. The format description fixe
 the encoding independently of record layout. The codec must establish its requested
 bounds, failure and correspondence laws, and specialization must establish its
 preservation obligations. This sketch authorizes no alternate production parser:
-the [required Narcissus lowering](../spec.md#r-05-043) and
-[independent descriptor review](../spec.md#r-05-046) retain their subjects and
+the [required Narcissus lowering](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-043) and
+[independent descriptor review](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-046) retain their subjects and
 amendment conditions.
 
 ## Hygienic construction and composition
@@ -241,7 +241,7 @@ Compile-time derivation covers many finite serialization, dispatch and registry
 uses of runtime reflection. Data or schemas first discovered during execution
 need explicit runtime descriptors, a confined interpreter or a later build; no
 compile-time construct makes unknown information available earlier. The
-[native admission rules](../spec.md#r-02-008) still govern executable updates.
+[native admission rules](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-02-008) still govern executable updates.
 
 Compiler services expose located syntax, resolved symbols, types, elaboration,
 dependencies, generated definitions and diagnostics to analyzers and tools. They

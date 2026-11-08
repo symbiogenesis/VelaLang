@@ -656,7 +656,6 @@ implicit conversion, ownership transfer, effect, disposal or proof authority.
   Binding immutability does not prohibit a
   write through an eligible exclusive loan, and the pure prototype reports its
   unsupported mutation boundary without claiming a source borrow judgment.
-
 - Inferred lambda parameters may omit the annotation: `value => value + 1`,
   `(value) => value + 1` and `(left, right) => left + right`. Explicitly typed,
   graded and resource-modified parameters retain their existing forms. An
@@ -692,7 +691,7 @@ implicit conversion, ownership transfer, effect, disposal or proof authority.
   `(value,)` acquires no new tuple or grouping meaning.
 - Pattern binders and constructors are distinguished by token shape without
   symbol-table or import-dependent lookup: an unqualified lowercase identifier
-   binds a value, `_` remains a discard whose resource admissibility requires
+  binds a value, `_` remains a discard whose resource admissibility requires
   checking, and an identifier whose final segment begins with an ASCII uppercase
   letter is a constructor (`None`, `BorrowConflict`, `Some(x)`, `Result.Empty`).
   Nullary constructors are written bare without `()` in patterns and expressions;

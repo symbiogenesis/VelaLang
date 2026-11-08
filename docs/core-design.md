@@ -1,6 +1,6 @@
 # Bounded language core and qualification contract
 
-> Non-normative synchronous-core design. Start with the [primary Vela design and examples](verification-strategy.md) and the [first-release contract](first-release.md). The Q21a fixture retains its [missing prerequisites](#decision-and-reopening-evidence); the [first-release delivery plan](../PLAN.md#vela-first-release-delivery) selects bounded work separately. No frontend, metatheory or production qualification is supplied. The [workflow disposition](workflow-contract.md#commissioning-disposition) governs canceled trials; the [requirements register](requirements-register.md) governs obligations.
+> Non-normative synchronous-core design. Start with the [primary Vela design and examples](verification-strategy.md) and the [first-release contract](first-release.md). The Q21a fixture retains its [missing prerequisites](#decision-and-reopening-evidence); the [first-release delivery plan](../PLAN.md#vela-first-release-delivery) selects bounded work separately. No frontend, metatheory or production qualification is supplied. The [workflow disposition](workflow-contract.md#commissioning-disposition) governs canceled trials; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations.
 
 ## Decision and boundary
 
@@ -17,11 +17,11 @@ rules must preserve this core's contracts rather than become prerequisites for
 its first useful component.
 
 **The concrete foundation remains a prerequisite.** The
-[foundation decision](hardware/cheri-foundation-map.md#review-decision)
+[foundation decision](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#review-decision)
 does not supply the complete resource/machine laws for this fixture. The
 returned-view exit needs actual split, suspension and restoration laws; syntax
 cannot supply them. The selected interpretation is the elaboration's image in
-an existing anchor under [R-05-020a](spec.md#r-05-020a). Every law below is
+an existing anchor under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a). Every law below is
 a theorem to be checked about that image and its resource interpretation, with
 source correspondence binding the exact authored computation. This interpretation
 commitment supplies no proof of those laws and admits no independent source reduction.
@@ -38,16 +38,16 @@ The fixture has no source allocation, implicit boxing, unwinding, suspension, ca
 
 ## Inputs and their actual subjects
 
-Inspection revision: `4aeaceedf4626ef64583a4680c19da29a469df4f`. The [foundation map](hardware/cheri-foundation-map.md) records constants and missing connections; [workflow](workflow-contract.md) owns the pilot comparison and [compiler routes](compiler-route-contract.md) the full-artifact comparison.
+Inspection revision: `4aeaceedf4626ef64583a4680c19da29a469df4f`. The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) records constants and missing connections; [workflow](workflow-contract.md) owns the pilot comparison and [compiler routes](compiler-route-contract.md) the full-artifact comparison.
 
 | Input | Inspected subject | Design use and limit |
 | --- | --- | --- |
-| [DescriptorCheck.v](../tools/bedrock2-lowering/DescriptorCheck.v) | `Descriptor.descriptor_check`, `spec_of_descriptor_check`, `descriptor_check_br2fn_ok` | The header check reads bytes within declared length, returns a status word and preserves its byte-array footprint and frame. Its relation uses `BasicC64Semantics`; it neither copies bytes nor proves a CHERI memory rule. Request identifiers, offsets, lengths and session permissions remain validated at use. |
-| [RingContract.v](../proofs/RingContract.v) | Generated layouts, operation declarations and status/lifecycle definitions | An extension evaluates layout constants from this owner. The core creates no competing wire enumeration or ring lifecycle. |
-| [CopyRingService.v](../proofs/CopyRingService.v) | `svc_op_record`, `service_conjuncts`, `the_staging_buffer_holds_the_declared_payload`, `every_held_reference_is_released_at_cleanup` | These constrain declared capacity and released-reference accounting. The file supplies no byte copying, memory implementation or Ztso refinement. Private staging is a reserved independent consumer, not an implementation baseline. |
+| [DescriptorCheck.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/bedrock2-lowering/DescriptorCheck.v) | `Descriptor.descriptor_check`, `spec_of_descriptor_check`, `descriptor_check_br2fn_ok` | The header check reads bytes within declared length, returns a status word and preserves its byte-array footprint and frame. Its relation uses `BasicC64Semantics`; it neither copies bytes nor proves a CHERI memory rule. Request identifiers, offsets, lengths and session permissions remain validated at use. |
+| [RingContract.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/proofs/RingContract.v) | Generated layouts, operation declarations and status/lifecycle definitions | An extension evaluates layout constants from this owner. The core creates no competing wire enumeration or ring lifecycle. |
+| [CopyRingService.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/proofs/CopyRingService.v) | `svc_op_record`, `service_conjuncts`, `the_staging_buffer_holds_the_declared_payload`, `every_held_reference_is_released_at_cleanup` | These constrain declared capacity and released-reference accounting. The file supplies no byte copying, memory implementation or Ztso refinement. Private staging is a reserved independent consumer, not an implementation baseline. |
 | [Q19/Q20](../PLAN.md#q-assessment-actions) | Concrete-law entry gate and initial/held-out comparison | Parser destination initialization develops the pilot; staging stays held out until interface freeze. Missing consumer implementations belong to Q2b/M7.1. Eventual-core cases are separate from that callback workflow. |
 
-The proposed parser-derived extension initializes its fixed private destination whole, copies each admitted input byte once into it and validates that private copy. This development contract exercises [the initialization obligation](spec.md#r-05-124), with failure behavior specified below. It does not make the existing header check a complete decoder or make copying an atomic snapshot of a concurrently mutable source.
+The proposed parser-derived extension initializes its fixed private destination whole, copies each admitted input byte once into it and validates that private copy. This development contract exercises [the initialization obligation](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-124), with failure behavior specified below. It does not make the existing header check a complete decoder or make copying an atomic snapshot of a concurrently mutable source.
 
 ## Reuse decisions
 
@@ -174,7 +174,7 @@ nor a diagnostic's path precision establishes superiority to another checker.
 
 Automatic refinement covers quantifier-free linear integer arithmetic over bounded scalars, equality/disequality, finite discriminants and congruence to a positive specialization-time alignment constant. Multiplication is by a known constant. Variable products, general nonlinear arithmetic and open quantified mathematics remain explicit goals. The [first-release primitive contract](first-release.md#primitive-semantics) fixes source operations and their target binding. Machine words enter through checked representability/no-overflow lemmas; intentional modular arithmetic uses explicit word lemmas. Initialization and typestate facts rely on resource rules. Bounded predicates and subrange projections over finite sequences on `.Model`—`Seq<T>.All(x => ...)`, `.Any(x => ...)`, `.Contains(x)`, `.Take(n)`, `.Skip(n)`, `.Slice(a, b)` and `.Count` when the element predicate stays within the supported fragment—together with sequence updates, vacant-slot prefix/suffix range splits (`[0..length)` and `[length..capacity)`) and content equality use pre-proved standard-library domain lemmas in the refinement/domain tier rather than open `forall`/`exists` quantifier instantiation or silently enlarging the arithmetic fragment. Sparse range obligations stay symbolic in static capacity `capacity` without per-element unfolding, and [qualification](first-release.md#qualification) checks capacity invariance ($N = 4$ versus $N = 10^9$).
 
-Checking uses conversion, resource/capture rules, reconstructed arithmetic, domain automation and explicit proof in that order. Timeout, unsupported formulas or failed reconstruction leave goals unresolved. [R-05-017](spec.md#r-05-017) keeps its reconstruction duty. Proof search proves the chosen contract and cannot weaken it to close a goal.
+Checking uses conversion, resource/capture rules, reconstructed arithmetic, domain automation and explicit proof in that order. Timeout, unsupported formulas or failed reconstruction leave goals unresolved. [R-05-017](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-017) keeps its reconstruction duty. Proof search proves the chosen contract and cannot weaken it to close a goal.
 
 Effects are closed read/write/call footprints with no allocation, including transitive callees and environments. Sequential footprints take union; named event counts add. Alternative exact counts must agree or become a proved bound or result-indexed count. Stack slots and specialized environments retain size/layout obligations. Effect variables, general grades and handler discharge belong to Q25's gated extension designs and are outside this synchronous fixture's qualification.
 
@@ -302,7 +302,7 @@ A hole records source expression, semantic environment, expected type/propositio
 
 At the inclusive copy guard, show `0 <= i <= n <= N` and `n <= s`, required `i < n`, `i < s` and `i < N`, destination loan and copy-prefix invariant. At failed error propagation, show outstanding `PreparationOpen` and expected `PreparationClosed`. At a post-match mutation, show retained `Ready` view and suspended parent. These are different diagnostics even if downstream search fails at one final theorem.
 
-Statuses distinguish unresolved, checked refutation where available, unsupported, timeout, stale and fresh-batch acceptance. [R-05-018a](spec.md#r-05-018a) admits no interactive/rendered acceptance. Stable goal IDs aid navigation without preserving acceptance after semantic edits.
+Statuses distinguish unresolved, checked refutation where available, unsupported, timeout, stale and fresh-batch acceptance. [R-05-018a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-018a) admits no interactive/rendered acceptance. Stable goal IDs aid navigation without preserving acceptance after semantic edits.
 
 Every result carries its source/dependency generation and judgment scope. Open required goals block component acceptance. Semantic edits withdraw old acceptance before asynchronous replay; late old-generation successes stay stale. The diagnostic trial sends such a response after a bound change. Failed search is unresolved/timeout unless checked evidence refutes the claim. Report the first missing premise in the deterministic checking order; it may change after repair, and unrelated downstream failure does not count as the intended negative.
 

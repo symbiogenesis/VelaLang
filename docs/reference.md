@@ -448,7 +448,7 @@ public lemma AddZero(Nat n)
 
 Executable failure is an explicit `Result` or `union` case. Vela has no
 exceptions, panics, stack unwinding or `longjmp`
-([R-05-100](spec.md#r-05-100)); an operation owes the absence of
+([R-05-100](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-100)); an operation owes the absence of
 unexpected traps under its entry conditions, and environmental faults keep the
 target contract's classification ([loans and control flow](core-design.md#loans-and-control-flow)).
 Checked arithmetic and conversions return `Result<T, ArithmeticError>` or

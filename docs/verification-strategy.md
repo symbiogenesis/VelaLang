@@ -12,23 +12,23 @@ It connects editing, language services, Gallina output and compile-time expressi
 evaluation to the development prototypes.
 
 > **Status:** This is a non-normative design proposal, not an implemented compiler or admission rule. [PLAN.md](../PLAN.md#q-assessment-actions) records execution state; [the completion log](completion-log.md) records evidence. The [workflow contract](workflow-contract.md#commissioning-disposition) defines the canceled experiments and their re-entry conditions.
-
-> The [requirements register](requirements-register.md) governs VerifiedOS; the [typed assembly language](../typed-assembly-language.md) governs the certificate language.
+>
+> The [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs VerifiedOS; the [typed assembly language](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/typed-assembly-language.md) governs the certificate language.
 > This proposal supplies no new semantic anchor or accepted trust assumption. Latest source update: 2026-11-03; upstream capabilities and proposed integration work are distinguished below.
 
 ## Recommendation
 
-**Retain Clight/CHERI-CompCert.** Direct lowering through an explicit-memory capability IR remains unselected. Q2b's device path, the missing machine connection and the [unauthored crown-jewel specifications](assurance/crown-jewels.md) keep their existing priority and owners. Reopening a canceled experiment requires a consumer blocked by the current route and the workflow contract's re-entry evidence.
+**Retain Clight/CHERI-CompCert.** Direct lowering through an explicit-memory capability IR remains unselected. Q2b's device path, the missing machine connection and the [unauthored crown-jewel specifications](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/crown-jewels.md) keep their existing priority and owners. Reopening a canceled experiment requires a consumer blocked by the current route and the workflow contract's re-entry evidence.
 
-**Adapt the selected CHERIoT Rust fork for the mandatory functional Rust producer.** The [baseline](assurance/proof-reuse/languages.md#cheriot-rust-selected-functional-capability-aware-compiler-baseline) already builds `compiler-builtins`, `core` and `alloc`; the [alternative decision](background/architectural-alternatives.md#functional-cheri-rust-compiler-starting-point) explains the selection and reopening conditions. Remaining work covers RV64 representation, purecap ABI, frozen instruction selection, compartment/device interfaces, bounded libraries/runtime, source-to-final-byte correspondence and replayable CHERI-TAL derivations. R-18-015's safe-MIR frontend, certification and resident-toolchain qualification remain required. This workstream keeps its separate owner and sits outside the priced bring-up total.
+**Adapt the selected CHERIoT Rust fork for the mandatory functional Rust producer.** The [baseline](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#cheriot-rust-selected-functional-capability-aware-compiler-baseline) already builds `compiler-builtins`, `core` and `alloc`; the [alternative decision](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/background/architectural-alternatives.md#functional-cheri-rust-compiler-starting-point) explains the selection and reopening conditions. Remaining work covers RV64 representation, purecap ABI, frozen instruction selection, compartment/device interfaces, bounded libraries/runtime, source-to-final-byte correspondence and replayable CHERI-TAL derivations. R-18-015's safe-MIR frontend, certification and resident-toolchain qualification remain required. This workstream keeps its separate owner and sits outside the priced bring-up total.
 
-**Keep `VerifiedComponents` frozen.** Its target-parametric Rocq library lacks concrete CHERI operation/representation laws and machine/contextual connections. Q2c and Q21a/Q21b declined commissioning those foundations without responsible pricing; the pilot never ran. Reopening evidence belongs to the [foundation map](hardware/cheri-foundation-map.md#re-entry-evidence), [core design](core-design.md#decision-and-reopening-evidence) and [compiler comparison](compiler-route-contract.md#re-entry-packages).
+**Keep `VerifiedComponents` frozen.** Its target-parametric Rocq library lacks concrete CHERI operation/representation laws and machine/contextual connections. Q2c and Q21a/Q21b declined commissioning those foundations without responsible pricing; the pilot never ran. Reopening evidence belongs to the [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#re-entry-evidence), [core design](core-design.md#decision-and-reopening-evidence) and [compiler comparison](compiler-route-contract.md#re-entry-packages).
 
-The [tooling qualification](assurance/proof-tooling-qualification.md) retained the locked batch workflow: cached presentation missed an imported-lemma change; Selective Stdlib, Equations and standalone `sauto` replayed without new assumptions but showed no client maintenance benefit. None was adopted.
+The [tooling qualification](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-tooling-qualification.md) retained the locked batch workflow: cached presentation missed an imported-lemma change; Selective Stdlib, Equations and standalone `sauto` replayed without new assumptions but showed no client maintenance benefit. None was adopted.
 
 **Deliver the bounded synchronous release first.** The [release contract](first-release.md#release-boundary) selects explicit representations, fixed ownership/use modes, stable dependent indices, ordinary errors and checked contracts over one retained compiler route. General grade algebras, multi-shot/shallow handlers, broad reflection and concurrent mutation need separate justification. Async requires a concrete service consumer and complete resource contract. The [delivery plan](../PLAN.md#vela-first-release-delivery) starts with a bounded concrete-buffer foundation investigation, whose results determine pricing for an executable slice and independent package trial. Syntax, mathematics and editor prototypes remain development tools; they supply no machine laws.
 
-**Interpret source in existing anchors.** Under [R-05-020a](spec.md#r-05-020a), untrusted elaboration is kernel-rechecked under R-05-009. The rule dossiers state laws about that checked interpretation, without introducing independent source semantics. Concrete resource laws, checked source correspondence, lowering and final-byte acceptance remain prerequisites. Before implementing later runtime-varying storage, amend the R-08-046 inventory and lifecycle classification.
+**Interpret source in existing anchors.** Under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a), untrusted elaboration is kernel-rechecked under R-05-009. The rule dossiers state laws about that checked interpretation, without introducing independent source semantics. Concrete resource laws, checked source correspondence, lowering and final-byte acceptance remain prerequisites. Before implementing later runtime-varying storage, amend the R-08-046 inventory and lifecycle classification.
 
 **Use Menhir for development parsing.** The [parser goal](#development-parser-and-grammar)
 connects the proposed grammar to located syntax trees, separate elaboration and
@@ -44,7 +44,7 @@ retain their separate owners and gates.
 
 ## Constraints and Desired Product
 
-The [register](requirements-register.md) remains authoritative. [Semantic anchors are fixed](spec.md#r-05-019); [verified compilation transports proofs between them](spec.md#r-05-021). [R-05-020a](spec.md#r-05-020a) permits untrusted source elaboration whose meaning and laws are checked in an existing anchor, preserving exact-source correspondence and every binary obligation. A new authoritative semantics, logic or checker still meets [R-05-020](spec.md#r-05-020). The [composition review](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows) distinguishes that resolved classification from the unbuilt concrete laws and compiler. Machine-model replacement remains a separate [migration option](extensions/unified-source-contract.md#migration-and-retirement), requiring its own amendments and consumer evidence. There is no new proof kernel, on-device dependent checker, managed runtime or non-CHERI VerifiedOS deployment path.
+The [register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) remains authoritative. [Semantic anchors are fixed](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-019); [verified compilation transports proofs between them](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-021). [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a) permits untrusted source elaboration whose meaning and laws are checked in an existing anchor, preserving exact-source correspondence and every binary obligation. A new authoritative semantics, logic or checker still meets [R-05-020](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020). The [composition review](extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows) distinguishes that resolved classification from the unbuilt concrete laws and compiler. Machine-model replacement remains a separate [migration option](extensions/unified-source-contract.md#migration-and-retirement), requiring its own amendments and consumer evidence. There is no new proof kernel, on-device dependent checker, managed runtime or non-CHERI VerifiedOS deployment path.
 
 ### Language Product Contract
 
@@ -92,12 +92,12 @@ The first software pipeline uses the existing anchors:
 
 ```text
 Authored source closure + independently reviewed contract
-	-> checked elaboration and source correspondence
-	-> interpreted core + reconstructed ownership/refinement proofs
-	-> proved representation and lowering
-	-> verified or translation-validated optimization
-	-> capability-aware selection/allocation + typed linkage
-	-> exact bytes + required TAL/CIC evidence over pinned Sail
+    -> checked elaboration and source correspondence
+    -> interpreted core + reconstructed ownership/refinement proofs
+    -> proved representation and lowering
+    -> verified or translation-validated optimization
+    -> capability-aware selection/allocation + typed linkage
+    -> exact bytes + required TAL/CIC evidence over pinned Sail
 ```
 
 Each arrow is an obligation. The frontend emits a [SourcePackage](#mechanically-produced-evidence) binding parsing, resolution, implicit insertion and desugaring to the authored source; MetaRocq does not supply that theorem merely by checking the resulting term. Hardware refinement meets the same Sail definitions independently on this route; the [whole-system contract](extensions/unified-source-contract.md) extends authorship while preserving a shared canonical machine subject. Reuse [DeepSEA and Sepref's construction/representation techniques](#closest-matches-to-the-complete-workflow) and [capability-law precedents](#capability-aware-and-parametric-verification) where their subjects and assumptions fit. The [core rules](#a-compositional-core), [illustrative surface](#an-ideal-surface) and [library package](#concrete-package-shape) specify the proposed boundaries in detail.
@@ -135,7 +135,7 @@ source elaboration or the final compiler's correctness.
 Select the exact generator and support-library closure together, preserving their
 version checks and qualifying them with the locked prover. The existing
 [toolchain terms record](../THIRD-PARTY.md) and
-[Rocq compatibility findings](../tools/opam/certirocq-compatibility.md#native-trial-verdict)
+[Rocq compatibility findings](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/certirocq-compatibility.md#native-trial-verdict)
 are inputs to that work, not acceptance of a Vela parser. Read the selected source
 licences before incorporation and qualify the intended distribution and bootstrap
 use. Parser generation remains untrusted; claimed results are reconstructed and
@@ -183,7 +183,7 @@ Use fixed runtime/erased and unrestricted/affine/relevant-verdict/linear discipl
 
 If that extension is commissioned, each domain supplies its carrier, operations, ordering/equality, algebraic laws, admissible structural rules and semantic interpretation. Its constraint procedure must return reconstructable evidence; unresolved constraints remain explicit obligations. Domain selection is explicit at public interfaces and specializes off device. A custom domain may express an analysis, but claims of erasure, exact use, exclusive permission or noninterference each need their own supporting theorem. In particular, an idempotent domain cannot manufacture single-use authority. There is no coercion from a cost or security grade to memory ownership, and a product of domains needs composition laws for their interaction.
 
-The extension must prove substitution and context scaling, graded elimination, phase separation, usage-aware soundness and erasure preservation over the checked interpretation image. Mutation changes resource predicates over stable identities and snapshots; no grade allows types to depend on unsynchronized changing storage. Interpret the calculus in universe-stratified CIC and the selected program logic. The source grade structure projects into the [existing TAL attributes](spec.md#r-05-132) and separately checked CIC obligations; it adds neither a general on-device grade interpreter nor new kernel conversion rules. Routine programs use inferred common grades and library contracts; algebra authors carry the stronger proof burden.
+The extension must prove substitution and context scaling, graded elimination, phase separation, usage-aware soundness and erasure preservation over the checked interpretation image. Mutation changes resource predicates over stable identities and snapshots; no grade allows types to depend on unsynchronized changing storage. Interpret the calculus in universe-stratified CIC and the selected program logic. The source grade structure projects into the [existing TAL attributes](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-132) and separately checked CIC obligations; it adds neither a general on-device grade interpreter nor new kernel conversion rules. Routine programs use inferred common grades and library contracts; algebra authors carry the stronger proof burden.
 
 ### General Handlers With Resource-Safe Resumptions
 
@@ -191,7 +191,7 @@ The first synchronous release uses explicit operation contracts and closed effec
 
 A captured continuation records its whole transitive resource context, loans, effects and exit obligations. One-shot resumption transfers that context once. Discarding it requires disposal of every outstanding resource, erasure of must-erase data and explicit elimination of mandatory verdicts naming their outcomes; affine use alone cannot justify abandoning them. The deferred multi-shot design permits resumption only for a context whose duplication is proved valid, with per-resumption effects and resource costs accounted. An exclusive loan or single-use protocol token cannot be duplicated by storing the continuation in a cell. Shared mutable captures still require their invariant and interference rules on every resumption.
 
-The VerifiedOS realization lowers control transfers and cleanup to explicit bounded control flow and represented state, respecting the [absence of exceptions and stack unwinding](spec.md#r-05-100). An effect handler neither changes the composition-fixed service graph nor grants ambient authority. Continuation storage, nesting and resumptions need admitted bounds; general handlers do not imply an unbounded runtime stack or heap. One-shot qualification includes nested/forwarded handlers, disposal, resource-returning errors and preservation across applicable cancellation and optimization. Multiple-resumption qualification belongs only to the separately selected extension.
+The VerifiedOS realization lowers control transfers and cleanup to explicit bounded control flow and represented state, respecting the [absence of exceptions and stack unwinding](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-100). An effect handler neither changes the composition-fixed service graph nor grants ambient authority. Continuation storage, nesting and resumptions need admitted bounds; general handlers do not imply an unbounded runtime stack or heap. One-shot qualification includes nested/forwarded handlers, disposal, resource-returning errors and preservation across applicable cancellation and optimization. Multiple-resumption qualification belongs only to the separately selected extension.
 
 **Disposal stays an explicit obligation, and handlers are lexically scoped.** Disposal by raising an exception at the capture site relies on the unwinding excluded above, and release-on-capture finalization cannot close a device-held loan or an in-flight DMA reference at a suspension, so a discarded continuation keeps the disposal duty above. [The handler dossier](extensions/handlers-async.md#handler-lookup-capture-and-return) performs each operation through a handler capability naming one instance, so no dynamically enclosing handler can intercept it, and preassigned frame slots give constant-time lookup. The deferred cloning extension's candidate representation stores a handled body's references to its own frames, handler links and capabilities included, relative to its delimiter's frame from handler entry, and a clone bound to its own invocation frame resolves them there with no rewrite pass; the cost is that proofs over dynamically selected handlers do not transfer. An automatically inferred handler bound is a proposal for Rocq to prove over the one-shot fragment. The [language landscape](language-landscape.md#effect-handler-disposal-routes) records the OCaml 5, Effekt, Lexa and RaML+ comparisons behind these choices.
 
@@ -213,9 +213,9 @@ The table below fixes Vela's choice along each dimension of the [async/await des
 
 **Extent is static, cancellation latency is bounded and ready results are accounted.** Released runtimes join children at scope close but enforce extent at run time, allow an unbounded interval before cancellation is observed, leave the accounting of an already-produced result opt-in or allocate operation state on spawn. Vela instead proposes a static extent rule, a specified maximum interval to a checkpoint, a mandatory cleanup edge for an already-produced result and a pre-assigned frame slot in place of allocation. The [runtime comparison](language-landscape.md#structured-concurrency-runtimes) records the Java, Python, Swift, Kotlin, C++ and Rust behavior behind these rows.
 
-Task frames, child capacity, completion records and continuation storage come from explicit bounded regions in the offline memory plan. Exhaustion returns the existing typed capacity verdict, retaining the unstarted computation's resources. Specialization lowers the bounded task family to a reaction graph with explicit state and syntactic poll sites under the [run-to-completion contract](spec.md#r-07-037a) and [schedulability proof](spec.md#r-11-006). Spawning binds a declared frame; it creates no internal thread, run queue or inner scheduler. A pending join records state and returns at a poll site; it never blocks the reaction. Ready results follow the graph's admitted order. Suspension safety requires stable represented storage, preserved loans, closed invariants and a proved restoration/cleanup path. References into a moved or expired frame fail that condition. Inter-core transfer separately needs a transfer/sharing theorem.
+Task frames, child capacity, completion records and continuation storage come from explicit bounded regions in the offline memory plan. Exhaustion returns the existing typed capacity verdict, retaining the unstarted computation's resources. Specialization lowers the bounded task family to a reaction graph with explicit state and syntactic poll sites under the [run-to-completion contract](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-07-037a) and [schedulability proof](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-11-006). Spawning binds a declared frame; it creates no internal thread, run queue or inner scheduler. A pending join records state and returns at a poll site; it never blocks the reaction. Ready results follow the graph's admitted order. Suspension safety requires stable represented storage, preserved loans, closed invariants and a proved restoration/cleanup path. References into a moved or expired frame fail that condition. Inter-core transfer separately needs a transfer/sharing theorem.
 
-Cancellation uses the existing [typed cancellation protocol](spec.md#r-12-097): generation and request identity, declared cancellation and commit points, `cancelled`, `too_late` and `not_live`, cleanup and DMA quiescence bounds. A request cannot undo a committed operation. Specify the maximum interval to a checkpoint and terminal completion, including cleanup and joins. A scoped timeout requests cancellation and joins within that bound; a client wait timeout only stops waiting and leaves the operation and its authority owned by the enclosing scope. Hardware overrun or compartment restart follows the existing fail-stop/revocation discipline and cannot depend on executing source cleanup. Device-held loans return only after the HAL's completion/quiescence obligation. Test ready and pending awaits, cancel-before-start, cancellation on both sides of commit, parent/child failure, racing completions, capacity exhaustion and cleanup failure. Timing and progress claims name their environmental assumptions.
+Cancellation uses the existing [typed cancellation protocol](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-097): generation and request identity, declared cancellation and commit points, `cancelled`, `too_late` and `not_live`, cleanup and DMA quiescence bounds. A request cannot undo a committed operation. Specify the maximum interval to a checkpoint and terminal completion, including cleanup and joins. A scoped timeout requests cancellation and joins within that bound; a client wait timeout only stops waiting and leaves the operation and its authority owned by the enclosing scope. Hardware overrun or compartment restart follows the existing fail-stop/revocation discipline and cannot depend on executing source cleanup. Device-held loans return only after the HAL's completion/quiescence obligation. Test ready and pending awaits, cancel-before-start, cancellation on both sides of commit, parent/child failure, racing completions, capacity exhaustion and cleanup failure. Timing and progress claims name their environmental assumptions.
 
 ### Interior Mutability Guardrails
 
@@ -229,7 +229,7 @@ Interior mutability is an encapsulated, proved state-transition interface. Shari
 
 An open invariant or exclusive dynamic-borrow guard cannot cross suspension, an effect operation that may capture control, or a reentrant call into unknown code. Close it first; a more permissive interface must prove a specific stable, non-reentrant protocol. This restriction includes apparently harmless getters and callbacks with hidden transitive effects. A saved dependent refinement describes a justified snapshot; it cannot be reused as a claim about current contents after another operation may write them.
 
-Derive transfer and sharing eligibility structurally through fields, closures, tasks and stored continuations. A local cell cannot become concurrently shared through a wrapper. Proved representation primitives sit behind sealed interfaces and retain compiler/TAL checking. No mutable global or thread-local state bypasses the declared authority graph. The [exclusive-access theorem](spec.md#r-05-096a) still forbids conflicting non-atomic accesses, and the [atomic profile](spec.md#r-15-026) permits no capability in shared mutable memory and no CAS consumer. Capability-bearing continuations therefore need private storage or a separately proved ownership transfer, never a shared mutable capability cell. No general blocking mutex, retry loop or scheduler fairness assumption is imported by naming a synchronization abstraction. Race freedom, functional correctness, bounded progress and information-flow preservation remain separate obligations.
+Derive transfer and sharing eligibility structurally through fields, closures, tasks and stored continuations. A local cell cannot become concurrently shared through a wrapper. Proved representation primitives sit behind sealed interfaces and retain compiler/TAL checking. No mutable global or thread-local state bypasses the declared authority graph. The [exclusive-access theorem](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-096a) still forbids conflicting non-atomic accesses, and the [atomic profile](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-026) permits no capability in shared mutable memory and no CAS consumer. Capability-bearing continuations therefore need private storage or a separately proved ownership transfer, never a shared mutable capability cell. No general blocking mutex, retry loop or scheduler fairness assumption is imported by naming a synchronization abstraction. Race freedom, functional correctness, bounded progress and information-flow preservation remain separate obligations.
 
 Q25d's [composed client](extensions/full-language-review.md#composed-client-and-inhabited-entry) combines a runtime-dependent packet length, a graded callback, a handler and a cancellable child updating a bounded shared service cell. Its [well-formed neighbors](extensions/full-language-review.md#well-formed-neighbors-and-their-judging-premise) include an owner hidden in a stored continuation, a stale cell snapshot, suspension with an exclusive guard open, parent storage released on a cancellation acknowledgment, an ignored child failure and a capability compare-and-swap the profile does not admit. Its entry is inhabited only in the source-level data and protocol model, not in the missing concrete CHERI interpretation. Qualification must construct witnesses satisfying every entry, representation and resource premise, and independently review the behavior contract; basic type inhabitation alone does not exclude vacuity.
 
@@ -239,7 +239,7 @@ One authoring surface carries **Safe**, **Contracted** and **Complete** evidence
 
 Authoring surface, evidence policy, execution profile and evidence endpoint remain distinct. The report states obligations, scope, assumptions and endpoint. An established claim, explicitly conditional external assumption and checked-success predicate retain their distinct licenses. `Unestablished` describes unfinished editor/scratch evidence and blocks an exported contract; it is not a release mode for an authored `ensures`. No policy changes overflow, evaluation order, ownership, exits or cancellation, and a validating wrapper declares its own failure behavior and cost.
 
-These names are deliberately disjoint from [the platform's three admission tiers](spec.md#r-13-011), which classify what the device admits at install over a binary and its certificate. A preset is decided off device about a source closure, is no admission input, and leaves the refuse-uncertified-code policy untouched. [The preset dossier](extensions/assurance-profiles.md) states the obligations, claim statuses, mixed-assurance composition rules, coverage dimensions and qualification stages; its stages have rows in [Q25d's pricing table](extensions/full-language-review.md#reviewed-implementation-pricing), where policy-semantics, ordinary-application and systems-boundary stages retain their concrete prerequisites and separate commissioning, and the complete-release and maintenance stages cite their existing or uncommissioned owners.
+These names are deliberately disjoint from [the platform's three admission tiers](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-13-011), which classify what the device admits at install over a binary and its certificate. A preset is decided off device about a source closure, is no admission input, and leaves the refuse-uncertified-code policy untouched. [The preset dossier](extensions/assurance-profiles.md) states the obligations, claim statuses, mixed-assurance composition rules, coverage dimensions and qualification stages; its stages have rows in [Q25d's pricing table](extensions/full-language-review.md#reviewed-implementation-pricing), where policy-semantics, ordinary-application and systems-boundary stages retain their concrete prerequisites and separate commissioning, and the complete-release and maintenance stages cite their existing or uncommissioned owners.
 
 ## Compiler Route Decision
 
@@ -264,7 +264,7 @@ The [native verified compiler and self-hosting option](extensions/unified-source
 
 ## Experiments and Stop Conditions
 
-The [component foundation map](hardware/cheri-foundation-map.md) supplies Q2c's current
+The [component foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md) supplies Q2c's current
 source inspection and missing-connection record. The
 [workflow comparison contract](workflow-contract.md),
 [bounded core design](core-design.md) and
@@ -275,7 +275,7 @@ source inspections and proposed acceptance cases provide no executed trial,
 checked primitive instance or new admission authority; each decision names its
 reopening conditions.
 
-Q19a/Q19b ran against [CopyRingService.v](../proofs/CopyRingService.v)'s existing helpers and invariant proofs. Q19c's frozen protocol uses parser destination initialization and reserves copy-service staging for independent reuse; Q2c's rejection left it unopened and Q19c was canceled. Q2b owns device lowering, Q3c specifies the protected-sequence fault model and Q3b owns its slice evidence. The mandatory machine and contextual proof obligations retain their owners and priority.
+Q19a/Q19b ran against [CopyRingService.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/proofs/CopyRingService.v)'s existing helpers and invariant proofs. Q19c's frozen protocol uses parser destination initialization and reserves copy-service staging for independent reuse; Q2c's rejection left it unopened and Q19c was canceled. Q2b owns device lowering, Q3c specifies the protected-sequence fault model and Q3b owns its slice evidence. The mandatory machine and contextual proof obligations retain their owners and priority.
 
 | Experiment | Decisive evidence | Stop or blocking result | Recorded outcome |
 | --- | --- | --- | --- |
@@ -291,7 +291,7 @@ Q21 recorded the bounded design and pricing decisions; Q25 recorded the expanded
 
 Continue the current compiler and device work, and keep the locked batch proof workflow that Q19 qualified. Keep the canceled Q19c/Q20b/Q20c proposals unopened until a consumer is blocked by the existing route and [the workflow contract's re-entry conditions](workflow-contract.md#commissioning-disposition) hold, and Q21's conditional core and compiler trials unopened until the reopening evidence their contracts name exists. Q2c/Q21's reasoned rejections concern commissioning these experiments on present evidence; they establish no impossibility result or compiler winner. Retain the current compiler requirements until equivalent substitute evidence supports an explicit amendment.
 
-For Vela, [R-05-020a](spec.md#r-05-020a) and the dossiers' interpretation commitment settle the producer-classification decision. The [first-release delivery sequence](../PLAN.md#vela-first-release-delivery) still requires checked concrete buffer laws, a source-correspondence theorem, a retained backend and explicit implementation commissioning. The main risks are interactions among dependency, mutation, captures, exits and erasure; missing machine/compiler proofs; common-mode specification/frontend errors; and reviewer capacity. Optional extensions do not move those obligations into a small prototype's estimate.
+For Vela, [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a) and the dossiers' interpretation commitment settle the producer-classification decision. The [first-release delivery sequence](../PLAN.md#vela-first-release-delivery) still requires checked concrete buffer laws, a source-correspondence theorem, a retained backend and explicit implementation commissioning. The main risks are interactions among dependency, mutation, captures, exits and erasure; missing machine/compiler proofs; common-mode specification/frontend errors; and reviewer capacity. Optional extensions do not move those obligations into a small prototype's estimate.
 
 The [whole-system proposal](../PLAN.md#vela-whole-system-authoring-proposal) adds a staged path from that software bridge to complete proof authorship, a Vela-authored canonical machine model and hardware generation. Its [migration predicate](extensions/unified-source-contract.md#migration-and-retirement) makes eventual Sail retirement explicit while retaining the incumbent until all affected evidence and consumers have moved. This design extension neither reopens the canceled trials nor supplies implementation evidence or a full-establishment estimate.
 
@@ -315,7 +315,7 @@ Architecture independence is also distinct from prover independence: the propose
 | System | First-class verification and useful idea | Evidence boundary and project fit |
 | --- | --- | --- |
 | [Verus](https://verus-lang.github.io/verus/guide/) | Rust executable, specification, and proof modes; contracts, ghost state, inductive lemmas, and SMT automation. Strong reference for an integrated systems-programming workflow. | Its guide explicitly excludes verifying the verifier and Rust/LLVM compilers. A solver verdict is not a Rocq certificate. Borrow its UX and proof/library organization; do not equate source verification with certified bytes. |
-| [VerusBelt](https://iris-project.org/pdfs/2026-pldi-verusbelt.pdf), PLDI 2026 | Semantic soundness in Iris/Rocq for a subset of Verus's proof-oriented types: cells, invariants, resource algebras and storage protocols, with full Rust lifetimes, concurrency and mutable borrows, licensing the type-check-then-spec-check discipline Verus performs with a solver. | It narrows the gap the Verus row names without closing it. The paper is explicit that Verus's front end, its verification-condition generation, its ghost-code erasure pass and its solvers stay trusted, and that standard-library specifications, decreases measures and invariant credits are outside the model. It is the grounding [the manual-proof path for HAL-adjacent `unsafe`](spec.md#r-18-018) names, and that use reads it correctly: the grounding is of the type system's meaning, never of the tool's implementation. Its subject is a simplified modeled language. |
+| [VerusBelt](https://iris-project.org/pdfs/2026-pldi-verusbelt.pdf), PLDI 2026 | Semantic soundness in Iris/Rocq for a subset of Verus's proof-oriented types: cells, invariants, resource algebras and storage protocols, with full Rust lifetimes, concurrency and mutable borrows, licensing the type-check-then-spec-check discipline Verus performs with a solver. | It narrows the gap the Verus row names without closing it. The paper is explicit that Verus's front end, its verification-condition generation, its ghost-code erasure pass and its solvers stay trusted, and that standard-library specifications, decreases measures and invariant credits are outside the model. It is the grounding [the manual-proof path for HAL-adjacent `unsafe`](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-18-018) names, and that use reads it correctly: the grounding is of the type system's meaning, never of the tool's implementation. Its subject is a simplified modeled language. |
 | [RefinedRust](https://plv.mpi-sws.org/refinedrust/) | Refined ownership types for safe and unsafe Rust, interpreted in Iris; generated proofs checked in Rocq. Particularly relevant to verified implementations behind safe APIs. | The foundational theorem concerns the embedded Rust model. Translation from actual Rust and subsequent compilation remain distinct boundaries. Best-aligned Rust proof infrastructure for the existing Radium anchor, not proof of all Rust or rustc. That project page carries the PLDI 2024 work only; its traits, closures and iterators extension is the separate OOPSLA 2026 paper, with a largely different author list. |
 | [Corten](https://arxiv.org/abs/2609.04372) | A deep embedding of Rust's THIR in Rocq, with a weakest-precondition calculus and an interaction-tree denotation, ingesting Rust through hax and the authors' own extension; its case study proves memory safety of a buddy allocator's allocation and deallocation. | The fact that decides its disposition is that the paper names no repository, artifact deposit or code URL anywhere, so there is nothing to pin, inspect or licence and no reproduction is possible from it. It is also a plain September 2026 preprint whose template carries an unfilled venue line. The transpiler is unverified against rustc, the borrow checker is used as an untrusted oracle, and the memory model is single-threaded. It shares its name and nothing else with CortenMM, the Asterinas kernel's memory manager verified in Verus (Zhang et al., SOSP 2025), a different project with a different author list, prover and subject. |
 | [Aeneas](https://github.com/AeneasVerif/aeneas) | Charon MIR/LLBC translation to functional definitions lets ordinary Rust programs be verified with functional reasoning. | The current README names Lean and HOL4 as its most mature backends, despite also providing Coq and F*. Unsafe and concurrency support are ongoing work. The [2024 symbolic borrow-checking result](https://arxiv.org/abs/2404.02680) is not a verified rustc backend. Its largest reported use, [SymCrypt's Rust cryptography](https://arxiv.org/abs/2609.15648) in a September 2026 preprint, verifies 16.7 KLOC of Rust through a 237 KLOC Lean development whose proofs agents largely wrote and the Lean kernel checks, with the Charon/Aeneas translation still trusted. That scale evidence is Lean-only, so pilot the actual Rocq subset before choosing it. |
@@ -324,8 +324,8 @@ Architecture independence is also distinct from prover independence: the propose
 | [RustHornBelt](https://people.mpi-sws.org/~dreyer/papers/rusthornbelt/paper.pdf), PLDI 2022 | The machine-checked foundation under that prophecy encoding: typing judgments carrying first-order specifications built with parametric prophecy variables, proved sound in Rocq over lambda-Rust, with proofs for Vec, IterMut, Cell and Mutex. | It verifies no Rust verification tool. The subject is lambda-Rust, not rustc, not surface Rust and not Creusot's actual translation, and the development's own notes record standard-library APIs still unverified. What transfers is that the borrow-end encoding is a sound proof principle, which is the claim the restoration contracts here rest on. |
 | [Flux](https://github.com/flux-rs/flux) | Refinement types integrated into Rust; lightweight value invariants can make bounds and API constraints part of signatures. | A practical refinement-checking candidate, not a general dependent proof assistant or established Rocq-to-binary chain. Borrow predictable inference and concise refinement diagnostics, while measuring the supported fragment. Its soundness theorem is about a core calculus and is conditional on the Stacked Borrows discipline, which is itself a proposed rather than normative aliasing model. [FLEX](https://arxiv.org/abs/2607.12226), a July 2026 preprint from the same group, reimplements the constraint solving as Lean tactics producing kernel-checked proofs for 95.7% of Flux's benchmark constraints; generating those constraints from Rust stays trusted and the kernel is Lean's, so it demonstrates the certificate-producing shape the [refinement tier](#layered-proof-and-staging) needs rather than a route to Rocq. |
 | [Thrust](https://www.riec.tohoku.ac.jp/~unno/papers/pldi2025.pdf), PLDI 2025 | Prophecy-based refinement types whose loop and recursion invariants are inferred by reducing refinement inference to constrained Horn clauses, so mutable borrows receive first-order specifications without aliasing reasoning. | Nothing is machine-checked: the CHC and SMT solvers are trusted oracles, as is the translation from Rust, and the reported results are benchmark outcomes. Its repository is effectively unlicensed, promising a dual grant in a README while shipping neither licence file; only the artifact deposit states MIT, over a container that also bundles MPL-2.0 components. Inference is the transferable part, and an inferred bound is a proposal for Rocq to prove. |
-| [Ante](https://antelang.org/blog/safe_cyclic_mutability/), 19 October 2026 design | Places, unstable places and mutation effects permit local shared mutation while tracking reference invalidation. | Candidate for [Vela's static invalidation analysis](extensions/interior-mutability.md#ante-as-a-candidate-for-static-invalidation), not a Rocq soundness or final-code theorem. The [producer disposition](background/architectural-alternatives.md#ante-place-sensitive-mutation-and-invalidation) is deferred; no rule or compiler is selected. |
-| [Evergreen](https://evergreenlang.net/) and [repository](https://github.com/jordan-bonecutter/evergreen) | A proof-oriented systems language with a plane-tree memory/revision model, vacant-slot storage (`T \| shape(T)`), named invariant conjuncts with selective lifting (`update(self) lifts ...`), two-step bulk relocation (`copy_representation` then `transfer_type`), and early shared-reference reservation (`starts_owner`). Its repository includes Lean 4 mechanizations of a 3-state reference-counting conservation invariant (`SharedOwnership.lean`) and an affine-linear arithmetic certificate checker (`Tier1Cert.lean`). | Its Rust frontend and semantic checker (`crates/evg-Semantic`), plane-tree ownership/lifetime rules, and verification-condition generator are unverified, and the Lean 4 proofs cover isolated sub-models rather than the language, compiler or target machine code. Its repository carries no root licence file (only a web-font licence under `web/public/fonts/UFL.txt`), so no code is incorporated. Its unspecified-value integer overflow semantics violates [R-05-144](spec.md#r-05-144), its general untagged raw unions `A \| B` cannot preserve CHERI capability tags across arbitrary mixed layouts, and its whole-continuation branch replay with hidden runtime drop flags conflicts with structured control-flow joins. Candidate donor for Vela's named `invariant Clause: ...` conjuncts with selective `open (...) lifts ...` lifting, two-step `CopyRepresentation`/`TransferType` bulk relocation over vacant slots, and the capacity-invariance qualification gate; the [producer disposition](background/architectural-alternatives.md#evergreen-plane-tree-verification-selective-invariant-lifting-and-two-step-bulk-relocation) declines it as a producer or semantic anchor. |
+| [Ante](https://antelang.org/blog/safe_cyclic_mutability/), 19 October 2026 design | Places, unstable places and mutation effects permit local shared mutation while tracking reference invalidation. | Candidate for [Vela's static invalidation analysis](extensions/interior-mutability.md#ante-as-a-candidate-for-static-invalidation), not a Rocq soundness or final-code theorem. The [producer disposition](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/background/architectural-alternatives.md#ante-place-sensitive-mutation-and-invalidation) is deferred; no rule or compiler is selected. |
+| [Evergreen](https://evergreenlang.net/) and [repository](https://github.com/jordan-bonecutter/evergreen) | A proof-oriented systems language with a plane-tree memory/revision model, vacant-slot storage (`T \| shape(T)`), named invariant conjuncts with selective lifting (`update(self) lifts ...`), two-step bulk relocation (`copy_representation` then `transfer_type`), and early shared-reference reservation (`starts_owner`). Its repository includes Lean 4 mechanizations of a 3-state reference-counting conservation invariant (`SharedOwnership.lean`) and an affine-linear arithmetic certificate checker (`Tier1Cert.lean`). | Its Rust frontend and semantic checker (`crates/evg-Semantic`), plane-tree ownership/lifetime rules, and verification-condition generator are unverified, and the Lean 4 proofs cover isolated sub-models rather than the language, compiler or target machine code. Its repository carries no root licence file (only a web-font licence under `web/public/fonts/UFL.txt`), so no code is incorporated. Its unspecified-value integer overflow semantics violates [R-05-144](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-144), its general untagged raw unions `A \| B` cannot preserve CHERI capability tags across arbitrary mixed layouts, and its whole-continuation branch replay with hidden runtime drop flags conflicts with structured control-flow joins. Candidate donor for Vela's named `invariant Clause: ...` conjuncts with selective `open (...) lifts ...` lifting, two-step `CopyRepresentation`/`TransferType` bulk relocation over vacant slots, and the capacity-invariance qualification gate; the [producer disposition](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/background/architectural-alternatives.md#evergreen-plane-tree-verification-selective-invariant-lifting-and-two-step-bulk-relocation) declines it as a producer or semantic anchor. |
 | [Tree Borrows](https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf), PLDI 2025 | An aliasing model for Rust mechanized in Rocq inside Simuliris, with intraprocedural optimizations proved sound against it, retaining most Stacked Borrows optimizations and enabling read-read reordering. | Not a normative Rust semantics, and neither rustc, LLVM nor the separately written Miri implementation is proved to correspond to the Rocq model. Its headline acceptance figure over published crates is a measurement rather than a theorem. It bounds what an aliasing discipline may assume; it supplies no capability provenance rule for this target. |
 | [Prusti](https://github.com/viperproject/prusti-dev) | Contract-annotated Rust through Viper, with panic/overflow checking and an editor workflow. | A useful established comparator, not assumed to track current Rust: the inspected repository retains an older pinned nightly. Viper verification does not itself produce the project's admitted proof evidence. |
 | [Kani](https://github.com/model-checking/kani) | Bit-precise model checking, proof harnesses, nondeterministic inputs, and checks for unsafe-code defects. | Excellent complementary counterexample search. Results depend on harness assumptions, supported operations, and sufficient unwinding. [Its function and loop contracts, quantifiers and stubbing](https://arxiv.org/abs/2607.01504), an ASE 2026 industry paper, extend a harness from bounded to unbounded verification and run over 16,000 harnesses per change in the standard-library campaign; an unbounded result is still a CBMC verdict over an unverified MIR translation, not a Rocq certificate. |
@@ -389,7 +389,7 @@ Likewise, an effect system such as Koka's or a linear extension to Haskell addre
 Koka's relevance extends beyond effects: its [fully in-place programming work](#embedded-verification-and-certified-synthesis) supplies a resource-disciplined functional fragment, while AddressC supplies an implemented imperative proof surface. Those are separate contributions and neither requires adopting Koka's runtime.
 
 The most directly relevant recent advances are therefore not a single new universal language: they are foundational Rust verification, live proof-state interaction, imperative dependent verification in Pulse and Lean, and more trustworthy extraction in Rocq.
-AI proof synthesis can help in all these workflows, but contributes candidate programs, contracts, and proof scripts only. A generated contract still needs independent review and a generated proof still needs kernel checking. Kernel checking is necessary but not sufficient against search that optimizes for a passing verdict: in 2026 a model shared credit for [a guard-checker defect](https://github.com/rocq-prover/rocq/issues/22382) through which Rocq's kernel and `rocqchk` accept `False` in the reported 9.2.0 release, and in [an agent run on a Rocq benchmark](https://arxiv.org/abs/2603.20405) 14 proofs used `Admitted` and 6 redefined types to bypass the theorem statement, all compiling without error. [The portable proof workflow's acceptance boundary](assurance/proof-assistance.md#acceptance-boundary) therefore also requires the preserved statement and the exact assumption audit, and [the prover lock's record](../tools/opam/README.md) names the kernel inconsistencies the locked version still carries.
+AI proof synthesis can help in all these workflows, but contributes candidate programs, contracts, and proof scripts only. A generated contract still needs independent review and a generated proof still needs kernel checking. Kernel checking is necessary but not sufficient against search that optimizes for a passing verdict: in 2026 a model shared credit for [a guard-checker defect](https://github.com/rocq-prover/rocq/issues/22382) through which Rocq's kernel and `rocqchk` accept `False` in the reported 9.2.0 release, and in [an agent run on a Rocq benchmark](https://arxiv.org/abs/2603.20405) 14 proofs used `Admitted` and 6 redefined types to bypass the theorem statement, all compiling without error. [The portable proof workflow's acceptance boundary](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-assistance.md#acceptance-boundary) therefore also requires the preserved statement and the exact assumption audit, and [the prover lock's record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/README.md) names the kernel inconsistencies the locked version still carries.
 
 #### Effect Handlers, Sharing and Protocol Logics
 
@@ -412,7 +412,7 @@ Each is a theorem about another modeled language with its own trusted base and i
 | System | What it establishes or enables | Consequence for this project |
 | --- | --- | --- |
 | [Live Verification in an Interactive Proof Assistant](https://doi.org/10.1145/3656439), PLDI 2024 | Incremental construction of low-level programs and their proofs inside Coq, with symbolic state at the cursor. | Closest precedent for the proposed Rocq-library-first UX. Reproducing the interaction is smaller than designing a new language and runtime. |
-| [Rupicola](https://github.com/mit-plv/rupicola) and [Bedrock2](https://github.com/mit-plv/bedrock2) | Relational compilation from functional descriptions to imperative code, plus a low-level verified compiler and end-to-end examples. | Directly useful construction techniques, and the one row here this repository has already measured rather than surveyed: M1.6 stood the stack up whole and found its verified exit emitting base-integer RISC-V with no capability instruction anywhere, which is the non-capability compilation target [purecap-only](spec.md#r-18-002) forbids, while the C-printer exit that does reach a usable target carries no theorem at all. Reuse the construction technique and treat the target as unbuilt; the planned Clight transport needs its own demonstrated connection. |
+| [Rupicola](https://github.com/mit-plv/rupicola) and [Bedrock2](https://github.com/mit-plv/bedrock2) | Relational compilation from functional descriptions to imperative code, plus a low-level verified compiler and end-to-end examples. | Directly useful construction techniques, and the one row here this repository has already measured rather than surveyed: M1.6 stood the stack up whole and found its verified exit emitting base-integer RISC-V with no capability instruction anywhere, which is the non-capability compilation target [purecap-only](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-18-002) forbids, while the C-printer exit that does reach a usable target carries no theorem at all. Reuse the construction technique and treat the target as unbuilt; the planned Clight transport needs its own demonstrated connection. |
 | [MetaRocq](https://metarocq.github.io/) | Quotation, verified type checking, and erasure; its bibliography includes verified extraction to OCaml/Malfunction in 2024 and the consolidated typechecking/erasure account in 2025. | Useful metaprogramming and proof infrastructure. Erasure is not native compilation; the documented safe checker also states a strong-normalization assumption. Inspect each theorem's assumptions rather than inferring them from the project name. Since [1.5.1](https://github.com/MetaRocq/metarocq/releases/tag/v1.5.1-9.1) the erasure pipeline also offers a phase its release notes call unsafe and unverified, remapping inductive types and their matches to arbitrary constants such as GMP-backed integers for `nat`, so a verified-erasure claim names the phases its run used. That release's [Rocq 9.2 variant](https://github.com/MetaRocq/metarocq/releases/tag/v1.5.1-9.2) of 16 June 2026 declares, in its [opam files](https://github.com/MetaRocq/metarocq/blob/v1.5.1-9.2/rocq-metarocq-utils.opam), a `rocq-core` range of `>= 9.2~ & < 9.3~` excluding the current [proof snapshot](../tools/opam/rocq.lock); no local build is claimed. |
 | [CertiRocq, formerly CertiCoq](https://github.com/CertiRocq/certirocq) | Gallina compilation to Clight and WebAssembly. | The current README says large parts are verified and others remain in progress. General Gallina compilation includes representation/runtime issues; it is not an automatic static-memory CHERI backend. Monitor or use for host tools, not the first on-device route. |
 | [Plinth/Plutus layered certification](https://webspace.science.uu.nl/~swier004/publications/2025-funarch.pdf), FUNARCH 2025 | Compilation traces connect independently implemented passes to Rocq translation relations, decision procedures and preservation proofs. | Design reference for [staged compiler evidence](extensions/unified-source-contract.md#optimization-stages-and-evidence). The paper proves semantic relations for dead-code elimination and nonrecursive-let compilation; other assurance levels check translation relations without semantic-preservation proofs or leave steps unchecked. Those levels cannot satisfy Vela's complete preservation duties, and the demonstrated validator equivalence supplies no CHERI, leakage, resource or final-byte theorem. No backend is selected or imported. |
@@ -420,8 +420,8 @@ Each is a theorem about another modeled language with its own trusted base and i
 | [CakeML](https://cakeml.org/) and [Pancake](https://cakeml.org/pancake.html) | CakeML demonstrates proof-producing translation and compilation to machine code. Pancake pursues explicit-memory systems programming using lower compiler layers without a GC. | Closest architectural evidence that the executable-reference goal is feasible. Their HOL foundation and target models are different; adopting them would not be a small Rocq library change. |
 | [Cogent](https://github.com/au-ts/cogent), with [Dargent](https://people.eng.unimelb.edu.au/rizkallahc/publications/dargent.pdf), POPL 2023 | Systems-oriented code/proof co-generation and refinement to C, with Isabelle proofs and file-system case studies. Dargent adds a declarative bit-level layout language whose generated getters and setters ship with generated Isabelle proofs that they realize the declared layout, so the refinement chain survives a custom representation instead of ending at hand-written marshalling. | The closest published result to this document's own promise of high-level specifications with representation control, and the one to read before designing representation glue. The compiler is not verified: each compilation carries its own certificate, so a defect is a failed proof for that program rather than an excluded class. Isabelle, the C parser, AutoCorres and the C compiler are trusted, bit-field semantics are simulated rather than modeled, hand-written foreign C is outside the certificate, and there is no concurrency. The tree has no single licence: it is per-file BSD 2-Clause or GPLv2 by tag, with the compiler itself GPLv2, which is a copyleft obligation for a downstream that vendors rather than reads it. |
 | [Jasmin](https://jasmin-lang.readthedocs.io/en/latest/) | Executable formal semantics, precise low-level control, and a Rocq-verified compiler to assembly for cryptographic code. | Distinguish compiler correctness from its trusted safety analyzer and EasyCrypt proof route. Its result is not automatically a proof about linked CHERI bytes or the project's leakage model. Borrow explicit representation and instruction-level accountability. |
-| [Verifying Peephole Rewriting in SSA Compiler IRs](https://doi.org/10.4230/LIPIcs.ITP.2024.9), ITP 2024 | A Lean mechanization of a core calculus for SSA IRs, generic over the IR and covering the nested-region scoping MLIR uses, whose central theorem is that applying an already-proved peephole rewrite at a program point preserves the program's denotational semantics. | Evidence that a rewrite family can be proved once and applied many times, which is the shape a validated optimization interface wants. Neither MLIR nor LLVM is verified: the dialect semantics are the authors' own formalization, nothing connects it to the C++ implementation or to the language reference, and each rewrite still needs its own proof. As an admission route it fails [the translator conditions](spec.md#r-05-020) at the first, checking in Lean rather than Rocq and retiring no interim here. |
-| [CHERIoT Rust](https://github.com/CHERIoT-Platform/cheri-rust/tree/ba6e0e6c9c40593f7b47d5af071a6ccb9d154cf6) | Experimental capability-aware rustc/LLVM fork compiling CHERIoT programs, `compiler-builtins`, `core` and `alloc`. | Selected functional starting point for the mandatory Rust producer, replacing fresh CHERI plumbing. The [source reading](assurance/proof-reuse/languages.md#cheriot-rust-selected-functional-capability-aware-compiler-baseline) fixes its RV32E/address-space/ABI differences, unimplemented compartment/device interfaces, separate dependency rights and certification gap. Adapt to the frozen RV64 profile; retain the MIR, CHERI-TAL, resource and final-byte duties. |
+| [Verifying Peephole Rewriting in SSA Compiler IRs](https://doi.org/10.4230/LIPIcs.ITP.2024.9), ITP 2024 | A Lean mechanization of a core calculus for SSA IRs, generic over the IR and covering the nested-region scoping MLIR uses, whose central theorem is that applying an already-proved peephole rewrite at a program point preserves the program's denotational semantics. | Evidence that a rewrite family can be proved once and applied many times, which is the shape a validated optimization interface wants. Neither MLIR nor LLVM is verified: the dialect semantics are the authors' own formalization, nothing connects it to the C++ implementation or to the language reference, and each rewrite still needs its own proof. As an admission route it fails [the translator conditions](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020) at the first, checking in Lean rather than Rocq and retiring no interim here. |
+| [CHERIoT Rust](https://github.com/CHERIoT-Platform/cheri-rust/tree/ba6e0e6c9c40593f7b47d5af071a6ccb9d154cf6) | Experimental capability-aware rustc/LLVM fork compiling CHERIoT programs, `compiler-builtins`, `core` and `alloc`. | Selected functional starting point for the mandatory Rust producer, replacing fresh CHERI plumbing. The [source reading](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#cheriot-rust-selected-functional-capability-aware-compiler-baseline) fixes its RV32E/address-space/ABI differences, unimplemented compartment/device interfaces, separate dependency rights and certification gap. Adapt to the frozen RV64 profile; retain the MIR, CHERI-TAL, resource and final-byte duties. |
 | [RustCompCert](https://arxiv.org/abs/2602.07455) | A Rust front end layered on CompCertO that lowers to Clight and reuses the existing backend, with Rocq proofs aimed at semantics preservation and at treating borrow checking as verifying compilation. | Self-described ongoing work in a February 2026 preprint: no end-to-end theorem is claimed finished, no artifact evaluation or review has occurred, and the scope is a sequential subset with no concurrency and no unsafe code. It builds a front end above CompCert rather than compiling Rust to it. Decisively for any incorporation, the fork inherits CompCert's non-commercial terms rather than an open-source licence. |
 
 F*/Low* with KaRaMeL, HACL*, Vale, and EverParse provide particularly strong evidence that high-level verified descriptions can yield useful high-performance native components.
@@ -454,9 +454,9 @@ The [paper's composed example and boundary](https://research.chalmers.se/publica
 
 The [Bedrock2 umbrella development](https://github.com/mit-plv/bedrock2) connects a verified program and compiler to a pipelined Kami processor for an IoT-lightbulb example, including a proof connecting its software-facing and hardware-facing RISC-V specifications. That is stronger than a source theorem or even an isolated compiler theorem. It demonstrates that a composed software/hardware result can exist in Coq. Its ordinary RISC-V specifications and processor are different from the pinned Sail term and CHERI target here; M1.6's local backend finding still stands. Q2b can inspect how the interfaces compose without inheriting that example's theorem or replacing this project's machine model.
 
-**seL4: a delivered artifact comparator.** Its [proof overview](https://sel4.org/Verification/proofs.html) documents functional correctness, binary correctness and security properties, with availability depending on configuration. Its [assumptions](https://sel4.org/Verification/assumptions.html) retain hardware, boot/assembly and device obligations, and distinguish modeled information flow from timing channels. This is an established comparison for an executable artifact with substantial assurance, rather than a proposal for a new proof language. The register already records the different proof-authority boundary at [proof diversity](spec.md#r-05-016a); seL4's configuration-specific results do not supply this platform's purecap target, source workflow or TAL evidence.
+**seL4: a delivered artifact comparator.** Its [proof overview](https://sel4.org/Verification/proofs.html) documents functional correctness, binary correctness and security properties, with availability depending on configuration. Its [assumptions](https://sel4.org/Verification/assumptions.html) retain hardware, boot/assembly and device obligations, and distinguish modeled information flow from timing channels. This is an established comparison for an executable artifact with substantial assurance, rather than a proposal for a new proof language. The register already records the different proof-authority boundary at [proof diversity](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-016a); seL4's configuration-specific results do not supply this platform's purecap target, source workflow or TAL evidence.
 
-**MachCSL: source-located binary proof machinery over Sail, awaiting source rights.** [Kaashoek and Zeldovich's xv6 verification](https://arxiv.org/abs/2609.04043) builds an Iris concurrent separation logic over the Sail RISC-V model and proves statements about the concrete kernel image. The [archived Rocq source reading](assurance/proof-reuse/languages.md#archived-machcsl-a-direct-sail-monad-logic-candidate-blocked-on-source-rights) identifies the Sail-monad `swp`, bind/frame/WP rules, concrete-image adequacy theorem and its assumption-audit target at an immutable edition. The maintained development is now Lean; the Rocq branch is no longer maintained and no source grant covering its proof files was identified. Its direct-over-term architecture is a useful comparison before constructing equivalent interfaces for Q35, but it replaces no selected machine logic or priced agreement obligation until rights, dependencies, exact assumptions and the canonical CHERI-term connection qualify. The theorem concerns another machine and ABI; capability/tag laws, noninterference, timing and robust preservation remain local obligations.
+**MachCSL: source-located binary proof machinery over Sail, awaiting source rights.** [Kaashoek and Zeldovich's xv6 verification](https://arxiv.org/abs/2609.04043) builds an Iris concurrent separation logic over the Sail RISC-V model and proves statements about the concrete kernel image. The [archived Rocq source reading](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#archived-machcsl-a-direct-sail-monad-logic-candidate-blocked-on-source-rights) identifies the Sail-monad `swp`, bind/frame/WP rules, concrete-image adequacy theorem and its assumption-audit target at an immutable edition. The maintained development is now Lean; the Rocq branch is no longer maintained and no source grant covering its proof files was identified. Its direct-over-term architecture is a useful comparison before constructing equivalent interfaces for Q35, but it replaces no selected machine logic or priced agreement obligation until rights, dependencies, exact assumptions and the canonical CHERI-term connection qualify. The theorem concerns another machine and ABI; capability/tag laws, noninterference, timing and robust preservation remain local obligations.
 
 #### Capability-Aware and Parametric Verification
 
@@ -513,9 +513,9 @@ The performance gap cannot be settled by compiler lineage: [CompCert's own descr
 
 **Borrowing precision: Polonius Alpha.** The Rust project's post [Enabling the next iteration of the borrow checker on nightly](https://blog.rust-lang.org/2026/08/04/enabling-polonius-alpha-on-nightly/), August 2026, enables a flow-sensitive borrow analysis by default on nightly. A loan returned on one branch need not prevent mutation on the branch where it is absent. This is an appropriate ownership-UX comparator for returned loans and reborrowing, with a pinned version and the announcement's unsupported cases recorded. It is an announcement rather than a design document: its evidence is a test suite and a crate run, it claims no formal model or soundness proof, it is not stabilized, and Alpha is narrower than the original Polonius, with the post itself naming programs the earlier implementation accepted and this one does not. The post aims to stabilize before the end of 2026 and reports no known issue in the Alpha subset, while the project's [2026 goal](https://goals.rust-lang.org/2026/polonius.html) still lists a soundness issue with the liveness of captured regions for opaque types and commits to a model in a-mir-formality validated against rustc, not a proof-assistant mechanization. The program the post shows Alpha rejecting, `conditional()`, reborrows conditionally inside a loop over a linked list, which is the loop-carried loan [the synchronous slice excludes](core-design.md#loans-and-control-flow), so that restriction matches what Rust intends to stabilize. The [2026 borrow-checker roadmap](https://goals.rust-lang.org/2026/roadmap-borrow-checker-within.html) takes the next ergonomic steps as goals rather than features: a view-types experiment for partial borrows in signatures, place-named lifetimes such as `'map` and `'self.text`, and internal references formalized only for simplified Rust. The first two bear on [region naming](#surface-conventions) and on lending part of a record through a public signature, which the slice carries only as a loan record's footprint under an explicit call contract; the illustrative surface proposes [named views](#flow-sensitive-loans-and-restoration-contracts) as its spelling. The library proposal's lexical scoped combinators are a bounded mechanism, not the eventual expressiveness ceiling, and the awkward rewrites their restrictions cause remain unmeasured, since the canceled Q20b trial would have recorded them; importing rustc's analysis would still require a sound interpretation over the admitted semantics.
 
-**Lifetimes without annotations: Goose.** [Goose](https://github.com/aardappel/goose), van Oortmerssen's 2026 language, is read at `master` revision `49d42ee7` of 2026-09-18 as a repository specification and implementation notes, with no paper; it is distinct from Perennial's Goose translator in [the tooling map](#existing-tooling-and-implementation-owners). It compiles a whole program in call-graph order and specializes each function per distinct root, the variable bounding a reference's target, so every root is statically known and one decidable rule replaces lifetime syntax: a reference may be stored only where its root's scope contains the destination root's scope. There is no heap, each resizable value topping a compiler-assigned data stack so that growth is a bump and nothing moves, and a named-ancestor `return from` elaborates to a hidden return discriminant each intermediate frame checks, with no unwinder, tables or destructors. Its premises are ones this platform already pays for at platform level, whole-program composition, [no runtime allocator](spec.md#r-08-010), [recursion depth as a static fact](spec.md#r-05-116), [bounded recursive data](spec.md#r-05-143) and [no unwinding](spec.md#r-05-100), so it is evidence that those constraints yield an annotation-free lifetime discipline and not only a memory plan. Three mechanisms are ownership-UX comparators for the loan rules. Static roots under specialization admit a loan stored in a field, which [the synchronous slice](core-design.md#loans-and-control-flow) excludes and Rust prices with lifetime parameters; the price here is per-root code growth, which [the feature decisions](#feature-decisions) already gate for generic specialization, and a join over [the typed callee set](spec.md#r-05-114) at indirect calls, since [closures and function pointers stay](spec.md#r-05-115) where Goose forbids them. Append within capacity typed as a write at the current length, disjoint from the prefix, rather than a consume-and-return of the owner lets prefix loans survive a push; [the fixed-capacity write rule](core-design.md#dependency-and-joins) can already express it, and the illustrative surface names it as [a tail view](#flow-sensitive-loans-and-restoration-contracts). Named-ancestor return is an elaboration into [the existing `Result` propagation exit](core-design.md#loans-and-control-flow), where every intermediate frame still owes its restoration and cleanup predicate and each site adds a branch to the WCET path. No surface feature is scheduled by this reading.
+**Lifetimes without annotations: Goose.** [Goose](https://github.com/aardappel/goose), van Oortmerssen's 2026 language, is read at `master` revision `49d42ee7` of 2026-09-18 as a repository specification and implementation notes, with no paper; it is distinct from Perennial's Goose translator in [the tooling map](#existing-tooling-and-implementation-owners). It compiles a whole program in call-graph order and specializes each function per distinct root, the variable bounding a reference's target, so every root is statically known and one decidable rule replaces lifetime syntax: a reference may be stored only where its root's scope contains the destination root's scope. There is no heap, each resizable value topping a compiler-assigned data stack so that growth is a bump and nothing moves, and a named-ancestor `return from` elaborates to a hidden return discriminant each intermediate frame checks, with no unwinder, tables or destructors. Its premises are ones this platform already pays for at platform level, whole-program composition, [no runtime allocator](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-010), [recursion depth as a static fact](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-116), [bounded recursive data](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-143) and [no unwinding](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-100), so it is evidence that those constraints yield an annotation-free lifetime discipline and not only a memory plan. Three mechanisms are ownership-UX comparators for the loan rules. Static roots under specialization admit a loan stored in a field, which [the synchronous slice](core-design.md#loans-and-control-flow) excludes and Rust prices with lifetime parameters; the price here is per-root code growth, which [the feature decisions](#feature-decisions) already gate for generic specialization, and a join over [the typed callee set](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-114) at indirect calls, since [closures and function pointers stay](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-115) where Goose forbids them. Append within capacity typed as a write at the current length, disjoint from the prefix, rather than a consume-and-return of the owner lets prefix loans survive a push; [the fixed-capacity write rule](core-design.md#dependency-and-joins) can already express it, and the illustrative surface names it as [a tail view](#flow-sensitive-loans-and-restoration-contracts). Named-ancestor return is an elaboration into [the existing `Result` propagation exit](core-design.md#loans-and-control-flow), where every intermediate frame still owes its restoration and cleanup predicate and each site adds a branch to the WCET path. No surface feature is scheduled by this reading.
 
-**Goose's boundary is stated on the register's terms rather than inferred from its claims.** Its specification calls itself a working specification, argues soundness informally and carries no formal model; its benchmarks are author-reported on commodity hardware and establish nothing about this target; the forge reports Apache-2.0 and the licence file is unread here. Three of its choices are refused. Its data stacks are large virtual reservations committed on page fault, with guard pages aborting on overflow, which [no overcommit or demand growth](spec.md#r-15-189b) excludes, so only its capacity-limited array class exists here and its no-heap claim is weaker than the platform's. Its pools call a stale reference reading a freed-then-reused slot's next same-typed tenant type-safe reuse, which is the event [the reuse gate](spec.md#r-08-015) closes and, under a pool's [confidentiality label](spec.md#r-08-046), a cross-tenant disclosure. Its absence of aliasing rules rests on no shared-memory concurrency, only reference-free values crossing its threads, where [the exclusive-access theorem](spec.md#r-05-096a) and restoration contracts need exclusive loans, and [presets share construct meaning](#assurance-presets-over-one-surface), so no Safe-only relaxation is available. Its union dichotomy, replaceable in place or interior-referenceable but never both, adds no safety over the loan tree, which refuses variant replacement while a payload loan is live.
+**Goose's boundary is stated on the register's terms rather than inferred from its claims.** Its specification calls itself a working specification, argues soundness informally and carries no formal model; its benchmarks are author-reported on commodity hardware and establish nothing about this target; the forge reports Apache-2.0 and the licence file is unread here. Three of its choices are refused. Its data stacks are large virtual reservations committed on page fault, with guard pages aborting on overflow, which [no overcommit or demand growth](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-189b) excludes, so only its capacity-limited array class exists here and its no-heap claim is weaker than the platform's. Its pools call a stale reference reading a freed-then-reused slot's next same-typed tenant type-safe reuse, which is the event [the reuse gate](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-015) closes and, under a pool's [confidentiality label](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-046), a cross-tenant disclosure. Its absence of aliasing rules rests on no shared-memory concurrency, only reference-free values crossing its threads, where [the exclusive-access theorem](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-096a) and restoration contracts need exclusive loans, and [presets share construct meaning](#assurance-presets-over-one-surface), so no Safe-only relaxation is available. Its union dichotomy, replaceable in place or interior-referenceable but never both, adds no safety over the loan tree, which refuses variant replacement while a payload loan is live.
 
 **Resource inference: RaRust.** [Automatic Linear Resource Bound Analysis for Rust via Prophecy Potentials](https://arxiv.org/html/2502.19810v1), OOPSLA 2025, infers symbolic linear bounds for a safe Rust fragment using shared and prophecy potentials for borrowing. Its soundness is proved on paper against its resource-aware borrow calculus, with no mechanization and with costs assigned by explicit `tick` events. The stated limitations include unsafe code, generics, closures, trait objects and nonlinear bounds. This is a closer inference reference for a future named resource obligation than inventing a general grade engine first. An untrusted analyzer may suggest potentials and bounds for Rocq to prove; its printed answer supplies neither a certificate nor a target WCET bound. Source events, peak memory and machine time retain distinct interpretations. No analyzer port is scheduled by this reading.
 
@@ -525,9 +525,9 @@ The performance gap cannot be settled by compiler lineage: [CompCert's own descr
 
 **Specification coverage: check what the theorem constrains.** [Static Coverage in Deductive Software Verification](https://www.amazon.science/publications/static-coverage-in-deductive-software-verification), FMCAD 2025, uses unsatisfiable cores in the Boogie/Dafny setting to help expose vacuity, unconstrained behavior and redundant specifications. This complements the register's existing inhabitation witnesses and the implementation mutants the frozen Q19c protocol specifies. [The workflow contract's weakening probe](workflow-contract.md#change-and-weakening-probes) takes the same shape: it removes the exact copied-prefix equality from the held-out client's postcondition while retaining bounds, initialization, frame and status, and requires the independent expected-byte check to expose the loss. A non-vacuous theorem may still ignore the field that matters. Reuse that testing idea with existing instruments; a general Boogie-to-Rocq coverage tool is not implied, and even complete formal coverage would not prove the informal intent correct.
 
-**Proof stability: measure development rather than successful proof counts.** [On the Impact of Formal Verification on Software Development](https://cseweb.ucsd.edu/~mcoblenz/assets/pdf/OOPSLA_2025_Dafny.pdf), OOPSLA 2025, reports interviews with experienced Dafny users identifying debugging, proof hardening and review as important costs. This is qualitative evidence, not a productivity multiplier. Dafny's [verification-optimization guide](https://dafny.org/dafny/VerificationOptimization/VerificationOptimization) gives transferable methods: isolate obligations, inspect resource use and vary search seeds to find fragile automation. [The workflow contract](workflow-contract.md#measurement-record-and-sampling) records diagnostic latency and review effort as separate series, and [its change probes](workflow-contract.md#change-and-weakening-probes) separate proof rediscovery after semantics-preserving edits from replay of already checked terms; [Q19a's trials](assurance/proof-tooling-qualification.md) measured only machine latency, not review effort. The relevant practice can be reused without importing Dafny as an acceptance tool.
+**Proof stability: measure development rather than successful proof counts.** [On the Impact of Formal Verification on Software Development](https://cseweb.ucsd.edu/~mcoblenz/assets/pdf/OOPSLA_2025_Dafny.pdf), OOPSLA 2025, reports interviews with experienced Dafny users identifying debugging, proof hardening and review as important costs. This is qualitative evidence, not a productivity multiplier. Dafny's [verification-optimization guide](https://dafny.org/dafny/VerificationOptimization/VerificationOptimization) gives transferable methods: isolate obligations, inspect resource use and vary search seeds to find fragile automation. [The workflow contract](workflow-contract.md#measurement-record-and-sampling) records diagnostic latency and review effort as separate series, and [its change probes](workflow-contract.md#change-and-weakening-probes) separate proof rediscovery after semantics-preserving edits from replay of already checked terms; [Q19a's trials](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-tooling-qualification.md) measured only machine latency, not review effort. The relevant practice can be reused without importing Dafny as an acceptance tool.
 
-**Certified search and proof-logging machinery is read against standing rules rather than adopted, and [the alternatives register](background/architectural-alternatives.md#certified-placement-and-infeasibility-no-new-certificate-machinery) takes its disposition.** Constraint and pseudo-Boolean solvers now emit proofs and checkers exist for those formats, so an offline search returning a certificate is an available shape; [the proof inventory](assurance/proof-reuse/foundations.md#certified-search-and-the-registers-standing-refusals) records the candidates' provers, trusted bases and terms. An untrusted producer whose output the *existing* checks re-validate is admissible and free to be as aggressive as it likes: [the rule behind the CryptOpt deletion](spec.md#r-05-066) states that it is aimed at minting a checker and not at that asymmetric-trust pattern, so an offline search proposing a placement the checks already in the toolchain re-validate needs no certificate-checking import at all. Importing one of these systems as a shipped certificate checker is refused: it mints a checker, several of the candidates check in Lean or HOL4 rather than Rocq and so fail [the translator conditions](spec.md#r-05-020) at the first, none retires an interim, and where the only yield is a smaller span over a plan that is already sound, [the no-tightening rule](spec.md#r-05-105) refuses it on its own terms. A checked infeasibility certificate has a different yield, turning a search that found no placement into a proof that none exists, so the no-tightening rule does not reach it. Its imported form fails instead on [R-05-016](spec.md#r-05-016)'s exclusion of acceptance on a non-Coq checker's verdict. A proof-producing route whose instance-specific term the kernel re-checks is not refused by that rule, but it is declined on present evidence: the local certificate model leaves its encoding seams unbridged, R-05-020's non-duplication and interim-retirement arguments are unmade, and no composition decision is shown to need the verdict. The alternatives register states the composition case and scoped contract a reopening must supply.
+**Certified search and proof-logging machinery is read against standing rules rather than adopted, and [the alternatives register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/background/architectural-alternatives.md#certified-placement-and-infeasibility-no-new-certificate-machinery) takes its disposition.** Constraint and pseudo-Boolean solvers now emit proofs and checkers exist for those formats, so an offline search returning a certificate is an available shape; [the proof inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/foundations.md#certified-search-and-the-registers-standing-refusals) records the candidates' provers, trusted bases and terms. An untrusted producer whose output the *existing* checks re-validate is admissible and free to be as aggressive as it likes: [the rule behind the CryptOpt deletion](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-066) states that it is aimed at minting a checker and not at that asymmetric-trust pattern, so an offline search proposing a placement the checks already in the toolchain re-validate needs no certificate-checking import at all. Importing one of these systems as a shipped certificate checker is refused: it mints a checker, several of the candidates check in Lean or HOL4 rather than Rocq and so fail [the translator conditions](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020) at the first, none retires an interim, and where the only yield is a smaller span over a plan that is already sound, [the no-tightening rule](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-105) refuses it on its own terms. A checked infeasibility certificate has a different yield, turning a search that found no placement into a proof that none exists, so the no-tightening rule does not reach it. Its imported form fails instead on [R-05-016](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-016)'s exclusion of acceptance on a non-Coq checker's verdict. A proof-producing route whose instance-specific term the kernel re-checks is not refused by that rule, but it is declined on present evidence: the local certificate model leaves its encoding seams unbridged, R-05-020's non-duplication and interim-retirement arguments are unmade, and no composition decision is shown to need the verdict. The alternatives register states the composition case and scoped contract a reopening must supply.
 
 These additions qualify mechanisms against existing owners. Pinning another repository alone closes no integration gap. The current tuple, client theorem, generated-code boundary, transitive assumptions, actual licence and measured benefit decide adoption. A blocked package can still inform a design; it cannot be described as an installed or proved part of the stack.
 
@@ -552,7 +552,7 @@ Different target binaries may implement the same abstract contract through diffe
 For a nondeterministic or underspecified contract, correct implementations need not produce identical traces; differential comparison must respect the contract rather than assume byte-for-byte output agreement.
 
 Functional refinement alone does not prove constant-time behavior, worst-case execution time, absence of hidden allocation, or robust isolation against adversarial linked code.
-Those remain the separately scoped obligations of the [specification](spec.md) and [admission language](../typed-assembly-language.md).
+Those remain the separately scoped obligations of the [specification](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md) and [admission language](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/typed-assembly-language.md).
 Neither an optimizing compiler nor an SMT success verdict closes them by implication.
 
 ### C*: The Useful Idea and the Actual Boundary
@@ -690,19 +690,19 @@ For the bounded-buffer example, the interface can have this schematic shape:
 
 ```text
 interface BufferStorage {
-	type Handle;
-	type Index;
-	predicate Owns(Handle target, Seq<byte> contents);
-	predicate ValidIndex(Index index, Nat length);
+    type Handle;
+    type Index;
+    predicate Owns(Handle target, Seq<byte> contents);
+    predicate ValidIndex(Index index, Nat length);
 
-	byte Read(in Handle target, Index index);
-	void Write(ref Handle target, Index index, byte value);
-	void WithElement(ref Handle target, Index index, ...);
+    byte Read(in Handle target, Index index);
+    void Write(ref Handle target, Index index, byte value);
+    void WithElement(ref Handle target, Index index, ...);
 
-	lemma ReadReturnsSelectedElement(Handle target, Seq<byte> contents, Index index) ensures ...;
-	lemma WriteUpdatesSelectedElementAndPreservesFrame(Handle target, Seq<byte> contents, Index index, byte value) ensures ...;
-	lemma ScopedBorrowRestoresOwnership(Handle target, Seq<byte> contents, Index index) ensures ...;
-	lemma OperationsTerminateUnderTheirPreconditions(Handle target, Seq<byte> contents, Index index) ensures ...;
+    lemma ReadReturnsSelectedElement(Handle target, Seq<byte> contents, Index index) ensures ...;
+    lemma WriteUpdatesSelectedElementAndPreservesFrame(Handle target, Seq<byte> contents, Index index, byte value) ensures ...;
+    lemma ScopedBorrowRestoresOwnership(Handle target, Seq<byte> contents, Index index) ensures ...;
+    lemma OperationsTerminateUnderTheirPreconditions(Handle target, Seq<byte> contents, Index index) ensures ...;
 }
 ```
 
@@ -714,7 +714,7 @@ Keep handles opaque: pointer width, integer casts, address equality, provenance,
 An operation that genuinely needs one of them states that dependency in a narrower interface.
 
 **The interface is a proof-side abstraction and never a second way to reach the machine, which is a register constraint rather than a design preference.**
-[A verified component explicitly naming a profile instruction that no ordinary lowering duty reaches uses exactly one surface](spec.md#r-05-023b), a backend primitive named by that instruction's own profile mnemonic and operand form and taking its meaning from the pinned Sail clause for it, and that surface is a duty of [the two required certifying compilers](spec.md#r-18-014) rather than a deliverable standing beside them.
+[A verified component explicitly naming a profile instruction that no ordinary lowering duty reaches uses exactly one surface](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-023b), a backend primitive named by that instruction's own profile mnemonic and operand form and taking its meaning from the pinned Sail clause for it, and that surface is a duty of [the two required certifying compilers](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-18-014) rather than a deliverable standing beside them.
 An operation law here is therefore discharged over that primitive and inherits its meaning; a law that introduced a machine operation of its own would be the second surface the register says does not exist.
 The constraint binds the instance and not the generic modules, and it is what keeps a target interface from quietly becoming a competing backend.
 
@@ -756,10 +756,10 @@ The iteration boundary is a reviewed semantic interface, not a permanent surface
 
 ```text
 Editable language, inference, automation, and editor tools
-	-> explicit program terms and proof obligations with source correspondence
-	-> reusable Rocq component interfaces and generic theorems
-	-> concrete semantic instance and proved target laws
-	-> target compiler and final-artifact evidence
+    -> explicit program terms and proof obligations with source correspondence
+    -> reusable Rocq component interfaces and generic theorems
+    -> concrete semantic instance and proved target laws
+    -> target compiler and final-artifact evidence
 ```
 
 Frontend elaborators, tactics, solvers, and AI assistants may change frequently because their proposed proofs are rechecked.
@@ -907,9 +907,9 @@ The relevant research supplies complementary rules and implementation techniques
 | [A Mixed Linear and Graded Logic](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.CSL.2025.32), CSL 2025; [Same Coeffect, Different Base](https://arxiv.org/abs/2606.28042), ICFP 2026 | Modal decomposition and translations between graded-base and linear-base presentations help identify when two annotations encode the same information. Keep a simple ownership surface plus separately interpreted resource contracts; these results do not supply the full dependent, mutable frontend or authorize a generic on-device grade interpreter. The translations are pen-and-paper and preserve typing, grades and equations in each direction; they are not full abstraction, no artifact accompanies them, and they establish nothing about any implementation of either lineage. |
 | [Autosubst](https://github.com/rocq-community/autosubst) and [Autosubst OCaml](https://github.com/uds-psl/autosubst-ocaml) | If a separately scoped frontend needs binding syntax, inspect generated substitution operations and proofs before hand-authoring them. Autosubst advertises Rocq 9.0+ support. The OCaml generator avoids functional extensionality in its generated lemmas, but its [published package](https://rocq-prover.org/p/rocq-autosubst-ocaml/1.1%2B9.0) constrains `rocq-core` to `>= 9.0 & < 9.1`, which excludes the locked [proof snapshot](../tools/opam/rocq.lock), and lacks modular syntax. The older [Haskell generator](https://github.com/uds-psl/autosubst2) imports functional extensionality. Qualify the chosen output and tuple; the current combinator library needs no new AST dependency. |
 
-The existing [Equations](https://github.com/rocq-prover/equations) and [Rocq-Elpi](https://github.com/LPCIC/coq-elpi) qualifications cover dependent definitions, checked derivations, quotations and environment interaction. The [Equations indexed-types tutorial](https://rocq-prover.github.io/platform-docs/equations/tutorial_indexed.html) distinguishes constructive uniqueness-of-identity-proofs for decidable indices from a global axiom, and warns that axioms can obstruct computation. [Q19b's trial](assurance/proof-tooling-qualification.md#q19b-dependent-computation-equations-and-equality-principles) confirmed that a selected indexed definition computes, that its generated equations replay and that decidable-index transport needs no global UIP, and then retained the handwritten match because the small client showed no maintenance gain. Elpi's higher-order abstract syntax can support a narrow elaboration task; MetaRocq retains its quotation/metatheory role. No package choice by itself supplies source correspondence or linear resource interpretation. Each incorporation still reads the chosen artifact's actual licence and dependency notices.
+The existing [Equations](https://github.com/rocq-prover/equations) and [Rocq-Elpi](https://github.com/LPCIC/coq-elpi) qualifications cover dependent definitions, checked derivations, quotations and environment interaction. The [Equations indexed-types tutorial](https://rocq-prover.github.io/platform-docs/equations/tutorial_indexed.html) distinguishes constructive uniqueness-of-identity-proofs for decidable indices from a global axiom, and warns that axioms can obstruct computation. [Q19b's trial](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-tooling-qualification.md#q19b-dependent-computation-equations-and-equality-principles) confirmed that a selected indexed definition computes, that its generated equations replay and that decidable-index transport needs no global UIP, and then retained the handwritten match because the small client showed no maintenance gain. Elpi's higher-order abstract syntax can support a narrow elaboration task; MetaRocq retains its quotation/metatheory role. No package choice by itself supplies source correspondence or linear resource interpretation. Each incorporation still reads the chosen artifact's actual licence and dependency notices.
 
-The locked prover also ships [user-declared rewrite rules](https://rocq-prover.org/doc/V9.3.0/refman/addendum/rewrite-rules.html) behind the `-allow-rewrite-rules` flag: `Symbol` constants reduce by rules that extend conversion, the manual calls them highly experimental, confluence and termination go unchecked, and type preservation gets only a superficial check that warns. Declaring grade arithmetic or an observational equality that way would make it compute definitionally, and the route is closed here: the proof gate's [kernel recheck](../tools/vela/proofaudit.py) refuses any summary whose theory line is not `Rewrite rules are not allowed`, matching [the equality ergonomics'](#layered-proof-and-staging) exclusion of kernel equality changes. Unresolved grade equalities therefore stay explicit proof obligations.
+The locked prover also ships [user-declared rewrite rules](https://rocq-prover.org/doc/V9.3.0/refman/addendum/rewrite-rules.html) behind the `-allow-rewrite-rules` flag: `Symbol` constants reduce by rules that extend conversion, the manual calls them highly experimental, confluence and termination go unchecked, and type preservation gets only a superficial check that warns. Declaring grade arithmetic or an observational equality that way would make it compute definitionally, and the route is closed here: the proof gate's [kernel recheck](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/vos/proofaudit.py) refuses any summary whose theory line is not `Rewrite rules are not allowed`, matching [the equality ergonomics'](#layered-proof-and-staging) exclusion of kernel equality changes. Unresolved grade equalities therefore stay explicit proof obligations.
 
 #### Composition Acceptance Cases
 
@@ -1219,14 +1219,14 @@ instead of `requires (forall (Nat i) => i < items.Length ==> items.Model.At(i) >
 module Buffers;
 
 public void Fill<ghost Nat count>(ref Span<byte, count> target, byte value)
-	effects writes(target)
-	ensures target.Model.All(x => x == value)
+    effects writes(target)
+    ensures target.Model.All(x => x == value)
 {
-	foreach (let index in 0usize..target.Length)
-		invariant target.Model.Take(Nat(index)).All(x => x == value)
-	{
-		target[index] = value;
-	}
+    foreach (let index in 0usize..target.Length)
+        invariant target.Model.Take(Nat(index)).All(x => x == value)
+    {
+        target[index] = value;
+    }
 }
 ```
 
@@ -1240,30 +1240,30 @@ A parser returns a runtime-discovered length paired with erased evidence, borrow
 
 ```text
 public record PacketView<region 'source>(
-	usize Consumed,                          // represented: the bytes the header occupied
-	in<'source> Span<byte> Payload,          // a subslice of the source, never outliving it
-	ghost PacketFormat.Header Header)        // erased
-	invariant PacketFormat.Encodes(Header, Payload.Model);
+    usize Consumed,                          // represented: the bytes the header occupied
+    in<'source> Span<byte> Payload,          // a subslice of the source, never outliving it
+    ghost PacketFormat.Header Header)        // erased
+    invariant PacketFormat.Encodes(Header, Payload.Model);
 
 public Result<PacketView<'input>, ParseError> ParsePrefix(in Span<byte> input)
-	effects reads(input)
-	ensures result.Model == PacketFormat.ParsePrefix(input.Model);
+    effects reads(input)
+    ensures result.Model == PacketFormat.ParsePrefix(input.Model);
 ```
 
-`PacketFormat.ParsePrefix` is the full success and error model supplied by the independently reviewed format descriptor, not a second handwritten specification. The name fixes prefix parsing and its trailing-input policy; an exact-input parser would be a separately named `ParseExact`. `'input` names the parameter's loan, so the signature declares no region or index parameter: the view borrows from `input`, and `Span<byte>` carries its own length. The record declares `region 'source` because it has no parameter to name. The shared loan keeps the input stable while any view is live, which is stronger than read-only access through one variable. An error carries no view, and the retained result tag, not an erased proof, selects the branch. This interface is a candidate surface over the existing [descriptor-to-implementation route](spec.md#r-05-043).
+`PacketFormat.ParsePrefix` is the full success and error model supplied by the independently reviewed format descriptor, not a second handwritten specification. The name fixes prefix parsing and its trailing-input policy; an exact-input parser would be a separately named `ParseExact`. `'input` names the parameter's loan, so the signature declares no region or index parameter: the view borrows from `input`, and `Span<byte>` carries its own length. The record declares `region 'source` because it has no parameter to name. The shared loan keeps the input stable while any view is live, which is stronger than read-only access through one variable. An error carries no view, and the retained result tag, not an erased proof, selects the branch. This interface is a candidate surface over the existing [descriptor-to-implementation route](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-043).
 
 The caller's loan ends at the view's last use, branch by branch:
 
 ```text
 match (ParsePrefix(in frame))
 {
-	Ok(packet) => {
-		Forward(in packet.Payload);          // frame stays shared-borrowed until this last use
-	},
-	Err(error) => {
-		frame.Clear();                       // no view exists on this branch, so frame is writable
-		Report(error);
-	},
+    Ok(packet) => {
+        Forward(in packet.Payload);          // frame stays shared-borrowed until this last use
+    },
+    Err(error) => {
+        frame.Clear();                       // no view exists on this branch, so frame is writable
+        Report(error);
+    },
 }
 ```
 
@@ -1273,12 +1273,12 @@ Restoration is inferred from control flow, and the author writes neither a callb
 
 ```text
 public void SetFirst<ghost Nat count>(ref Span<byte, count> target, byte value)
-	requires target.Length > 0
-	effects writes(target)
-	ensures target.Model == old(target.Model).Update(0, value)
+    requires target.Length > 0
+    effects writes(target)
+    ensures target.Model == old(target.Model).Update(0, value)
 {
-	let ref byte first = ref target[0usize];
-	first = value;
+    let ref byte first = ref target[0usize];
+    first = value;
 }
 ```
 
@@ -1286,15 +1286,15 @@ A loan returned on one branch leaves the owner writable on the other, the condit
 
 ```text
 public Result<ref<'table> Value, TableFull> FindOrInsert<ghost Nat capacity>(
-	ref Table<Key, Value, capacity> table, Key key)
-	effects writes(table)
-	ensures result is Ok(slot) ==> slot == old(table.Model).GetOr(key, Value.Default)
-	restores result is Ok(slot) ==> table.Model == old(table.Model).Set(key, final(slot))
-	ensures result is Err(_) ==> table.Model == old(table.Model) && table.Model.Count == capacity
+    ref Table<Key, Value, capacity> table, Key key)
+    effects writes(table)
+    ensures result is Ok(slot) ==> slot == old(table.Model).GetOr(key, Value.Default)
+    restores result is Ok(slot) ==> table.Model == old(table.Model).Set(key, final(slot))
+    ensures result is Err(_) ==> table.Model == old(table.Model) && table.Model.Count == capacity
 {
-	if (table.Find(key) is Some(slot))
-		return Ok(slot);                           // the loan leaves with the result on this branch only
-	return table.TryInsert(key, Value.Default);    // no loan is live here, so the table is writable
+    if (table.Find(key) is Some(slot))
+        return Ok(slot);                           // the loan leaves with the result on this branch only
+    return table.TryInsert(key, Value.Default);    // no loan is live here, so the table is writable
 }
 ```
 
@@ -1305,23 +1305,23 @@ A signature can also lend part of a record. `Log` names two views: its initializ
 ```text
 public struct Log<T, ghost Nat capacity>
 {
-	private usize length;
-	private Slots<T, capacity> slots;
+    private usize length;
+    private Slots<T, capacity> slots;
 
-	public view Entries = slots[0..length];            // lowering length also needs this view
-	public view Tail = slots[length], length grows;    // the next slot, and raising length only
+    public view Entries = slots[0..length];            // lowering length also needs this view
+    public view Tail = slots[length], length grows;    // the next slot, and raising length only
 
-	public void Push(ref this.Tail, T item)
-		requires this.Length < capacity
-		ensures this.Model == old(this.Model).Append(item);
+    public void Push(ref this.Tail, T item)
+        requires this.Length < capacity
+        ensures this.Model == old(this.Model).Append(item);
 }
 
 public void AddEntry<ghost Nat capacity>(ref Log<Entry, capacity> log, Entry entry)
-	requires 0 < log.Length && log.Length < capacity
+    requires 0 < log.Length && log.Length < capacity
 {
-	let first = in log[0usize];      // a shared loan through Entries
-	log.Push(entry);                 // needs only Tail, which is disjoint from every Entries loan
-	Audit(in first);                 // still live, and its entry unchanged
+    let first = in log[0usize];      // a shared loan through Entries
+    log.Push(entry);                 // needs only Tail, which is disjoint from every Entries loan
+    Audit(in first);                 // still live, and its entry unchanged
 }
 ```
 
@@ -1335,9 +1335,9 @@ An initialization operation returns a different state rather than letting a call
 
 ```text
 public Buffer<byte, count, Initialized> Initialize<ghost Nat count>(
-	owned Buffer<byte, count, Uninitialized> storage, byte value)
-	effects writes(storage)
-	ensures result.Model.All(x => x == value);
+    owned Buffer<byte, count, Uninitialized> storage, byte value)
+    effects writes(storage)
+    ensures result.Model.All(x => x == value);
 ```
 
 Inside a caller:
@@ -1352,28 +1352,28 @@ When a bounded container maintains multiple coupled field invariants across a mu
 
 ```text
 public struct BoundedBuffer<T, ghost Nat capacity>
-	invariant LengthBound: Nat(length) <= capacity
-	invariant InitializedPrefix: slots.Slice(0, Nat(length)).IsInitialized
-	invariant VacantSuffix: slots.Slice(Nat(length), capacity).IsVacant
+    invariant LengthBound: Nat(length) <= capacity
+    invariant InitializedPrefix: slots.Slice(0, Nat(length)).IsInitialized
+    invariant VacantSuffix: slots.Slice(Nat(length), capacity).IsVacant
 {
-	private usize length;
-	private Slots<T, capacity> slots;
+    private usize length;
+    private Slots<T, capacity> slots;
 
-	public void RelocatePrefixInto(ref BoundedBuffer<T, capacity> destination)
-		requires destination.length == 0usize
-		effects writes(this, destination)
-		ensures this.length == 0usize
-		ensures destination.Model == old(this.Model)
-	{
-		open (ref this, ref destination) lifts InitializedPrefix, VacantSuffix
-		{
-			let usize count = this.length;
-			CopyRepresentation(in this.slots, ref destination.slots, count);
-			TransferType<T>(ref this.slots, ref destination.slots, count);
-			destination.length = count;
-			this.length = 0usize;
-		}
-	}
+    public void RelocatePrefixInto(ref BoundedBuffer<T, capacity> destination)
+        requires destination.length == 0usize
+        effects writes(this, destination)
+        ensures this.length == 0usize
+        ensures destination.Model == old(this.Model)
+    {
+        open (ref this, ref destination) lifts InitializedPrefix, VacantSuffix
+        {
+            let usize count = this.length;
+            CopyRepresentation(in this.slots, ref destination.slots, count);
+            TransferType<T>(ref this.slots, ref destination.slots, count);
+            destination.length = count;
+            this.length = 0usize;
+        }
+    }
 }
 ```
 
@@ -1384,15 +1384,15 @@ A protocol exposes a different kind of erased evidence, with an explicit result 
 ```text
 public union PublishResult<ghost Identity id>
 {
-	Success(tracked PublishPermit<id, Published> permit);
-	Retry(PublishError error, tracked PublishPermit<id, Populated> permit);
+    Success(tracked PublishPermit<id, Published> permit);
+    Retry(PublishError error, tracked PublishPermit<id, Populated> permit);
 }
 
 public PublishResult<id> TryPublish<ghost Identity id>(
-	ref PublicationSlot<id> slot,
-	tracked PublishPermit<id, Populated> permit)
-	effects writes(slot)
-	ensures PublicationProtocol.Step(old(slot.Model), slot.Model, result.Model);
+    ref PublicationSlot<id> slot,
+    tracked PublishPermit<id, Populated> permit)
+    effects writes(slot)
+    ensures PublicationProtocol.Step(old(slot.Model), slot.Model, result.Model);
 ```
 
 `PublicationSlot` supplies runtime storage, and `PublishPermit` is a module-protected protocol resource tied to its stable identity. The caller writes `TryPublish(ref slot, move permit)` and matches the result; the retained runtime tag selects a case, whose erased evidence records the state it establishes. Both cases return a token, an exit obligation stronger than non-duplication that an affine logic's weakening rule does not supply. `Retry` restores the populated state; an operation that can partially publish needs a distinct recovery state and case. Pure snapshots are copyable, as in `ghost Seq<byte> before = target.Model` where the current resource justifies the observation, but permission evidence cannot be duplicated or manufactured from an identifier. This sequential example claims no concurrency, eventual publication, crash recovery or device ordering. The lower-level split and restore mechanism stays inside the [resource-law explanation](#concrete-package-shape), so ordinary clients cannot inspect a parent whose permission is suspended.
@@ -1404,21 +1404,21 @@ A library supplies a grade domain as a sealed record of carrier, operations, adm
 ```text
 public domain NatExact
 {
-	carrier Nat;
-	zero 0; one 1; add (+); mul (*);
-	admits (==);                // demand must equal the allowance: two uses never fit one
-	interpret Use.Exact;        // grade q means exactly q uses in the graded value semantics
-	laws NatExactLaws;          // semiring, congruence, monotonicity and interpretation proofs
+    carrier Nat;
+    zero 0; one 1; add (+); mul (*);
+    admits (==);                // demand must equal the allowance: two uses never fit one
+    interpret Use.Exact;        // grade q means exactly q uses in the graded value semantics
+    laws NatExactLaws;          // semiring, congruence, monotonicity and interpretation proofs
 }
 
 public void MapInto<ghost Nat count, captures C>(
-	in Span<byte, count> input,
-	ref Span<byte, count> output,
-	in Fn(byte) -> byte captures C transform @ NatExact(count))
-	requires Disjoint(output, C)
-	effects reads(input, C), writes(output)
-	ensures output.Model == input.Model.Map(transform.Model)
-	ensures CallCount(trace, transform) == count;
+    in Span<byte, count> input,
+    ref Span<byte, count> output,
+    in Fn(byte) -> byte captures C transform @ NatExact(count))
+    requires Disjoint(output, C)
+    effects reads(input, C), writes(output)
+    ensures output.Model == input.Model.Map(transform.Model)
+    ensures CallCount(trace, transform) == count;
 ```
 
 `Fn(byte) -> byte captures C` is a total shared-call function whose whole transitive capture set is `C`, carried in the type as [Scala 3's capture checker](#type-theory-and-elaboration-reuse) carries it. `Disjoint(output, C)` refuses a transform retaining a loan that overlaps the output, and a consuming closure or hidden mutable capture fails the `Fn` mode. `C` and the closure's type specialize, so no boxing or dynamic dispatch is implied, and the `in` loan keeps the captures alive for the call.
@@ -1434,22 +1434,22 @@ An effect declares each operation's reply and how many times a handler may resum
 ```text
 public effect Choose
 {
-	bool Choose() resumes(0..2);
+    bool Choose() resumes(0..2);
 }
 
 public usize BestScore<captures C, ghost SearchBudget budget>(
-	in Fn() -> usize captures C effects(Choose) body)
-	where Duplicable(C)          // a second resumption copies everything the continuation retains
-	requires Search.ExpansionFits(body.Model, budget)
-	effects reads(C)
-	ensures Search.Work(trace) <= budget.Work
-	ensures Search.PeakFrames(trace) <= budget.Frames
+    in Fn() -> usize captures C effects(Choose) body)
+    where Duplicable(C)          // a second resumption copies everything the continuation retains
+    requires Search.ExpansionFits(body.Model, budget)
+    effects reads(C)
+    ensures Search.Work(trace) <= budget.Work
+    ensures Search.PeakFrames(trace) <= budget.Frames
 {
-	return handle (body())
-	{
-		Choose() with k => Max(resume k(false), resume k(true)),   // deep: each resumption reinstalls this handler
-		return score => score,                                     // runs once per completed resumption
-	};
+    return handle (body())
+    {
+        Choose() with k => Max(resume k(false), resume k(true)),   // deep: each resumption reinstalls this handler
+        return score => score,                                     // runs once per completed resumption
+    };
 }
 ```
 
@@ -1487,7 +1487,7 @@ dropped. `dispose` runs the continuation's declared cleanup:
 ```text
 public effect Reject
 {
-	never Reject(ParseError error);          // no reply exists, so a handler can only dispose
+    never Reject(ParseError error);          // no reply exists, so a handler can only dispose
 }
 ```
 
@@ -1496,8 +1496,8 @@ Inside a caller:
 ```text
 let checked = handle (Validate(ref packet))
 {
-	Reject(error) with k => { dispose k; return Err(error); },   // ends k's loans, erases, examines verdicts
-	return _ => Ok(),
+    Reject(error) with k => { dispose k; return Err(error); },   // ends k's loans, erases, examines verdicts
+    return _ => Ok(),
 };
 ```
 
@@ -1510,50 +1510,50 @@ This optional multi-shot/async research example is outside the first release. Th
 ```text
 public union Delivery<ghost Nat n>
 {
-	Accepted(owned Packet<n> packet, Added<n> receipt);
-	Cancelled(owned Packet<n> packet);
+    Accepted(owned Packet<n> packet, Added<n> receipt);
+    Cancelled(owned Packet<n> packet);
 }
 
 public async Delivery<n> Accept<ghost Nat n>(
-	owned Packet<n> packet,
-	in CountCell counter,
-	tracked AddOnce<counter, n> allowance)
-	effects reads(packet), calls(Forward, counter.Add, counter.Retire)
+    owned Packet<n> packet,
+    in CountCell counter,
+    tracked AddOnce<counter, n> allowance)
+    effects reads(packet), calls(Forward, counter.Add, counter.Retire)
 {
-	let header = packet.Header;
-	Fn() -> usize effects(Choose) score = () => Score(header, Choose());
-	let best = BestScore(in score);
-	await Forward(in packet, best);                                    // a checkpoint even when already complete
-	let receipt = commit counter.Add(move allowance, packet.Length);   // last checkpoint, then one AMOADD
-	return Accepted(move packet, receipt);                             // a later request is answered too_late
+    let header = packet.Header;
+    Fn() -> usize effects(Choose) score = () => Score(header, Choose());
+    let best = BestScore(in score);
+    await Forward(in packet, best);                                    // a checkpoint even when already complete
+    let receipt = commit counter.Add(move allowance, packet.Length);   // last checkpoint, then one AMOADD
+    return Accepted(move packet, receipt);                             // a later request is answered too_late
 }
 on cancel                                                              // a request accepted before the commit
 {
-	counter.Retire(move allowance);                                    // no addition; the allowance retires once
-	return Cancelled(move packet);
+    counter.Retire(move allowance);                                    // no addition; the allowance retires once
+    return Cancelled(move packet);
 }
 
 public async Result<TaskOutcome<Delivery<n>>, Busy<n>> Serve<ghost Nat n>(
-	ref Frames frames, owned Packet<n> packet,
-	in CountCell counter, tracked AddOnce<counter, n> allowance)
+    ref Frames frames, owned Packet<n> packet,
+    in CountCell counter, tracked AddOnce<counter, n> allowance)
 {
-	scope (ref frames)                                                 // no child outlives this block
-	{
-		let dormant = Accept(move packet, in counter, move allowance);   // constructed, not yet run
-		match (spawn dormant)                                          // binds a declared frame and completion record
-		{
-			Spawned(task) =>
-				return Ok(await task);                                 // transfer the complete terminal outcome after joining
-			Full(unstarted, verdict) =>
-				return Err(Busy(verdict, move unstarted));             // exhaustion returns every input
-		}
-	}                                                                  // an early exit cancels, then joins, every child
+    scope (ref frames)                                                 // no child outlives this block
+    {
+        let dormant = Accept(move packet, in counter, move allowance);   // constructed, not yet run
+        match (spawn dormant)                                          // binds a declared frame and completion record
+        {
+            Spawned(task) =>
+                return Ok(await task);                                 // transfer the complete terminal outcome after joining
+            Full(unstarted, verdict) =>
+                return Err(Busy(verdict, move unstarted));             // exhaustion returns every input
+        }
+    }                                                                  // an early exit cancels, then joins, every child
 }
 ```
 
 This example declares an empty task-failure set. `Forward` returns `Unit` under its declared cancellation/resource contract. `Serve` preserves the joined `TaskOutcome`: normal return is `Completed(Accepted(...))`, while accepted cancellation is `Cancelled` carrying the resource result constructed by `Accept`'s cleanup. The outer `Ok` does not unwrap that outcome or turn cancellation into normal task completion; it transfers the mandatory examination duty to `Serve`'s caller. The caller must explicitly handle the task outcome before using a returned packet.
 
-Calling an async function constructs an owned dormant computation and runs none of it. Direct `await` consumes a dormant helper in the current task's bounded graph, without child registration; nested storage, cancellation and commit duties remain explicit. `spawn` separately binds a preassigned frame from the scope's declared pool, or returns the unchanged computation with a typed capacity verdict. A `spawn` reached after the scope's cancellation request registers its child already marked, so its first activation records `cancelled` without running its body, and `on cancel` spawns nothing. Every `await` is a checkpoint, even on a ready result, so a latched request is never skipped. A request accepted at a checkpoint before `commit` follows the nested helper's cleanup and cancels/joins any registered child before the enclosing cleanup, with each resource accounted once. `commit` performs the last checkpoint and then a bounded region with no suspension, capture or fallible step, whose single aligned AMOADD is the linearization point; a request arriving afterwards is answered `too_late`, and the operation completes normally. A client wait timeout stops only the wait and leaves the task with its scope, while a scoped timeout requests cancellation and joins within the declared bound. The task lowers to a bounded reaction graph with syntactic poll sites and no inner scheduler, under [the async rules](extensions/handlers-async.md#frames-child-ownership-and-reaction-execution) and [the typed cancellation protocol](spec.md#r-12-097).
+Calling an async function constructs an owned dormant computation and runs none of it. Direct `await` consumes a dormant helper in the current task's bounded graph, without child registration; nested storage, cancellation and commit duties remain explicit. `spawn` separately binds a preassigned frame from the scope's declared pool, or returns the unchanged computation with a typed capacity verdict. A `spawn` reached after the scope's cancellation request registers its child already marked, so its first activation records `cancelled` without running its body, and `on cancel` spawns nothing. Every `await` is a checkpoint, even on a ready result, so a latched request is never skipped. A request accepted at a checkpoint before `commit` follows the nested helper's cleanup and cancels/joins any registered child before the enclosing cleanup, with each resource accounted once. `commit` performs the last checkpoint and then a bounded region with no suspension, capture or fallible step, whose single aligned AMOADD is the linearization point; a request arriving afterwards is answered `too_late`, and the operation completes normally. A client wait timeout stops only the wait and leaves the task with its scope, while a scoped timeout requests cancellation and joins within the declared bound. The task lowers to a bounded reaction graph with syntactic poll sites and no inner scheduler, under [the async rules](extensions/handlers-async.md#frames-child-ownership-and-reaction-execution) and [the typed cancellation protocol](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-097).
 
 `Packet<n>` keeps its represented length equal to the ghost index `n`, so the allowance and the addition agree. `AddOnce` is a unique protocol resource, not a grade, and it also names the counter's generation and the request. The conserved total of outstanding allowances proves the counter cannot overflow, and the addition publishes nothing else. The only multi-shot continuation, inside `BestScore`, retains `header` alone, while `packet` and `allowance` stay outside it. Capturing `allowance` inside the handled body would fail `Duplicable`, and releasing `frames` on a `Cancelled` acknowledgement rather than at the join would fail the scope's terminal-ownership rule.
 
@@ -1563,7 +1563,7 @@ Cells expose only their proved operations:
 stats.Update((ref Stats s) => { s.Accepted += 1; });       // local: the view cannot escape, suspend or reenter
 
 if (settings.TryWrite((ref Settings s) => { s.Retries = 3; }) is Err(BorrowConflict()))
-	Defer();                                                // a live reader is an examined result, not a panic
+    Defer();                                                // a live reader is an examined result, not a panic
 
 let seen = counter.Load();                                  // a historical sample, never a current fact
 ```
@@ -1576,11 +1576,11 @@ Every accepted exported contract holds under [every preset](#assurance-presets-o
 
 ```text
 public void Sort(ref Span<Key> keys)
-	effects writes(keys)
-	ensures IsSorted(keys.Model) && IsPermutation(keys.Model, old(keys.Model));
+    effects writes(keys)
+    ensures IsSorted(keys.Model) && IsPermutation(keys.Model, old(keys.Model));
 
 public Result<SortedView<'keys>, Unsorted> CheckSorted(in Span<Key> keys)
-	effects reads(keys);
+    effects reads(keys);
 ```
 
 `Sort` must establish its authored postcondition before any preset accepts that interface. A Safe sorter may instead omit the postcondition, with the changed interface rechecking every dependent client. Exploratory sortedness conjectures remain scratch goals, not exported `ensures` clauses. `CheckSorted` establishes its checked-success predicate only on `Ok`, and its shared loan prevents mutation invalidating that view. No preset changes either function's execution semantics.
@@ -1638,16 +1638,16 @@ Its current requirement-compatible VerifiedOS route for an initial on-device com
 
 ```text
 Reviewed executable Gallina contract + generic component theorem
-	-> CHERI instance: proved operation laws + explicit representation
-	-> Rocq proof-guided construction of an imperative implementation
-	-> proved transport to the selected CHERI-C / CompCert representation
-	-> CHERI-CompCert and required secure-compilation evidence
-	-> final assembly, link, layout, and image validation
-	-> exact installed bytes + TAL evidence + deeper CIC proofs
-						 |
-				the same pinned Sail term
-						 |
-				 hardware refinement
+    -> CHERI instance: proved operation laws + explicit representation
+    -> Rocq proof-guided construction of an imperative implementation
+    -> proved transport to the selected CHERI-C / CompCert representation
+    -> CHERI-CompCert and required secure-compilation evidence
+    -> final assembly, link, layout, and image validation
+    -> exact installed bytes + TAL evidence + deeper CIC proofs
+                         |
+                the same pinned Sail term
+                         |
+                 hardware refinement
 ```
 
 These arrows are obligations, not claims that the route is implemented end to end.
@@ -1658,19 +1658,19 @@ Another project's backend replaces the target-specific portion, not the independ
 Within VerifiedOS, all machine-level connections still use the same pinned Sail term and the reviewed source anchors.
 For a Rust-origin component, the existing Radium/source-correspondence route replaces the Gallina-to-C construction portion; no new source language displaces contained Rust by this proposal.
 TCB components retain the required verified-C path.
-The register makes [admission independent of source language and producer identity](spec.md#r-05-008). A new authoring surface must still satisfy [source correspondence](spec.md#r-05-026): a valid proof about the wrong source does not meet the obligation.
+The register makes [admission independent of source language and producer identity](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-008). A new authoring surface must still satisfy [source correspondence](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-026): a valid proof about the wrong source does not meet the obligation.
 
 For a contract `Contract`, implementation `Program`, final bytes `Binary`, and pinned machine semantics `Sail`, the central functional goal has the shape
 
 ```text
 PlatformAssumptions /\ ValidEntryState /\ Represents(inputs, memory)
-	-> every permitted execution of Binary under Sail
-	   satisfies Contract, with outputs related by Represents.
+    -> every permitted execution of Binary under Sail
+       satisfies Contract, with outputs related by Represents.
 ```
 
 Termination or reactive progress is stated separately as appropriate; a terminating postcondition is not enough to exclude divergence.
 For adversarial contexts, a whole-program functional theorem is not the required robust preservation theorem.
-The [source correspondence rule](spec.md#r-05-026) also requires binding the evidence to the authored source closure, not merely proving something about a convenient intermediate term.
+The [source correspondence rule](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-026) also requires binding the evidence to the authored source closure, not merely proving something about a convenient intermediate term.
 An untrusted parser/elaborator can produce a perfectly valid proof about the wrong program; kernel checking alone does not prevent this subject mismatch.
 Use a reviewed elaboration meaning and checked correspondence to the exact source subject, not just a hash attached to unrelated proof output.
 
@@ -1745,10 +1745,10 @@ The eventual frontend's mandatory output has this schematic shape:
 
 ```text
 SourcePackage(sourceClosure) = {
-	coreProgram;
-	elaboration : Elaborates(sourceClosure, coreProgram);
-	typing : WellTyped(coreProgram);
-	sourceMap : SourceLocations(sourceClosure, coreProgram)
+    coreProgram;
+    elaboration : Elaborates(sourceClosure, coreProgram);
+    typing : WellTyped(coreProgram);
+    sourceMap : SourceLocations(sourceClosure, coreProgram)
 }
 ```
 
@@ -1768,7 +1768,7 @@ The canceled library experiment's proposed deliverable is a small off-device Roc
 It exposes executable pure specifications, operation and representation interfaces, reusable refinement lemmas, and proof automation that produces terms checked by Rocq.
 That library could be useful independently of new syntax. The current first delivery is instead [the concrete-buffer sequence](../PLAN.md#vela-first-release-delivery); the retained experiment remains uncommissioned.
 
-**The Q19c library pilot was canceled before execution for want of its concrete laws.** Its starting point is accessible CHERI-aware semantics with usable primitive rules, not an abstract signature asserted to be sound. The required Iris-over-Sail foundation and machine connection remain open, [the crown-jewel inventory](assurance/crown-jewels.md) still records specification work as unauthored, and M1.6's verified exit supplies no capability-aware backend. [Q2c's decision](hardware/cheri-foundation-map.md#review-decision) rejects commissioning that foundation for the bounded experiment without responsibly bounded cost and named-consumer justification. A reopening needs the actual checked constants, a consumer blocked by the existing route and a new item ID; the retired Q19c ID is not reused.
+**The Q19c library pilot was canceled before execution for want of its concrete laws.** Its starting point is accessible CHERI-aware semantics with usable primitive rules, not an abstract signature asserted to be sound. The required Iris-over-Sail foundation and machine connection remain open, [the crown-jewel inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/crown-jewels.md) still records specification work as unauthored, and M1.6's verified exit supplies no capability-aware backend. [Q2c's decision](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#review-decision) rejects commissioning that foundation for the bounded experiment without responsibly bounded cost and named-consumer justification. A reopening needs the actual checked constants, a consumer blocked by the existing route and a new item ID; the retired Q19c ID is not reused.
 
 The retained core design and bounded emission-lemma alternative remain available for a reviewed reopening. Q21b's proposed experiment asks whether a generated family can reach a compilation theorem with less prerequisite work; its commissioning is rejected on the present full-cost evidence. Finite emission does not remove the general logic needed by other guarantees. A changed library entry condition must identify checked substitute laws and clear affected requirements; until then no one builds an interface that nothing can instantiate.
 
@@ -1827,13 +1827,13 @@ The public component package can have this schematic Rocq module shape:
 
 ```text
 Module Components (Backend : COMPONENT_BACKEND).
-	Record Component (contract : Backend.Contract) := {
-		implementation : Backend.Program;
-		representation : Backend.Representation;
-		functional : Backend.Refines implementation representation contract;
-		terminates : Backend.TerminatesUnder implementation representation contract.entry;
-		effects : Backend.RespectsEffects implementation representation contract.entry contract.effects
-	}.
+    Record Component (contract : Backend.Contract) := {
+        implementation : Backend.Program;
+        representation : Backend.Representation;
+        functional : Backend.Refines implementation representation contract;
+        terminates : Backend.TerminatesUnder implementation representation contract.entry;
+        effects : Backend.RespectsEffects implementation representation contract.entry contract.effects
+    }.
 End Components.
 ```
 
@@ -1856,10 +1856,10 @@ For scoped element borrowing, the core resource law has the schematic separation
 
 ```text
 BufferOwn(target, values)
-	|- CellOwn(target, index, values[index]) *
-	   (forall replacement,
-	      CellOwn(target, index, replacement) -*
-	      BufferOwn(target, Update(values, index, replacement)))
+    |- CellOwn(target, index, values[index]) *
+       (forall replacement,
+          CellOwn(target, index, replacement) -*
+          BufferOwn(target, Update(values, index, replacement)))
 ```
 
 The law requires a valid index and the actual layout/disjointness premises of the selected memory logic.
@@ -1909,7 +1909,7 @@ No new optimizer, code generator, or language runtime is necessary for the initi
 
 #### Existing Tooling and Implementation Owners
 
-The [current spec](spec.md#r-05-018a) selects bounded qualification, not blanket adoption. The [checklist's Q19](../PLAN.md#q-assessment-actions) ran the diagnostics and selective-reuse trials, recorded in [the qualification record](assurance/proof-tooling-qualification.md), and canceled its conditional source-level component pilot; Q2b and Q3b own the existing device and assurance work. Upstream capability is not compatibility with this checkout's exact Rocq/plugin tuple, and a package installed in a switch is not a library imported by a shipped proof. No candidate below is incorporated by this table.
+The [current spec](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-018a) selects bounded qualification, not blanket adoption. The [checklist's Q19](../PLAN.md#q-assessment-actions) ran the diagnostics and selective-reuse trials, recorded in [the qualification record](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-tooling-qualification.md), and canceled its conditional source-level component pilot; Q2b and Q3b own the existing device and assurance work. Upstream capability is not compatibility with this checkout's exact Rocq/plugin tuple, and a package installed in a switch is not a library imported by a shipped proof. No candidate below is incorporated by this table.
 
 | Candidate and upstream | Owner and disposition | Useful capability and qualification boundary |
 | --- | --- | --- |
@@ -1951,7 +1951,7 @@ Q19's trials retained the existing theorem statements and compared setup, manual
 The protocols below are the frozen record of what the library, workflow and artifact trials would establish. Q19a and Q19b ran their bounded workflow and reuse trials; Q19c's library-feasibility pilot and Q20b/Q20c's workflow and optimized-artifact comparisons were canceled before execution and reopen only under [the workflow contract's re-entry conditions](workflow-contract.md#commissioning-disposition). Q20a's retained contract fixes that comparison under the [language product contract](#language-product-contract); its integration cells would consume existing implementations and proofs, not price missing backends or admission machinery. Q21a separately scoped the core, and Q21b the compiler comparison and bounded emission-lemma alternative. Their design and pricing acts produce no implemented feature or artifact theorem. The effort ranges below remain separate research-planning judgments; expansion requires normal milestone and review approval.
 **The lowering experiment is the one still open, and its boundary remains explicit.**
 The plan's Q2 demonstrates one single-source lowering route on a wire parser; its host-only half, Q2a, landed with a boundary audit finding the checked relation stopping at the first of its four boundaries, and its device half, Q2b, is open.
-A reopened library trial would consume checked primitive and representation artifacts under [Q2c's re-entry evidence](hardware/cheri-foundation-map.md#re-entry-evidence) and test generic source-level reuse; it would not charge again for Q2b's lowering or Q3b's target and fault evidence. Q3c authors the protected-sequence fault model that Q3b applies. If the rules do not exist, neither a completed work breakdown nor assumed laws opens it.
+A reopened library trial would consume checked primitive and representation artifacts under [Q2c's re-entry evidence](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#re-entry-evidence) and test generic source-level reuse; it would not charge again for Q2b's lowering or Q3b's target and fault evidence. Q3c authors the protected-sequence fault model that Q3b applies. If the rules do not exist, neither a completed work breakdown nor assumed laws opens it.
 
 The [workflow contract's clients and baseline evidence](workflow-contract.md#clients-and-baseline-evidence), [freeze and independence rules](workflow-contract.md#freeze-and-independence), and [cost ledger](workflow-contract.md#accounting-and-decision-thresholds) govern the library and workflow comparison below. The artifact endpoint extends that accounting without charging shared work twice.
 
@@ -2012,30 +2012,30 @@ A small team needs both proof-engineering and systems/compiler expertise; dividi
 An unfamiliar team, missing transport theorem, changing ISA/ABI, or unexpectedly weak upstream library can exceed these bands substantially.
 No AI productivity multiplier is assumed. The plan's measurements of completed agent-assisted items do not calibrate these unimplemented language and compiler research projects; their task mix, review obligations and uncertainty differ. Published 2026 reports show why a rate does not transfer: [a 7,800-line CertiCoq ANF correctness proof](https://arxiv.org/abs/2602.20082) took about 96 hours of agent work adapting an existing CPS proof, and [MachCSL's](#closest-matches-to-the-complete-workflow) 1.5 million lines of Rocq took 93 days with its authors designing every layer and specification. Each measures its own task, starting point and supervision, not a factor for these rows.
 
-The [proof reuse inventory](assurance/proof-reuse.md) qualifies source evidence as of 2026-09-10; qualification alone does not make a foundation locally usable. A usable starting point has a selected licensed edition, a compatible dependency closure, checked assumptions and the required theorem over the local semantics. The [integrated Stdlib references](assurance/proof-reuse/foundations.md#f01-rocq-stdlib-arithmetic-integrated-by-reference) replace existing proofs without closing an open obligation, so they supply no new effort discount. The bands already assume library reuse. More precise theorem locations reduce repeated discovery work, but no measured saving or newly demonstrated foundation justifies lowering these bands.
+The [proof reuse inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse.md) qualifies source evidence as of 2026-09-10; qualification alone does not make a foundation locally usable. A usable starting point has a selected licensed edition, a compatible dependency closure, checked assumptions and the required theorem over the local semantics. The [integrated Stdlib references](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/foundations.md#f01-rocq-stdlib-arithmetic-integrated-by-reference) replace existing proofs without closing an open obligation, so they supply no new effort discount. The bands already assume library reuse. More precise theorem locations reduce repeated discovery work, but no measured saving or newly demonstrated foundation justifies lowering these bands.
 
 Each row is scoped from its stated starting point. Rows overlap and are alternatives or extensions, so they must not be added as a project total.
 Source-level deliverables exclude CHERI compiler construction, whole-system proofs, hardware refinement, production certification, and on-device admission unless explicitly stated.
 The initial library bands include checking the selected theorem interfaces and assumptions, narrowly factoring already usable primitive rules into interfaces, proving the corresponding instance wrappers and replaying the resulting clients. Their lower ends assume direct use of those rules; their upper ends allow additional local representation, framing and client-proof repair within the stated scope. This interpretation of the bands is an engineering judgment, not a measured distribution.
-They exclude acquiring unavailable source rights, migrating an incompatible prover or program-logic dependency closure, establishing missing primitive soundness, connecting a new machine or program logic, or engineering a universal backend API. Those prerequisites need separately scoped owners and estimates before a dependent row can start; they are not absorbed by its upper end. In particular, [Cerise and Cerisier](assurance/proof-reuse/hardware.md#hw-05-cerise-universal-contract-and-sentry-encapsulation) use different machines and prover/library editions, while [RustBelt and RefinedRust](assurance/proof-reuse/languages.md#ownership-initialization-and-type-soundness) supply ownership precedents rather than the missing local capability laws.
-The [foundation map's re-entry evidence](hardware/cheri-foundation-map.md#re-entry-evidence) decides whether the library conditions hold. Until then, its pilot and dependent rows are conditional comparisons, not estimates for delivering their results from the present checkout.
+They exclude acquiring unavailable source rights, migrating an incompatible prover or program-logic dependency closure, establishing missing primitive soundness, connecting a new machine or program logic, or engineering a universal backend API. Those prerequisites need separately scoped owners and estimates before a dependent row can start; they are not absorbed by its upper end. In particular, [Cerise and Cerisier](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/hardware.md#hw-05-cerise-universal-contract-and-sentry-encapsulation) use different machines and prover/library editions, while [RustBelt and RefinedRust](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#ownership-initialization-and-type-soundness) supply ownership precedents rather than the missing local capability laws.
+The [foundation map's re-entry evidence](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#re-entry-evidence) decides whether the library conditions hold. Until then, its pilot and dependent rows are conditional comparisons, not estimates for delivering their results from the present checkout.
 
 | Deliverable | Effort judgment | Starting point and exit evidence |
 | --- | --- | --- |
 | `VerifiedComponents` feasibility pilot | 4-8 person-weeks, conditional on checked local primitive laws | Start after the foundation map's re-entry gate. Generic fill and bounded update, narrow interface laws and initial instance wrappers; replay, mutation rejection, and assumption audit. A Cerise source theorem over its own machine does not meet this entry condition. |
-| Reusable bounded-component library | 4-9 person-months, including the pilot | Start from the same checked foundation. Parameterized initialization, disjoint copy, scoped update, documented combinators, independent client reuse, and instance/refactoring tests. Selected [stdpp/coqutil laws](assurance/proof-reuse/foundations.md#f02-stdpp-finite-maps-sets-and-sequences) can support the representation proofs; finite capacity and iteration order still need local proofs. One concrete instance; source assurance only. |
-| Scoped borrow-restoration extension | 1-3 person-months | Working buffer predicates and frame rules. Reuse [RustBelt's ownership proof structure](assurance/proof-reuse/languages.md#rustbelt-semantic-ownership-and-lifetime-soundness) for lexical element/slice borrowing, with local restoration proofs and negative alias/escape tests. Excludes porting lambda-Rust or Iris, general Rust borrow inference and concurrent interior mutation. |
+| Reusable bounded-component library | 4-9 person-months, including the pilot | Start from the same checked foundation. Parameterized initialization, disjoint copy, scoped update, documented combinators, independent client reuse, and instance/refactoring tests. Selected [stdpp/coqutil laws](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/foundations.md#f02-stdpp-finite-maps-sets-and-sequences) can support the representation proofs; finite capacity and iteration order still need local proofs. One concrete instance; source assurance only. |
+| Scoped borrow-restoration extension | 1-3 person-months | Working buffer predicates and frame rules. Reuse [RustBelt's ownership proof structure](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#rustbelt-semantic-ownership-and-lifetime-soundness) for lexical element/slice borrowing, with local restoration proofs and negative alias/escape tests. Excludes porting lambda-Rust or Iris, general Rust borrow inference and concurrent interior mutation. |
 | Indexed protocol library | 1-3 person-months | A reviewed sequential transition specification and primitive implementations. One bounded protocol, with success/failure ownership and reuse by another client; excludes crash/concurrency/freshness proofs. |
-| Descriptor-backed codec integration | 2-4 person-months, conditional on a usable synthesis path | One reviewed bounded descriptor, concrete representation, parse/reject/consumed-length proofs and the required admissible-byte canonicity proof. [Narcissus](assurance/proof-reuse/parsers.md#narcissus-primary-same-language-starting-point) is the source, but its available source targets do not establish local compatibility. Excludes backend porting, a standards-wide descriptor campaign and [VUPER's unresolved acquisition and correspondence work](assurance/proof-reuse/parsers.md#vuper-unusually-close-uper-research-candidate). |
+| Descriptor-backed codec integration | 2-4 person-months, conditional on a usable synthesis path | One reviewed bounded descriptor, concrete representation, parse/reject/consumed-length proofs and the required admissible-byte canonicity proof. [Narcissus](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/parsers.md#narcissus-primary-same-language-starting-point) is the source, but its available source targets do not establish local compatibility. Excludes backend porting, a standards-wide descriptor campaign and [VUPER's unresolved acquisition and correspondence work](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/parsers.md#vuper-unusually-close-uper-research-candidate). |
 | Fixed-domain graded accounting | 2-4 person-months | Existing component traces and loop rules. One event-count or budget domain, a semantic interpretation theorem, composition lemmas, and misuse tests; no generic grading inference. |
 | Extensible graded proof library | 9-18 person-months | Successful fixed-domain prototype. Lawful algebra interfaces, more than one independently interpreted analysis, and checked evidence; excludes a new dependent typechecker and arbitrary privacy/timing analyses. |
 | Existing-editor proof/evidence diagnostics | 3-6 person-weeks | Existing Rocq interaction and build evidence are available, and Q19a's rejected rendering trial supplies the imported-dependency freshness case a candidate must refuse. Focus on local obligations, subject identity, and assumptions; excludes a new language server. |
 | Restricted Vela syntax prototype | 2-4 person-months | Successful library clients. Parse their bounded subset, preserve source locations, and generate inspectable terms/proofs. A prototype is not accepted source-correspondence evidence by itself. |
-| Reviewed restricted frontend | 9-18 person-months, including its syntax prototype | Working library and a fixed small source semantics. Checked elaboration/correspondence for that subset, useful diagnostics, negative tests and reproducible builds. [MetaRocq](assurance/proof-reuse/languages.md#metarocq-a-verified-pcuic-checker-with-explicit-normalization-premises) supplies checking and erasure theorems; local frontend correspondence and the checker's normalization premises remain separate obligations. Reuse a qualified backend and runtime discipline; exclude repairing their missing proofs. |
-| Native integration of one library family | 2-6 person-months, conditional on the complete target route | The required CHERI compilation, source-correspondence and final-artifact checking routes must work first. Connect representations and obligations, bind exact bytes, and measure resources. Existing [Rupicola/Bedrock2 derivations](assurance/proof-reuse/languages.md#rupicola-proof-producing-relational-compilation) do not include the printer, purecap bridge or final-byte theorem; those remain separately owned prerequisites, not work hidden inside this band. |
+| Reviewed restricted frontend | 9-18 person-months, including its syntax prototype | Working library and a fixed small source semantics. Checked elaboration/correspondence for that subset, useful diagnostics, negative tests and reproducible builds. [MetaRocq](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#metarocq-a-verified-pcuic-checker-with-explicit-normalization-premises) supplies checking and erasure theorems; local frontend correspondence and the checker's normalization premises remain separate obligations. Reuse a qualified backend and runtime discipline; exclude repairing their missing proofs. |
+| Native integration of one library family | 2-6 person-months, conditional on the complete target route | The required CHERI compilation, source-correspondence and final-artifact checking routes must work first. Connect representations and obligations, bind exact bytes, and measure resources. Existing [Rupicola/Bedrock2 derivations](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#rupicola-proof-producing-relational-compilation) do not include the printer, purecap bridge or final-byte theorem; those remain separately owned prerequisites, not work hidden inside this band. |
 | Optional second-target bounded-buffer probe outside VerifiedOS | 1-3 person-months | Working generic library and a second backend with already proved compatible primitive/logic rules. Instantiate one family and audit proof reuse and missing guarantees. Source-level experiment only; excludes backend porting, compiler construction, and equivalent isolation. |
 | General dependent systems-language implementation | 4-10 person-years for a limited usable research tool | Coarse comparison band for language design, elaboration, resource analysis, layout, one backend, libraries and editor support. Not a costed implementation of the proposed combined authority calculus; excludes a Rust-sized ecosystem and fully verified end-to-end compiler. |
-| New verified optimizing CHERI compiler route | 10-30 or more person-years | A fixed source/target subset and substantial reuse of verified compiler infrastructure. Include source qualification, dependency adaptation, missing semantic bridges, representation, erasure/lowering, optimization preservation, ABI/link integration and required security-property transport. [CompCert/SECOMP](assurance/proof-reuse/languages.md#compiler-correctness-and-resource-planning) and [Bedrock2](assurance/proof-reuse/languages.md#bedrock2-a-proved-compiler-pipeline-to-a-specified-risc-v-machine) supply components with different licence, target and completeness limits; no closed CHERI chain is imported. Excludes hardware proofs and a full general-language ecosystem; feasibility may require narrowing the scope. |
+| New verified optimizing CHERI compiler route | 10-30 or more person-years | A fixed source/target subset and substantial reuse of verified compiler infrastructure. Include source qualification, dependency adaptation, missing semantic bridges, representation, erasure/lowering, optimization preservation, ABI/link integration and required security-property transport. [CompCert/SECOMP](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#compiler-correctness-and-resource-planning) and [Bedrock2](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse/languages.md#bedrock2-a-proved-compiler-pipeline-to-a-specified-risc-v-machine) supply components with different licence, target and completeness limits; no closed CHERI chain is imported. Excludes hardware proofs and a full general-language ecosystem; feasibility may require narrowing the scope. |
 
 The final two rows are order-of-magnitude research budgets, not confidence intervals or estimates of the repository's existing compiler work.
 The selected CHERIoT Rust functional baseline removes fresh capability-plumbing work from the mandatory Rust producer; that producer has no priced cell in this table or the bring-up total. Its adaptation and certification need their own breakdown, and the new verified optimizing compiler comparison above already assumes substantial infrastructure reuse. No hours or percentage are subtracted from either on the strength of a functional RV32 compiler alone.
@@ -2057,7 +2057,7 @@ Reuse the inventory's selected source readings when they still apply. Re-price a
 For the blocked machine-logic dependencies, compare the [bounded source-compatibility continuation](../PLAN.md#machine-logic-compatibility-continuation) with a replacement's complete interpretation and adequacy bridge. Successful installation alone does not decide that comparison. Keep the locked prover and assumptions; a proposed framework swap must remove more work than its port, review and continuing maintenance add.
 
 Within one target, the strongest savings mechanism is reuse of a proved representation and frame/restoration theorem across changing clients.
-Q25w's [concrete foundation investigation](../PLAN.md#vela-first-release-delivery) uses the [existing ownership ledger](hardware/cheri-foundation-map.md#foundation-ownership-ledger), so the decoder, byte instance and Vela client share named laws and their establishment cost. A missing law stays with its owner; a generic library or syntax increment cannot absorb it as glue. The independent package trial measures [representation-transfer reuse](workflow-contract.md#representation-transfer-comparison) only after these concrete laws exist.
+Q25w's [concrete foundation investigation](../PLAN.md#vela-first-release-delivery) uses the [existing ownership ledger](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#foundation-ownership-ledger), so the decoder, byte instance and Vela client share named laws and their establishment cost. A missing law stays with its owner; a generic library or syntax increment cannot absorb it as glue. The independent package trial measures [representation-transfer reuse](workflow-contract.md#representation-transfer-comparison) only after these concrete laws exist.
 Across targets, reuse primarily covers abstract specifications, algorithm proofs, and authoring tools; representation and target-security proofs are separate work.
 Rapid syntax and proof-search iteration can preserve these investments when the semantic contract stays fixed, while a new observation model or interface law can invalidate substantial downstream work.
 The next is generation from an existing format or protocol specification, avoiding repeated implementation/proof synchronization.

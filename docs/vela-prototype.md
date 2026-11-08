@@ -262,7 +262,7 @@ source-preserving default, or `--format write` to opt into canonical formatting.
 `--no-lint` disables optional lints; repeatable `--allow ID` and
 `--deny ID` control individual findings without disabling language checks.
 `vela lint --preview-bindings SOURCE` prints a rechecked candidate containing
-only the suggested `let ` insertions, preserving original comments and newlines
+only the suggested `let` insertions, preserving original comments and newlines
 and leaving the input file unchanged. Its [source-bound preview contract](authoring-tools.md#lint-policy)
 keeps annotation checking, allow/deny policy and semantic comparison explicit.
 

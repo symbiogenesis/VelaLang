@@ -1,6 +1,6 @@
 # Graded dependent foundation
 
-> Non-normative Q25a checking interfaces and schematic derivations. Start with the [primary Vela design and examples](../verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates; the [requirements register](../requirements-register.md) remains authoritative. No implementation, checked metatheory, accepted axiom or qualified binary is supplied.
+> Non-normative Q25a checking interfaces and schematic derivations. Start with the [primary Vela design and examples](../verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) remains authoritative. No implementation, checked metatheory, accepted axiom or qualified binary is supplied.
 
 ## Scope and research boundary
 
@@ -24,7 +24,7 @@ interpretation, preserving the
 are selected; [Q25d](full-language-review.md) records composition obligations.
 
 Every law in this dossier must be proved about the elaboration's image in an
-existing anchor, under [the untrusted-elaboration boundary](../spec.md#r-05-020a).
+existing anchor, under [the untrusted-elaboration boundary](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a).
 The displayed judgments describe proposed syntax-directed evidence construction.
 They carry no independent source evaluation or admission authority. Substitution
 and structural-rule theorems relate the interpreted images of the original and
@@ -270,7 +270,7 @@ Its generated theorem relates entry state, execution of the elaborated image and
 | `Transfer(domain,Delta)` | Permission and representation transport to the receiving execution domain, preserving exclusivity, lifetime, publication ordering and the manifest join. |
 | `Share(protocol,Delta)` | The declared concurrent operations preserve an invariant under actual interference and the pinned memory model. A shared handle grants only those operations. |
 
-`Dispose` is an explicit computation with effects and, where relevant, writes; proof erasure does not zero machine registers or spill slots. Mandatory verdict elimination names the outcome as required by [R-05-097 through R-05-100](../spec.md#r-05-097). Source ownership connects to the [exclusive-access and composition obligations](../spec.md#r-05-096a); borrowing cannot derive an overlapping permission merely because it preserves a grade.
+`Dispose` is an explicit computation with effects and, where relevant, writes; proof erasure does not zero machine registers or spill slots. Mandatory verdict elimination names the outcome as required by [R-05-097 through R-05-100](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-097). Source ownership connects to the [exclusive-access and composition obligations](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-096a); borrowing cannot derive an overlapping permission merely because it preserves a grade.
 
 Sequencing composes outcome-indexed resource transitions and concatenates traces; effect sets take union. Repeating a callback or resumption needs its repeatable calling contract and fresh separated per-invocation inputs `Delta_i`. For `k` invocations, a per-call source-event law gives the corresponding sum or `k`-fold count. A grade on the callable does not supply that law, termination, invocation order or a claim about optimized machine calls. Multi-shot capture needs `Dup` for the entire retained continuation context even if each explicit argument is pure.
 
@@ -329,11 +329,11 @@ Specialization fixes phase, convention, layout and erasure before emission. Repr
 
 `SourcePackage` binds source/generated inputs, domain implementations/laws, elaborated constraints, reconstructed proofs, implicits/transports, representation and exact core computation. Parsing, resolution, instance selection and desugaring need correspondence; old core proofs cannot accept changed source. Erasure preserves results, control, effects, resource behavior and requested observations under that representation, relating retained behavior across instances differing only in erased proofs. Type-checking an irrelevant term is insufficient.
 
-[R-05-132 through R-05-134](../spec.md#r-05-132) keep the source/TAL boundary: compile source obligations into the existing admitted attributes where their actual rules suffice, and carry the remaining proved obligations as CIC terms. General source domains, dependent normalization and grade-polymorphic dictionaries do not become TAL attributes. A requested new attribute would need that requirement's amendment demonstration and the TAL's own extension conditions. This dossier proposes none. Final-source correspondence, ABI, optimization, timing, linking and Sail evidence remain with the existing compiler/admission owners.
+[R-05-132 through R-05-134](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-132) keep the source/TAL boundary: compile source obligations into the existing admitted attributes where their actual rules suffice, and carry the remaining proved obligations as CIC terms. General source domains, dependent normalization and grade-polymorphic dictionaries do not become TAL attributes. A requested new attribute would need that requirement's amendment demonstration and the TAL's own extension conditions. This dossier proposes none. Final-source correspondence, ABI, optimization, timing, linking and Sail evidence remain with the existing compiler/admission owners.
 
 ## Q25d debts and acceptance boundary
 
-These debt keys are neither Rocq constants, schedule cells nor assumptions. Q25d joins them with [Q21 packages](../core-design.md#proof-obligations-and-proposed-work-packages) and the [foundation map](../hardware/cheri-foundation-map.md), recording owner and estimate boundaries in [pricing](full-language-review.md#reviewed-implementation-pricing). All theorem subjects below are elaborated images in the selected existing anchor. The [first-release plan](../../PLAN.md#vela-first-release-delivery) selects the fixed resource/phase/correspondence obligations it actually uses; it does not commission every generic-domain or control/mutation debt. Unestablished foundation work stays explicitly `unpriced` when a responsible range is unavailable.
+These debt keys are neither Rocq constants, schedule cells nor assumptions. Q25d joins them with [Q21 packages](../core-design.md#proof-obligations-and-proposed-work-packages) and the [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md), recording owner and estimate boundaries in [pricing](full-language-review.md#reviewed-implementation-pricing). All theorem subjects below are elaborated images in the selected existing anchor. The [first-release plan](../../PLAN.md#vela-first-release-delivery) selects the fixed resource/phase/correspondence obligations it actually uses; it does not commission every generic-domain or control/mutation debt. Unestablished foundation work stays explicitly `unpriced` when a responsible range is unavailable.
 
 | Debt key | Required artifact and refusal predicate |
 | --- | --- |

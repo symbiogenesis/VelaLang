@@ -2,7 +2,7 @@
 
 > Non-normative replacement criteria extending the [primary Vela design and examples](../verification-strategy.md).
 > [PLAN.md](../../PLAN.md#vela-whole-system-authoring-proposal) owns proposal stages;
-> the [requirements register](../requirements-register.md) governs admission until
+> the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs admission until
 > explicit amendments accept replacements. This contract supplies no implementation
 > or agreement theorem.
 
@@ -89,7 +89,7 @@ can retire:
   progress, adversarial-context isolation, permitted leakage and resource bounds
   wherever the component's accepted claim includes them.
 
-The [foundation map](../hardware/cheri-foundation-map.md#required-connections)
+The [foundation map](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md#required-connections)
 owns missing concrete laws; generic separation logic or surface syntax supplies
 no CHERI instance. VST may remain internal. Its replacement needs sound rules and
 connections to the admitted machine logic, preserving every discharged obligation.
@@ -230,7 +230,7 @@ reviewed scope decision; silently omitting a difficult operation is no replaceme
 Supply one admitted machine closure, parameterized by actual platform variation,
 with explicit configuration, core class and hart identities. Every consumer resolves
 that closure and declared instances, without private transcriptions. Resolve the
-[canonical term's open configuration question](../assurance/canonical-machine-term.md#2-generation-identity)
+[canonical term's open configuration question](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/canonical-machine-term.md#2-generation-identity)
 before migration: a term fixed to one hart cannot stand for all compositions.
 
 Prove full-selected-scope agreement with pinned Sail-generated definitions, with
@@ -257,7 +257,7 @@ rules and cycles/schedules.
 Its semantics/compiler need checked connections to the admitted hardware interpretation
 and exact synthesis input. Initial Kami/Kôika elaboration or RTL generation is
 permitted; generation alone meets neither connection. The
-[RTL boundary](../assurance/rtl-correspondence-boundary.md) distinguishes source
+[RTL boundary](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/rtl-correspondence-boundary.md) distinguishes source
 circuit theorems from synthesized artifacts.
 
 Simulator/RTL may share hardware definitions, and architecture/hardware may share
@@ -297,7 +297,7 @@ whole-system replacement, the technical transition criteria are:
    identities for retained historical results. Remove active dual maintenance and
    update provenance, gates and the trust-base inventory in the same transition.
 
-The amendment dossier follows [the register amendment process](../spec.md#r-18-034).
+The amendment dossier follows [the register amendment process](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-18-034).
 It reviews the anchor identity and provenance rules R-05-019 through R-05-019c,
 R-05-020's replacement conditions, and all affected source-correspondence,
 primitive, binary-validation and hardware obligations. In particular it accounts

@@ -1,6 +1,6 @@
 # Assurance presets and evidence policy
 
-> Non-normative Q25 policy proposal; no preset, report, frontend or diagnostic here is implemented. Start with the [primary Vela design and examples](../verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates, Q25d prices implementation, and the [requirements register](../requirements-register.md) governs admission.
+> Non-normative Q25 policy proposal; no preset, report, frontend or diagnostic here is implemented. Start with the [primary Vela design and examples](../verification-strategy.md). [Q25](../../PLAN.md#q-assessment-actions) owns design gates, Q25d prices implementation, and the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs admission.
 
 ## Scope and the governing rule
 
@@ -12,7 +12,7 @@ The policy first applies to the [bounded synchronous release](../first-release.m
 Async, general handlers, extensible grade domains and other extensions need their
 own consumer and qualification; presets cannot enable unsupported features.
 
-Presets classify source-closure evidence off device. The platform's [numeric assurance tiers](../spec.md#r-13-011) instead classify binary admission at install according to code's trust role; [landing tiers](../../PLAN.md#checklist-conventions) classify document review. A preset confers no admission authority and changes no [refuse-uncertified-code policy](../spec.md#r-13-014).
+Presets classify source-closure evidence off device. The platform's [numeric assurance tiers](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-13-011) instead classify binary admission at install according to code's trust role; [landing tiers](../../PLAN.md#checklist-conventions) classify document review. A preset confers no admission authority and changes no [refuse-uncertified-code policy](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-13-014).
 
 ## Four concerns that one strictness setting conflates
 
@@ -52,7 +52,7 @@ Unselected code retains its ordinary interface; linking beside verified code con
 
 Complete requires coverage of a release's specified requirements, executions, implementation closure, environment assumptions and evidence endpoint. Every resulting obligation is discharged; pending goals, unapproved axioms and unchecked dependency contracts cannot pass silently.
 
-Helpers may be covered by enclosing proofs or automatic analysis. A service can intentionally run forever while proving progress of each admitted request. Timing, termination, deadlock freedom, safety and information flow remain separately named requirements. Approved assumptions remain visible, including the foundational/environmental trust base allowed by [R-05-164](../spec.md#r-05-164); prohibiting project-added axioms does not establish zero trust.
+Helpers may be covered by enclosing proofs or automatic analysis. A service can intentionally run forever while proving progress of each admitted request. Timing, termination, deadlock freedom, safety and information flow remain separately named requirements. Approved assumptions remain visible, including the foundational/environmental trust base allowed by [R-05-164](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-164); prohibiting project-added axioms does not establish zero trust.
 
 ### Default obligations
 
@@ -102,7 +102,7 @@ evidence; `Unestablished` is never an accepted contract status.
 | Conditional | Result depends on a declared external assumption | Consumers carrying that assumption into their own reports |
 | Unestablished | No accepted evidence; scratch or unfinished build only | No accepted exported contract or use as a proof premise, safe-elimination justification or optimization fact |
 
-Tests and measurements establish no universal theorem. A solver timeout is no counterexample; unchecked unsatisfiability is no accepted proof. Checked success promises neither universal parsing nor inexhaustible allocation: invalid input and [bounded-pool exhaustion](../spec.md#r-08-046) remain explicit outcomes.
+Tests and measurements establish no universal theorem. A solver timeout is no counterexample; unchecked unsatisfiability is no accepted proof. Checked success promises neither universal parsing nor inexhaustible allocation: invalid input and [bounded-pool exhaustion](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-046) remain explicit outcomes.
 
 An ordinary sorter may export an array without sortedness. An opaque sorted-array invariant requires a verified algorithm, verified validation or approved assumption; disabling verification cannot manufacture that stronger value through a safe interface. Mutable abstractions must also control invalidating writes. Validation of one snapshot licenses no later write or alias, under the [snapshot rules](interior-mutability.md#snapshots-and-dependent-indices). Verus's ignored code, external specifications and assumed contracts provide a trust-accounting precedent in [the survey](../verification-strategy.md#what-the-rust-verifiers-contribute).
 
@@ -154,7 +154,7 @@ Unresolved editor/scratch annotations cannot influence accepted typing or compil
 
 ## What complete coverage must mean
 
-Complete requires property-by-boundary coverage, following the platform's [coverage matrix](../assurance/coverage-matrix.md), rather than an annotation percentage. Each cell cites discharge evidence; an empty discharge fails. [Coverage changes](../assurance/coverage-matrix.md#4-how-to-read-a-cell-and-how-to-change-one) start from requirements.
+Complete requires property-by-boundary coverage, following the platform's [coverage matrix](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/coverage-matrix.md), rather than an annotation percentage. Each cell cites discharge evidence; an empty discharge fails. [Coverage changes](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/coverage-matrix.md#4-how-to-read-a-cell-and-how-to-change-one) start from requirements.
 
 | Dimension | Example requirement | Easily missed obligation |
 | --- | --- | --- |
@@ -165,7 +165,7 @@ Complete requires property-by-boundary coverage, following the platform's [cover
 | Security | Policy confines authority and information | Functional equivalence and memory safety imply neither guarantee |
 | Executable correspondence | Source properties hold of shipped image | Connect lowering, optimization, linkage and runtime |
 
-The closure includes reachable implementations, generic instantiations, dynamic selections, dependencies, generated code and relevant runtime components. Exclusions require explicit environmental/boundary models; plugins or foreign implementations must satisfy them or trigger requalification. Requirement IDs map to formal statements and evidence. Review checks inconsistent preconditions, unreachable success and vacuity; its judgment remains a [recorded residual](../spec.md#17-residual-risks-the-honest-ceiling). Witnesses and negatives do not prove requirement completeness, and a specification generated from code proves no intent.
+The closure includes reachable implementations, generic instantiations, dynamic selections, dependencies, generated code and relevant runtime components. Exclusions require explicit environmental/boundary models; plugins or foreign implementations must satisfy them or trigger requalification. Requirement IDs map to formal statements and evidence. Review checks inconsistent preconditions, unreachable success and vacuity; its judgment remains a [recorded residual](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#17-residual-risks-the-honest-ceiling). Witnesses and negatives do not prove requirement completeness, and a specification generated from code proves no intent.
 
 ## Meanings no preset may reinterpret
 
@@ -173,10 +173,10 @@ The closure includes reachable implementations, generic instantiations, dynamic 
 | --- | --- | --- |
 | Use count, memory permission, information-flow label, cost | [Graded foundation](graded-foundation.md#dimensions-and-lawful-domains) | Cost/security grants ownership; idempotent use means single use |
 | Transitive continuation captures | [Handler rules](handlers-async.md#handler-lookup-capture-and-return) | Storage duplicates an exclusive loan/token or permits dropping cleanup/erasure duties |
-| Cancellation request, terminal result, safe reuse | [Cancellation](handlers-async.md#cancellation-commit-and-all-exits), [typed protocol](../spec.md#r-12-097) | `cancelled` frees backing before device/participant access ends |
+| Cancellation request, terminal result, safe reuse | [Cancellation](handlers-async.md#cancellation-commit-and-all-exits), [typed protocol](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-097) | `cancelled` frees backing before device/participant access ends |
 | Historical snapshot, current contents | [Mutability](interior-mutability.md#snapshots-and-dependent-indices) | An observed refinement survives arbitrary interference |
 | Ghost data, runtime witnesses | [Erasure](graded-foundation.md#inference-specialization-and-admission) | Erase execution-needed indices or make bounds checks/dynamic indexing free |
-| Pool capacity | [Bounded pools](../spec.md#r-08-046) | Treat exhaustion as impossible |
+| Pool capacity | [Bounded pools](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-08-046) | Treat exhaustion as impossible |
 
 Mutable dependencies require stable snapshots or invariant protocols under every preset. Continuations, frames, queues and cleanup still fit the resource/scheduling model; hiding proofs behind an API hides no obligation.
 
@@ -197,7 +197,7 @@ A syntax- and CHERI-independent planner consumes ordinary instances and returns 
 | Optimality/approximation | Objective relation to the specified feasible set | A conservative graph's optimum may differ from the program's |
 | Preservation | Lowering/deployment preserve lifetime, representation and resources | Packing removes no retained authority, nonborrowable reservations or workload-bound duty |
 
-The [research agenda](../background/static-memory-research.md) owns capacity questions, certificate checking, constraint encoding, source relation and deployment connections. These integrations need not wait for the complete language.
+The [research agenda](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/background/static-memory-research.md) owns capacity questions, certificate checking, constraint encoding, source relation and deployment connections. These integrations need not wait for the complete language.
 
 ## Erasure, compilation and the release record
 
@@ -264,4 +264,4 @@ Acceptance requires sound assurance boundaries and useful ordinary clients under
 
 This proposal claims no usability, build-time, annotation-burden or search-scalability measurement; automatic proof of arbitrary programs; optimal compilation; proof-free unsafe primitives; or recovery of requirements from source. It amends no requirement or admission rule; changes must satisfy their normative owner's predicate.
 
-SPARK's [usage scenarios](https://docs.adacore.com/spark2014-docs/html/ug/en/usage_scenarios.html), [Dafny's contracts and ghost material](https://dafny.org/dafny/DafnyRef/DafnyRef) and [Verus's trust accounting](https://verus-lang.github.io/verus/guide/tcb.html) supply adoption patterns and vocabulary, with wider assessment in the [research landscape](../verification-strategy.md#research-landscape) and source/licence readings in the [proof inventory](../assurance/proof-reuse.md). Their conclusions transfer only to the checked artifact when its premises match; performance experiments neither establish nor invalidate those logical results. No upstream is incorporated; incorporation requires the selected artifact's [licence reading](../../THIRD-PARTY.md).
+SPARK's [usage scenarios](https://docs.adacore.com/spark2014-docs/html/ug/en/usage_scenarios.html), [Dafny's contracts and ghost material](https://dafny.org/dafny/DafnyRef/DafnyRef) and [Verus's trust accounting](https://verus-lang.github.io/verus/guide/tcb.html) supply adoption patterns and vocabulary, with wider assessment in the [research landscape](../verification-strategy.md#research-landscape) and source/licence readings in the [proof inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-reuse.md). Their conclusions transfer only to the checked artifact when its premises match; performance experiments neither establish nor invalidate those logical results. No upstream is incorporated; incorporation requires the selected artifact's [licence reading](../../THIRD-PARTY.md).

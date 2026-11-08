@@ -17,4 +17,3 @@ Assurance and design findings raised by Vela specification and qualification ite
 **F-356** measurement: cancellation of a registered but unstarted child must not return its frame before terminal-result collection
 · Raised: Q25c
 · Disposition: closed in design review; returned inputs enter the reserved cancelled-completion record, and the frame remains owned until terminal collection and its release gate.
-

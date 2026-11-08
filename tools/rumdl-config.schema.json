@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "Reviewed rumdl configuration policy",
+  "required": [
+    "global",
+    "MD003",
+    "MD004",
+    "MD009",
+    "MD010",
+    "MD033",
+    "MD046",
+    "MD048",
+    "MD049",
+    "MD050",
+    "MD055",
+    "MD060"
+  ],
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enable",
+        "disable",
+        "respect-gitignore",
+        "editorconfig",
+        "flavor"
+      ],
+      "properties": {
+        "enable": {
+          "enum": [
+            [
+              "ALL"
+            ]
+          ]
+        },
+        "disable": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "respect-gitignore": {
+          "enum": [
+            false
+          ]
+        },
+        "editorconfig": {
+          "enum": [
+            true
+          ]
+        },
+        "flavor": {
+          "enum": [
+            "standard"
+          ]
+        }
+      }
+    },
+    "MD003": {
+      "enum": [
+        {
+          "style": "atx"
+        }
+      ]
+    },
+    "MD004": {
+      "enum": [
+        {
+          "style": "dash"
+        }
+      ]
+    },
+    "MD009": {
+      "enum": [
+        {
+          "strict": true
+        }
+      ]
+    },
+    "MD010": {
+      "enum": [
+        {
+          "code-blocks": true,
+          "spaces-per-tab": 4
+        }
+      ]
+    },
+    "MD033": {
+      "enum": [
+        {
+          "allowed-elements": [
+            "a"
+          ]
+        }
+      ]
+    },
+    "MD046": {
+      "enum": [
+        {
+          "style": "fenced"
+        }
+      ]
+    },
+    "MD048": {
+      "enum": [
+        {
+          "style": "backtick"
+        }
+      ]
+    },
+    "MD049": {
+      "enum": [
+        {
+          "style": "asterisk"
+        }
+      ]
+    },
+    "MD050": {
+      "enum": [
+        {
+          "style": "asterisk"
+        }
+      ]
+    },
+    "MD055": {
+      "enum": [
+        {
+          "style": "leading-and-trailing"
+        }
+      ]
+    },
+    "MD060": {
+      "enum": [
+        {
+          "enabled": true,
+          "style": "compact"
+        }
+      ]
+    }
+  }
+}

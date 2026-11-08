@@ -127,7 +127,7 @@ must be generated from one owner and checked for drift.
 Prefer released Rocq adaptations; otherwise qualify a reviewed upstream revision
 or maintained fork with licence reading, reproducible pin and bounded semantic
 comparison. Contribute qualified fixes upstream. Preserve meaningful release/version
-checks; disabling them qualifies no pair. The [compatibility record](../tools/opam/certirocq-compatibility.md#native-trial-verdict)
+checks; disabling them qualifies no pair. The [compatibility record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/certirocq-compatibility.md#native-trial-verdict)
 identifies proof-command relocation and the remaining version issue.
 
 Before switching the prototype, provide a supported build/runtime route on
@@ -170,7 +170,7 @@ archive, builds its Rocq support library in the existing locked proof switch and
 runs the recursive kernel checker. An optional `--archive FILE` uses the same
 authenticated bytes without downloading them. The bounded source adaptation moves
 only the three late `Proof` commands identified in the
-[same-prover compatibility record](../tools/opam/certirocq-compatibility.md#native-trial-verdict).
+[same-prover compatibility record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/certirocq-compatibility.md#native-trial-verdict).
 Source hashes guard both sides of that transformation. A diagnostic reference
 deletes just those commands; its frozen public types, universes, executable bodies
 and assumptions must match the candidate at the same prover. No source is installed

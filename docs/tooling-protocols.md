@@ -69,7 +69,7 @@ maps. The language server consumes those services; it must not introduce another
 parser, type system or proof acceptance path. Reuse
 [contextual diagnostic judgments](core-design.md#typed-holes-and-invalidation)
 from `core-diagnostics`. The existing Rocq editor and
-[R-05-018a workflow](spec.md#r-05-018a) retain their own subject and scope;
+[R-05-018a workflow](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-018a) retain their own subject and scope;
 their qualification is not Vela-server qualification.
 
 The [compiler-service contract](extensions/metaprogramming.md#compiler-services-and-runtime-information)
@@ -91,12 +91,12 @@ that those consumers do not implement. A valid format alone supplies neither.
 
 Host development initially uses standard input/output connections, keeping logs
 off the protocol stream. A resident VerifiedOS service must use the
-[capability-delegated compartment transport](implementation/userspace-porting.md#zed-the-reference-editor)
+[capability-delegated compartment transport](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/implementation/userspace-porting.md#zed-the-reference-editor)
 and supervision model. Scope document access and debug sessions to explicitly
 delegated workspaces and targets. Do not infer file, process, network or hardware
 authority from a URI, workspace setting or client capability. A resident deployment
 fixes its protocol version and feature profile at composition under
-[R-12-043a](spec.md#r-12-043a), advertises that fixed profile and refuses
+[R-12-043a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-12-043a), advertises that fixed profile and refuses
 incompatible offers. Broader host-side feature negotiation supplies no exception
 to that rule; resident negotiation beyond it needs a register/prose amendment
 before implementation. Capability exchange cannot weaken admission or security.
@@ -105,10 +105,10 @@ Host development implementations remain untrusted diagnostic tools. Before
 admitting any resident attacker-facing endpoint or interchange reader described
 here, enumerate its exact framing, encoding and message-schema profile and
 descriptor identities in the
-[wire-format inventory](assurance/wire-format-inventory.md).
-[R-05-042](spec.md#r-05-042) requires verified copy-once Narcissus parsers;
-[R-05-043](spec.md#r-05-043) retains their required lowering and
-[R-05-046](spec.md#r-05-046) independent descriptor review. A bounded JSON
+[wire-format inventory](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/wire-format-inventory.md).
+[R-05-042](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-042) requires verified copy-once Narcissus parsers;
+[R-05-043](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-043) retains their required lowering and
+[R-05-046](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-046) independent descriptor review. A bounded JSON
 library or successful protocol transcript discharges none of these duties.
 The unpriced protocol stages select no resident profile or parser implementation.
 
@@ -178,7 +178,7 @@ state may use a separately versioned, capability-advertised Vela extension with
 an explicit schema, source/dependency identity, statuses and cancellation rules.
 That extension adds presentation, not proof authority. Interactive recovery,
 holes and cached goals cannot satisfy
-[batch acceptance](spec.md#r-05-018a). A build command may report a separately
+[batch acceptance](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-018a). A build command may report a separately
 completed batch verdict only with its exact artifact/environment evidence.
 
 ## Compiler inspection API
@@ -350,10 +350,10 @@ reported unavailable, never reconstructed as live authority from an integer.
 Mutation, arbitrary command execution, reverse execution, data breakpoints and
 hot reload remain unadvertised unless separately contracted and qualified.
 
-VerifiedOS's [debug lifecycle](spec.md#r-15-078) excludes production Debug
+VerifiedOS's [debug lifecycle](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-078) excludes production Debug
 Module access. Development/RMA entry retains
-[authenticated authorization and crypto-erase](spec.md#r-15-079).
-The [trigger-module exclusion](spec.md#r-15-079a) applies in every lifecycle
+[authenticated authorization and crypto-erase](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-079).
+The [trigger-module exclusion](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-15-079a) applies in every lifecycle
 state: no hardware breakpoints or watchpoints may be assumed. Use simulator
 breakpoints or bounded external single-step/PC comparison on an authorized target,
 reporting the latter's cost and limits. Never patch executable memory or add a
@@ -415,8 +415,8 @@ Validate addresses against the final image, including dead elimination and
 instruction encoding, rather than an intermediate object alone.
 
 Keep ELF/DWARF readers in producer/debug compartments under
-[R-13-010](spec.md#r-13-010). Symbols, debug and unwind metadata stay outside
-execution SRAM under [R-13-010c](spec.md#r-13-010b), in host sidecars or the
+[R-13-010](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-13-010). Symbols, debug and unwind metadata stay outside
+execution SRAM under [R-13-010c](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-13-010b), in host sidecars or the
 authenticated store as permitted by the owning package contract. No loader,
 install-path parser, admission certificate or capability authority is introduced
 by a debug sidecar.

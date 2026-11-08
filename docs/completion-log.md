@@ -2,13 +2,18 @@
 
 Landing evidence for Vela design, parser, elaborator, LSP, playground, and first-slice items extracted from [VerifiedOS](https://github.com/symbiogenesis/VerifiedOS).
 
+<a id="q19-qualify-existing-proof-tooling-and-one-reusable-component"></a>
+<a id="q20-test-the-combined-language-and-production-artifact-goal"></a>
+
+## Q20 · Test the combined language and production-artifact goal
+
 Retained the reviewed contract and canceled uncommissioned workflow/promotion trials. Mandatory producer duties remain; no experiment is recorded as executed.
 
 Landed: Tier A.
 
 <a id="q20a-author-the-combined-acceptance-and-benchmark-contract"></a>
 
-#### Q20a · Author the combined acceptance and benchmark contract
+## Q20a · Author the combined acceptance and benchmark contract
 
 [The workflow contract](workflow-contract.md) fixes parser client, held-out service, exits/cases, semantic probes, evidence identities and cost thresholds. Independent/integrated review and host document checks passed with proof/model/interfaces unchanged. The contract is authored; trials are unopened and missing copying baselines remain entry conditions.
 
@@ -16,7 +21,7 @@ Landed: Tier A. The independent read covers the intended outputs, every exit, ne
 
 <a id="q20b-compare-one-integrated-source-and-proof-workflow-on-a-held-out-client"></a>
 
-##### Q20b · Compare one integrated source and proof workflow on a held-out client
+### Q20b · Compare one integrated source and proof workflow on a held-out client
 
 Canceled before execution on 2026-09-26: no qualified presentation environment/generic instance released the trial. Former 14 h, range 8–20 estimate removed without execution credit. Mandatory duties remain; re-entry needs Q19c's conditions and a new suffixed ID.
 
@@ -81,10 +86,10 @@ The [foundation dossier](extensions/graded-foundation.md) specifies grades, depe
 
 At `6d0ee4e`, focused checks pass; integration reads the dossier against the strategy, synchronous core, sibling interfaces and register. Paper derivations supply no soundness theorem, concrete CHERI instance, executed negative case or qualified binary. The `GF-*` laws remain implementation obligations. Accounting: 0.2 h author/check actual; Q25d owns shared review, integration and host validation.
 
-  * Finding: the call-by-name grading reference supplies no proof that effectful
-    arguments execute once under the proposed call-by-value rules. Pure value
-    substitution and explicit effectful binding are separated; `GF-cbv` remains
-    the composed-law obligation. F-353.
+- Finding: the call-by-name grading reference supplies no proof that effectful
+  arguments execute once under the proposed call-by-value rules. Pure value
+  substitution and explicit effectful binding are separated; `GF-cbv` remains
+  the composed-law obligation. F-353.
 
 Landed: Tier A. The full read accepts the rule dossier and its explicitly named
 missing laws at Q25a's design predicate. It opens no frontend implementation.
@@ -97,14 +102,14 @@ The [control dossier](extensions/handlers-async.md) specifies handler lookup/cap
 
 Authoring `9503081` and independent review `1faa273` receive integration corrections to the cancellation bound and checkpoint order. The authored traces remain conditional derivations; `HA-*` laws, target bounds and frontend admission are unimplemented. Accounting: 0.2 h author/check actual; Q25d owns shared review, integration and final host checks. No guest measurement is claimed.
 
-  * Two findings.
-    * **Language-frame occupancy needs an explicit inventory disposition.**
-      Q25d must classify it under R-08-046 or amend that entry and its prose before
-      runtime implementation opens. F-354.
-    * **Cancellation delay can precede committed work on one path.** A maximum
-      between those terms omits that path; integration composes the decision
-      prefix with the complete selected suffix, cancelled or committed, in one
-      elapsed-time unit. F-355.
+- Two findings.
+  - **Language-frame occupancy needs an explicit inventory disposition.**
+    Q25d must classify it under R-08-046 or amend that entry and its prose before
+    runtime implementation opens. F-354.
+  - **Cancellation delay can precede committed work on one path.** A maximum
+    between those terms omits that path; integration composes the decision
+    prefix with the complete selected suffix, cancelled or committed, in one
+    elapsed-time unit. F-355.
 
 Landed: Tier A. The full and independent reads accept the lifecycle design after
 the bound and checkpoint-order corrections, with all target laws still explicit.
@@ -117,10 +122,10 @@ The [cell dossier](extensions/interior-mutability.md) specifies local/dynamic-bo
 
 At `1f2d633`, focused checks pass; independent review and integration correct frame release and initialization/cancellation joins. Concrete CHERI witnesses and source-to-Sail correspondence remain owed; wrappers and grades supply no sharing authority. Accounting: 0.2 h author/check actual; Q25d owns shared review, integration and final host checks. No executed language or guest evidence is claimed.
 
-  * Finding: the registered-but-unstarted cancellation branch must retain its
-    frame while returned inputs await collection in the reserved cancelled
-    completion record. Integration makes collection and the release gate precede
-    frame reuse. F-356.
+- Finding: the registered-but-unstarted cancellation branch must retain its
+  frame while returned inputs await collection in the reserved cancelled
+  completion record. Integration makes collection and the release gate precede
+  frame reuse. F-356.
 
 Landed: Tier A. The full and independent reads accept the interfaces, counter
 protocol and qualification cases with their unmechanized obligations preserved.
@@ -146,7 +151,7 @@ The [pure translation contract](vela-prototype.md) landed at
 functions, immutable bindings, branches and prior-function calls, then emits
 hygienic Gallina definitions bound to exact source bytes. Diagnostics retain source
 locations; rejected source and failed atomic file writes preserve existing output.
-The [authored example](tools/vela/examples/pure.vela) and independent expected
+The [authored example](../tools/vela/examples/pure.vela) and independent expected
 terms exercise the fragment. Boolean equality binds operands once to keep emitted
 text linear in source size.
 
@@ -170,7 +175,7 @@ The [surface contract](vela-prototype.md#source-fragment) landed at
 `2cac393c` before the parser correction. Public declarations and parameters put
 types first, Boolean types use `bool`, and immutable locals precede explicit
 returns or fully returning `if (condition)` blocks. The
-[example](tools/vela/examples/pure.vela), independent term oracle and rejection
+[example](../tools/vela/examples/pure.vela), independent term oracle and rejection
 cases use those conventions from the
 [proposed surface](verification-strategy.md#an-ideal-surface).
 The superseded prototype spellings, missing returns, trailing statements,
@@ -292,7 +297,7 @@ requirement, coverage cell, semantic anchor or kernel equality was amended.
 #### Q25s · Attach Vela documentation comments to compiler facts
 
 Accepted on 2026-11-03 for public functions and constants in the pure compiler.
-The [independent qualification](vela-documentation-qualification.md) covers the
+The [independent qualification](documentation-qualification.md) covers the
 compiler-selected declaration site, original UTF-8 witnesses, bounded plain-text
 hover and complete refusal of forged or stale documentation. At `e29b9547`,
 focused documentation, formatter and lint controls pass, including attachment
@@ -356,7 +361,7 @@ sequential helper execution, ordinary error payloads and task-failure outcomes.
 Q25t owns the executable source-preserving default check/emission policy and
 its independent byte-preservation and explicit-write controls.
 
-The [delivery sequence](PLAN.md#vela-first-release-delivery) commissions
+The [delivery sequence](../PLAN.md#vela-first-release-delivery) commissions
 Q25w's finite foundation investigation with separate successful-candidate and
 blocked-result predicates. Later component, independent-package and release
 stages require actual prerequisites and separately priced acceptance. This item
@@ -392,8 +397,8 @@ machine-logic blockers keep full machine-refinement closure and subsequent
 delivery stages closed:
 
 1. **Concrete `Span<byte>` carrier, inhabited byte case and contract elaboration
-   ([tools/vela/elaborate.py](tools/vela/elaborate.py),
-   [tools/vela/examples/first_slice.vela](tools/vela/examples/first_slice.vela)):**
+   ([tools/vela/elaborate.py](../tools/vela/elaborate.py),
+   [tools/vela/examples/first_slice.vela](../tools/vela/examples/first_slice.vela)):**
    `Span<byte>` elaborates to `vela_Span` over `vela_ByteStore` (`nat -> vela_u8`)
    paired with `Base`, `Length`, `Tag`, `PermRead`, `PermWrite` and derived
    `CanRead`/`CanWrite` predicates. Bounded operations `Span.AllocZeroed`,
@@ -437,7 +442,7 @@ delivery stages closed:
    [Q25af and Q25ag](critique.md#vela-evidence-and-surface-review)
    own honest emission and slice conformance.
 3. **Capacity-invariance gate, semantic negative controls and target execution
-   ([tools/vela/first_slice.py](tools/vela/first_slice.py)):**
+   ([tools/vela/first_slice.py](../tools/vela/first_slice.py)):**
    checking at static capacity $N = 8$ (`8usize`) and $N = 10^9$
    (`1_000_000_000usize`) produces identical obligation counts (`9`), inference
    work steps (`11765`), reduction steps (`79`) and emitted Gallina size (`86299`
@@ -464,15 +469,15 @@ delivery stages closed:
    owners:
    - `Q35b`/`Q35o`/`Q35p`: `rv64d.v` refuses Rocq 9.3.0 compilation at
      `__WriteRAM_Meta` / `write_tag_bool` (`Prompt_monad.monad bool ?E0` vs
-     outcome `M unit`; [canonical-machine-term.md](assurance/canonical-machine-term.md#9-the-whole-term-compile-refusal))
+     outcome `M unit`; [canonical-machine-term.md](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/canonical-machine-term.md#9-the-whole-term-compile-refusal))
      and `rocq-sail-stdpp` is not carried in the shared proof switch (`F-778`).
    - `Q35c`/`Q35m`/`Q35k`/`Q35l`: the machine-logic dependency chain
      (`Islaris`/`Lithium`/`Katamaran`) reached its bounded refusal endpoint at
      Rocq 9.3.0 (`Q35m`, `F-785`, `F-786`), leaving `Q35k` (unary safety over
      `rv64d.v`) and `Q35l` (`byte-instance` laws over `rv64d.v`) blocked and
      `byte-instance` / `scoped-resources` uncommissioned in
-     [cheri-foundation-map.md](hardware/cheri-foundation-map.md).
-   - `Q2b` ([tools/bedrock2-lowering/DescriptorCheck.v](tools/bedrock2-lowering/DescriptorCheck.v)):
+     [cheri-foundation-map.md](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/hardware/cheri-foundation-map.md).
+   - `Q2b` ([tools/bedrock2-lowering/DescriptorCheck.v](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/bedrock2-lowering/DescriptorCheck.v)):
      targets `BasicC64Semantics` (flat byte-array read-only check without
      destination initialization, byte copy or CHERI capability tags).
    - `Q35d`/`M1.2g`/`Q35j`: mechanized Sail-to-Clight/CompCert refinement and the
@@ -481,7 +486,7 @@ delivery stages closed:
    `rv64d.v`, mechanized Sail-to-Clight/CompCert refinement for `first_slice.c`,
    and user-managed Host CI and Guest CI runs could not run or remain pending and
    supply no passing verdict. Subsequent stages in
-   [Vela first-release delivery](PLAN.md#vela-first-release-delivery) remain
+   [Vela first-release delivery](../PLAN.md#vela-first-release-delivery) remain
    unpriced until those owners land.
 
 The original 24 h estimate, range 16–32, is retained because earlier authoring
@@ -577,13 +582,13 @@ compiler/protocol/browser evidence accept this bounded local increment.
 
 #### Q25af · Make Vela elaboration evidence kernel-honest
 
-Accepted on 2026-11-07 under [R-05-020a](spec.md#r-05-020a), the
+Accepted on 2026-11-07 under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a), the
 [evidence review](critique.md#vela-evidence-and-surface-review)
 and the [primitive contract](first-release.md#primitive-semantics).
-The mathematical elaborator ([tools/vela/elaborate.py](tools/vela/elaborate.py),
-[elaborate_declarations.py](tools/vela/elaborate_declarations.py),
-[elaborate_types.py](tools/vela/elaborate_types.py) and
-[solver_ledger.py](tools/vela/solver_ledger.py)) emits the real
+The mathematical elaborator ([tools/vela/elaborate.py](../tools/vela/elaborate.py),
+[elaborate_declarations.py](../tools/vela/elaborate_declarations.py),
+[elaborate_types.py](../tools/vela/elaborate_types.py) and
+[solver_ledger.py](../tools/vela/solver_ledger.py)) emits the real
 source proposition for every contract `ensures`, `restores` and theorem
 obligation instead of substituting `true = true` or reflexive `x = x`
 tautologies. Obligations for which the elaborator constructs a kernel proof term
@@ -595,7 +600,7 @@ entry in `solver_trust`. Exclusive `ref` parameters emit kernel post-state
 images (`_post_<param>`) so postconditions and restoration obligations state the
 callable's actual effect.
 
-In the Gallina prelude ([elaborate_types.py](tools/vela/elaborate_types.py)),
+In the Gallina prelude ([elaborate_types.py](../tools/vela/elaborate_types.py)),
 fixed-width integers (`u8`..`u64`, `i8`..`i64`, `usize`, `byte`) are represented
 over little-endian bit lists of width `vela_int_bits k`. Wrapping, saturating
 and checked addition, subtraction, multiplication, division, remainder, negation
@@ -603,8 +608,8 @@ and bitwise shifts, two's-complement signed comparisons (`vela_int_slt`..`vela_i
 and widening/narrowing/checked conversions (`vela_int_from`, `vela_int_try_from`,
 `vela_int_to_nat`, `vela_nat_to_usize`) replace the prior identity and
 placeholder definitions. Independent value controls in
-[test_vela_primitives.py](tools/tests/test_vela_primitives.py) and
-[test_vela_solver_ledger.py](tools/tests/test_vela_solver_ledger.py)
+[test_vela_primitives.py](../tools/tests/test_vela_primitives.py) and
+[test_vela_solver_ledger.py](../tools/tests/test_vela_solver_ledger.py)
 check boundary values, signedness, overflow/zero-divisor/invalid-shift `Err`
 outcomes, non-tautological obligation types and exact `Print Assumptions`
 agreement with `solver_trust`.
@@ -622,9 +627,10 @@ accounting, bit-list Gallina primitive definitions and local kernel replay.
 
 Accepted on 2026-11-07 under the [synchronous core](core-design.md#loans-and-control-flow)
 and [first-slice qualification contract](first-release.md#first-slice-qualification).
-[tools/vela/examples/first_slice.vela](tools/vela/examples/first_slice.vela)
-and [tools/vela/first_slice.py](tools/vela/first_slice.py) conform
+[tools/vela/examples/first_slice.vela](../tools/vela/examples/first_slice.vela)
+and [tools/vela/first_slice.py](../tools/vela/first_slice.py) conform
 to the synchronous design:
+
 - `PrepareAndValidatePacket(ref Span<byte> dst, in Span<byte> pkt) -> Result<ValidatedPacket<'dst>, ValidationError>`
   validates framing, magic, payload length and checksum, scrubs destination
   bytes, copies payload bytes through a borrowed slice, restores `dst` before
@@ -666,9 +672,10 @@ qualification.
 
 Accepted on 2026-11-07 under the [evidence review](critique.md#vela-evidence-and-surface-review)
 and [surface grammar](surface-grammar.md). Across the Menhir
-grammar ([tools/vela/parser/parser.mly](tools/vela/parser/parser.mly)),
-lexer ([lexer.mll](tools/vela/parser/lexer.mll)), pure and mathematical
+grammar ([tools/vela/parser/parser.mly](../tools/vela/parser/parser.mly)),
+lexer ([lexer.mll](../tools/vela/parser/lexer.mll)), pure and mathematical
 elaborators, formatter and lints:
+
 1. Selective record-invariant lifting uses `open (ref this) lifts Clause, ... { ... }`,
    reserving `scope` exclusively for structured task scopes.
 2. Exclusive `ref` parameters preserve their container descriptor (`Base`,
@@ -715,4 +722,3 @@ package-trial measurement obligations.
 
 The original 12 h estimate, range 8–16, is retained because authoring intervals
 were shared across the Q25af–Q25ai batch; both calibration columns remain `n/a`.
-
