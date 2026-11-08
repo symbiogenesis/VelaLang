@@ -114,6 +114,44 @@ retain their existing owners and pending status. The
 [generated-test boundary](tooling-protocols.md#generated-development-tests)
 keeps these development results separate from proof and product acceptance.
 
+[`python tools/run.py vela-parser syntax-campaigns`](../../tools/toolchain/syntax_campaigns.py)
+implements this qualification over the `file` entry of
+[`parser.mly`](../../tools/toolchain/parser/parser.mly)
+(`c249a367a6c7cadae2caf42d613afccb54173270ed453d97593c301c561373d2`) using the
+locked `verifiedos-sail-0.20.3-ocaml-5.4.1` toolchain (`menhir, version 20260209`,
+binary SHA-256 `290c659064d26cb1c51b743ec6a414ed4269e7f686821637656d526333c6c7a2`;
+`ocamlc 5.4.1`, binary SHA-256
+`454b023dfdebe17bd760300da10dd5b97833a11597cc5f2287444d0ed428a9fc`). It freezes
+the `multi-declaration-precedence-trailing-comma-and-trivia-boundaries`
+interaction across deterministic seeds `20261108..20261171` (`64` sentences,
+`goal_length = 36`, `max_sentence_tokens = 512`, `max_rendered_source_bytes = 65536`,
+`max_interpreter_output_bytes = 4194304`, `max_campaign_seconds = 60`,
+`max_memory_bytes = 536870912`). Before invoking the parser,
+[`qualify_renderer`](../../tools/toolchain/syntax_campaigns.py) qualifies all `37`
+pure terminals across `canonical`
+(`2cd098a78292d4714a11705ce547b266d5c9774b700121ce432d09113693237e`),
+`utf8_comments_crlf`
+(`08dbc326b3ff684f1c2e979221498db6e80a2dac6599e9b9d4d7a0f0e2ff8587`) and
+`bare_cr_separators`
+(`a66574b5431441dcc59ea87f609c2487b616d88122e28eb3768c49aa90fb3174`), plus six
+negative controls (`empty-sentence`, `missing-eof`, `premature-eof`,
+`surface-only-terminal`, `unknown-terminal`, `exceeds-token-budget`). Batch
+`menhir --interpret --interpret-show-cst` accepts all `64` generated sentences
+and rejects `3` malformed negative controls; across all `192` rendered
+trivia/payload checks, [`IndependentPureAstOracle`](../../tools/toolchain/syntax_campaigns.py)
+independently matches `63` accepted native ASTs and `1` automaton-accepted /
+semantic-action-refused bare-typed local sentence (seed `20261116`, where the
+`value_type name EQUAL expression SEMICOLON` production accepts in the LR(1)
+automaton and raises a located `syntax` refusal at `line 3, column 1`). Seeded
+fault evaluation records `stillborn-mutant` as `stillborn`, kills all three
+semantic-action and byte-span faults that `--interpret` alone accepts
+(`right-associative-subtraction-or-division-action`: `35 -> 16` tokens;
+`trailing-comma-span-or-arity-corruption`: `34 -> 15` tokens; held-out
+`expression-body-excludes-arrow-or-semicolon-span`: `29 -> 14` tokens), and
+verifies deterministic JSON replay in
+[`test_vela_syntax_campaigns.py`](../../tools/tests/test_vela_syntax_campaigns.py)
+without random generation, a second grammar or a `menhirLib` runtime dependency.
+
 ## Promotion and retirement
 
 [Q25h](../../PLAN.md#q-assessment-actions) owns promotion and Python parser

@@ -104,9 +104,17 @@ wheel, native extension or reproduction blob is copied, distributed or added to
 `tools/pyproject.toml` or `tools/uv.lock`, while minimized counterexamples are
 retained as explicit Apache-2.0 regression data under the
 [test contract](docs/tooling/tooling-protocols.md#generated-development-tests).
-Q25y reuses the selected Menhir and its
-[generator and output reading](#development-tools-contained-by-use); it still reads the actual
-outputs its additional facilities would retain.
+[Q25y](PLAN.md#q-assessment-actions) reuses the locked Menhir `20260209` binary
+(`290c659064d26cb1c51b743ec6a414ed4269e7f686821637656d526333c6c7a2`) in
+`verifiedos-sail-0.20.3-ocaml-5.4.1` and its
+[generator and output reading](#development-tools-contained-by-use):
+`menhir --random-sentence` emits only terminal symbol names from the
+repository's own Apache-2.0 grammar (`tools/toolchain/parser/parser.mly`),
+`menhir --interpret --interpret-show-cst` emits ephemeral bracketed
+nonterminal/terminal trees inspected in memory, and retained replay cases store
+only Apache-2.0 terminal sequences, rendered Vela sources and expected
+observations without linking `menhirLib`, enabling `--table`, or retaining
+`--list-errors` / `.messages` catalogs.
 
 [CoqEAL and Trocq](docs/assurance/verification-strategy.md#existing-tooling-and-implementation-owners)
 remain conditional proof-transfer references. A concrete consumer and separately

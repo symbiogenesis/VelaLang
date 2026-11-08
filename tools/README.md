@@ -16,7 +16,7 @@
 | `python tools/run.py vela` | host | Pure Vela prototype checker, formatter, linter, Gallina emitter, and generated-test runner |
 | `python tools/run.py vela-lsp` | host | Pure Vela Language Server Protocol server over stdio |
 | `python tools/run.py vela-playground` | guest (`[wsl]`) | Unified Vela browser playground with dependent mathematics |
-| `python tools/run.py vela-parser` | guest (`[wsl]`) | Menhir parser build/qualification, dependent elaboration, first-slice harness, and Rocq kernel replay |
+| `python tools/run.py vela-parser` | guest (`[wsl]`) | Menhir parser build/qualification, syntax campaigns, dependent elaboration, first-slice harness, and Rocq kernel replay |
 
 ## Dependency and version policy
 
