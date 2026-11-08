@@ -1,15 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Qualify the bounded Menhir Rocq support prerequisite in an isolated native tree.
+"""Qualify the checked pure Vela parser and Menhir Rocq support pair in an isolated native tree.
 
-This builds no Vela parser and installs nothing. Abstract automaton parameters
-remain visible in the recorded assumption queries; a concrete generated grammar
-and its executable correspondence still need their own qualification.
+This extracts the pure grammar view from parser.mly, generates VelaPureGrammar.v
+via menhir --coq --strict, proves safety, completeness, correctness, unambiguity
+and concrete parse/refusal/rejection/timeout theorems with zero axioms under
+recursive rocqchk, extracts vela_checked_parser.ml, compiles vela-checked-parser,
+and verifies runtime correspondence against the pure qualification and migration
+oracles. The Windows host replacement route remains deferred.
 """
 
 import hashlib
 import io
 import json
 import re
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -20,7 +24,14 @@ from typing import cast
 
 from filelock import FileLock
 
-from toolchain import proofenv
+from toolchain import (
+    env,
+    migration,
+    proofenv,
+)
+from toolchain import (
+    parser as vela_parser,
+)
 from toolchain.atomic import atomic_path
 
 RELEASE = "20260209"
@@ -33,6 +44,8 @@ UPSTREAM_REPAIR = "6dedce5de5df8f139c42326f3bd95e7a1c878674"
 INTERPRETER_SHA256 = "4891ad9d65843fefa4d9d424e0d065e241760f705464efc233796d445b16294f"
 CANDIDATE_SHA256 = "69cfbdd086858ef37fa50eed10866379a51bd858113a9716331d88f9e46e7fde"
 REFERENCE_SHA256 = "04aa7bda193a67219fea99ee6f1b86eb7db3da735b04e32f662ac1e5c041b02c"
+VALIDATOR_COMPLETE_SHA256 = "c7e1f4f25be2a4371d06dd1d01ea2adb21d889c1c18739ebf74afca8408b4f64"
+VALIDATOR_COMPLETE_CANDIDATE_SHA256 = "1a284ece0e5b547e2b816c0f7623ee1ee628d30385f5d3dde4dd1a180589cb66"
 VERSION_SHA256 = "3746feeefa899fe0d43e4db0ec53f2d7ddd72076d9fab29cdcc9ecb0250072e6"
 LICENSES = {
     "LICENSE": "9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5",
@@ -43,17 +56,91 @@ MODULES = (
     "Interpreter_correct", "Main", "Validator_classes", "Validator_complete",
     "Validator_safe", "Version",
 )
+GRAMMAR_MODULES = ("VelaPureAst", "VelaPureGrammar", "VelaPureProofs")
+ALL_MODULES = (*MODULES, *GRAMMAR_MODULES)
 TARGETS = ("pop", "reduce_step", "parse")
+THEOREMS = (
+    "vela_file_safe",
+    "vela_file_complete_validator",
+    "vela_file_correct",
+    "vela_file_complete",
+    "vela_file_unambiguity",
+    "vela_file_positive_precedence",
+    "vela_file_bare_local_refused",
+    "vela_file_empty_module_rejected",
+    "vela_file_zero_fuel_timeout",
+)
+PURE_TERMINALS: tuple[str, ...] = (
+    "MODULE", "PUBLIC", "NAT", "BOOL", "LET", "CONST", "RETURN", "IF", "ELSE", "TRUE", "FALSE",
+    "LPAREN", "RPAREN", "LBRACE", "RBRACE", "SEMICOLON", "COMMA", "COLON", "FATARROW",
+    "EQUAL", "PLUS", "MINUS", "STAR", "SLASH", "PERCENT",
+    "EQ", "LE", "NE", "LT", "GT", "GE", "AND", "OR", "NOT", "EOF",
+    "IDENT", "DECIMAL",
+)
+EXPECTED_PURE_SKELETON: dict[str, tuple[tuple[str, ...], ...]] = {
+    "file": (("MODULE", "name", "SEMICOLON", "nonempty_list(pure_declaration)", "EOF"),),
+    "pure_declaration": (
+        ("PUBLIC", "ioption(CONST)", "value_type", "name", "LPAREN", "comma_list(parameter)", "RPAREN", "function_body"),
+        ("PUBLIC", "CONST", "value_type", "name", "EQUAL", "expression", "SEMICOLON"),
+    ),
+    "name": (("IDENT",),),
+    "value_type": (("NAT",), ("BOOL",)),
+    "function_body": (("block",), ("FATARROW", "expression", "SEMICOLON")),
+    "parameter": (("option(CONST)", "value_type", "name"),),
+    "block": (("LBRACE", "list(binding)", "exit", "RBRACE"),),
+    "binding": (
+        ("LET", "name", "EQUAL", "expression", "SEMICOLON"),
+        ("LET", "value_type", "name", "EQUAL", "expression", "SEMICOLON"),
+        ("value_type", "name", "EQUAL", "expression", "SEMICOLON"),
+        ("name", "EQUAL", "expression", "SEMICOLON"),
+        ("CONST", "value_type", "name", "EQUAL", "expression", "SEMICOLON"),
+    ),
+    "exit": (
+        ("RETURN", "expression", "SEMICOLON"),
+        ("IF", "LPAREN", "expression", "RPAREN", "block", "ELSE", "block"),
+    ),
+    "expression": (("left_binary(conjunction,s_disjunction_operator)",),),
+    "conjunction": (("left_binary(comparison,s_conjunction_operator)",),),
+    "comparison": (("sum",), ("sum", "comparison_operator", "sum")),
+    "comparison_operator": (("EQ",), ("LE",), ("NE",), ("LT",), ("GT",), ("GE",)),
+    "sum": (("left_binary(product,s_sum_operator)",),),
+    "plus_operator": (("PLUS",),),
+    "product": (("left_binary(unary,s_product_operator)",),),
+    "star_operator": (("STAR",),),
+    "unary": (("atom",), ("negation_operator", "unary")),
+    "negation_operator": (("NOT",),),
+    "atom": (
+        ("DECIMAL",), ("TRUE",), ("FALSE",), ("name",),
+        ("name", "LPAREN", "comma_list(call_argument(expression,name))", "RPAREN"),
+        ("LPAREN", "expression", "RPAREN"),
+    ),
+    "call_argument(expression,identifier)": (
+        ("expression",),
+        ("identifier", "COLON", "expression"),
+    ),
+    "left_binary(operand,operator)": (
+        ("operand",),
+        ("left_binary(operand,operator)", "operator", "operand"),
+    ),
+    "s_disjunction_operator": (("OR",),),
+    "s_conjunction_operator": (("AND",),),
+    "s_sum_operator": (("plus_operator",), ("MINUS",)),
+    "s_product_operator": (("star_operator",), ("SLASH",), ("PERCENT",)),
+    "comma_list(item)": ((), ("comma_nonempty_list(item)",)),
+    "comma_nonempty_list(item)": (("item", "comma_tail(item)"),),
+    "comma_tail(item)": ((), ("COMMA",), ("COMMA", "item", "comma_tail(item)")),
+}
 MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 TIMEOUT = 180
 
-FROZEN_QUERY = """From MenhirLib Require Import Automaton Interpreter.
+FROZEN_QUERY = """From MenhirLib Require Import Automaton Interpreter Validator_complete.
 Set Printing All.
 Set Printing Universes.
 Set Printing Depth 1000000.
 Set Printing Width 1000000.
 Module Probe (A: Automaton.T).
 Module I := Interpreter.Make A.
+Module V := Validator_complete.Make A.
 Check I.pop.
 Print I.pop.
 Print Assumptions I.pop.
@@ -63,6 +150,10 @@ Print Assumptions I.reduce_step.
 Check I.parse.
 Print I.parse.
 Print Assumptions I.parse.
+Check V.is_validator_forall_items.
+Print Assumptions V.is_validator_forall_items.
+Check V.complete_is_validator.
+Print Assumptions V.complete_is_validator.
 End Probe.
 """
 ASSUMPTIONS_QUERY = """From MenhirLib Require Import Automaton Main.
@@ -74,6 +165,801 @@ Print Assumptions Parser.unambiguity.
 End SupportBoundary.
 """
 
+VELA_PURE_AST_V = """(* SPDX-License-Identifier: Apache-2.0 *)
+From Stdlib Require Import Bool Arith List Ascii String.
+Import ListNotations.
+Open Scope string_scope.
+
+Definition span : Type := (nat * nat)%type.
+
+Inductive json : Type :=
+| JNull : json
+| JBoolean : bool -> json
+| JNumber : nat -> json
+| JString : string -> json
+| JArray : list json -> json
+| JObject : list (string * json) -> json.
+
+Record located_text : Type := {
+  loc_span : span;
+  loc_value : string
+}.
+
+Record node : Type := {
+  node_span : span;
+  node_depth : nat;
+  node_syntax : json
+}.
+
+Inductive outcome (A : Type) : Type :=
+| Accepted : A -> outcome A
+| Refused : string -> nat -> string -> outcome A.
+Arguments Accepted {A} _.
+Arguments Refused {A} _ _ _.
+
+Definition max_syntax_depth : nat := 256.
+Definition max_block_bindings : nat := 64.
+
+Definition span_json (sp : span) : json :=
+  JArray [JNumber (fst sp); JNumber (snd sp)].
+
+Definition loc_text (sp : span) (value : string) : located_text :=
+  {| loc_span := sp; loc_value := value |}.
+
+Definition loc_json (item : located_text) : json :=
+  JObject [("text", JString (loc_value item)); ("span", span_json (loc_span item))].
+
+Definition loc_start (item : located_text) : nat := fst (loc_span item).
+Definition loc_end (item : located_text) : nat := snd (loc_span item).
+Definition node_start (item : node) : nat := fst (node_span item).
+Definition node_end (item : node) : nat := snd (node_span item).
+
+Fixpoint max_depth (items : list node) : nat :=
+  match items with
+  | [] => 0
+  | item :: rest => Nat.max (node_depth item) (max_depth rest)
+  end.
+
+Definition make_node (kind : string) (first_pos last_pos : nat)
+  (fields : list (string * json)) (children : list node) : outcome node :=
+  let depth := S (max_depth children) in
+  if Nat.ltb max_syntax_depth depth then
+    Refused "limit" first_pos "syntax tree exceeds depth 256"
+  else
+    Accepted {|
+      node_span := (first_pos, last_pos);
+      node_depth := depth;
+      node_syntax := JObject (("kind", JString kind) :: ("span", span_json (first_pos, last_pos)) :: fields)
+    |}.
+
+Definition array_json (items : list node) : json :=
+  JArray (List.map node_syntax items).
+
+Definition const_fields (flag : option span) : list (string * json) :=
+  match flag with
+  | None => []
+  | Some _ => [("const", JBoolean true)]
+  end.
+
+Definition bind {A B : Type} (value : outcome A) (next : A -> outcome B) : outcome B :=
+  match value with
+  | Accepted item => next item
+  | Refused kind offset message => Refused kind offset message
+  end.
+
+Fixpoint sequence_outcomes {A : Type} (items : list (outcome A)) : outcome (list A) :=
+  match items with
+  | [] => Accepted []
+  | item :: rest =>
+      bind item (fun head =>
+      bind (sequence_outcomes rest) (fun tail =>
+      Accepted (head :: tail)))
+  end.
+
+Fixpoint last_end (fallback : nat) (items : list node) : nat :=
+  match items with
+  | [] => fallback
+  | [item] => node_end item
+  | _ :: rest => last_end fallback rest
+  end.
+
+Definition binary_node (op : located_text) (left_out right_out : outcome node) : outcome node :=
+  bind left_out (fun left_node =>
+  bind right_out (fun right_node =>
+  make_node "binary" (node_start left_node) (node_end right_node)
+    [("operator", loc_json op); ("left", node_syntax left_node); ("right", node_syntax right_node)]
+    [left_node; right_node])).
+"""
+
+VELA_PURE_GRAMMAR_MLY = """/* SPDX-License-Identifier: Apache-2.0 */
+%{
+From Stdlib Require Import Bool Arith List String.
+From MenhirLib Require Import VelaPureAst.
+Import ListNotations.
+Open Scope string_scope.
+%}
+
+%token <VelaPureAst.span> MODULE PUBLIC NAT BOOL LET CONST RETURN IF ELSE TRUE FALSE
+%token <VelaPureAst.span> LPAREN RPAREN LBRACE RBRACE SEMICOLON COMMA COLON FATARROW
+%token <VelaPureAst.span> EQUAL PLUS MINUS STAR SLASH PERCENT
+%token <VelaPureAst.span> EQ LE NE LT GT GE AND OR NOT EOF
+%token <VelaPureAst.span * String.string> IDENT DECIMAL
+
+%start <VelaPureAst.outcome VelaPureAst.node> file
+%type <VelaPureAst.outcome VelaPureAst.node> pure_declaration value_type function_body parameter
+%type <VelaPureAst.outcome VelaPureAst.node> block binding exit expression conjunction comparison
+%type <VelaPureAst.outcome VelaPureAst.node> sum product unary atom
+%type <VelaPureAst.outcome VelaPureAst.node> call_argument(expression, name)
+%type <VelaPureAst.outcome VelaPureAst.node> left_binary(conjunction, s_disjunction_operator)
+%type <VelaPureAst.outcome VelaPureAst.node> left_binary(comparison, s_conjunction_operator)
+%type <VelaPureAst.outcome VelaPureAst.node> left_binary(product, s_sum_operator)
+%type <VelaPureAst.outcome VelaPureAst.node> left_binary(unary, s_product_operator)
+%type <VelaPureAst.located_text> name comparison_operator plus_operator star_operator
+%type <VelaPureAst.located_text> negation_operator s_disjunction_operator s_conjunction_operator
+%type <VelaPureAst.located_text> s_sum_operator s_product_operator
+%type <Datatypes.option VelaPureAst.span> option(CONST)
+%type <Datatypes.list (VelaPureAst.outcome VelaPureAst.node)> list(binding) nonempty_list(pure_declaration)
+%type <Datatypes.list (VelaPureAst.outcome VelaPureAst.node)> comma_list(parameter) comma_nonempty_list(parameter) comma_tail(parameter)
+%type <Datatypes.list (VelaPureAst.outcome VelaPureAst.node)> comma_list(call_argument(expression, name)) comma_nonempty_list(call_argument(expression, name)) comma_tail(call_argument(expression, name))
+
+%%
+
+option(X):
+  { (@None _) }
+| x=X
+  { Some x }
+
+list(X):
+  { (@nil _) }
+| x=X xs=list(X)
+  { cons x xs }
+
+nonempty_list(X):
+  x=X
+  { cons x nil }
+| x=X xs=nonempty_list(X)
+  { cons x xs }
+
+file:
+  m=MODULE module_name=name s=SEMICOLON declarations=nonempty_list(pure_declaration) EOF
+    { bind (sequence_outcomes declarations) (fun decl_nodes =>
+      make_node "file" (fst m) (last_end (snd s) decl_nodes)
+        [("name", loc_json module_name); ("declarations", array_json decl_nodes)]
+        decl_nodes) }
+
+pure_declaration:
+  p=PUBLIC result=value_type function_name=name LPAREN
+  parameters=comma_list(parameter) RPAREN body=function_body
+    { bind result (fun result_node =>
+      bind (sequence_outcomes parameters) (fun param_nodes =>
+      bind body (fun body_node =>
+      make_node "function" (fst p) (node_end body_node)
+        ([("name", loc_json function_name); ("result", node_syntax result_node);
+          ("parameters", array_json param_nodes); ("body", node_syntax body_node)]
+         ++ const_fields None)
+        (result_node :: body_node :: param_nodes)))) }
+| p=PUBLIC c=CONST result=value_type function_name=name LPAREN
+  parameters=comma_list(parameter) RPAREN body=function_body
+    { bind result (fun result_node =>
+      bind (sequence_outcomes parameters) (fun param_nodes =>
+      bind body (fun body_node =>
+      make_node "function" (fst p) (node_end body_node)
+        ([("name", loc_json function_name); ("result", node_syntax result_node);
+          ("parameters", array_json param_nodes); ("body", node_syntax body_node)]
+         ++ const_fields (Some c))
+        (result_node :: body_node :: param_nodes)))) }
+| p=PUBLIC CONST vtype=value_type constant_name=name EQUAL value=expression s=SEMICOLON
+    { bind vtype (fun type_node =>
+      bind value (fun value_node =>
+      make_node "constant" (fst p) (snd s)
+        [("name", loc_json constant_name); ("type", node_syntax type_node);
+         ("value", node_syntax value_node)]
+        [type_node; value_node])) }
+
+name:
+  spelling=IDENT
+    { loc_text (fst spelling) (snd spelling) }
+
+value_type:
+  sp=NAT
+    { make_node "type" (fst sp) (snd sp) [("name", JString "Nat")] [] }
+| sp=BOOL
+    { make_node "type" (fst sp) (snd sp) [("name", JString "bool")] [] }
+
+function_body:
+  value=block
+    { value }
+| arrow=FATARROW value=expression s=SEMICOLON
+    { bind value (fun value_node =>
+      make_node "expression_body" (fst arrow) (snd s)
+        [("value", node_syntax value_node)] [value_node]) }
+
+parameter:
+  constant=option(CONST) parameter_type=value_type parameter_name=name
+    { bind parameter_type (fun type_node =>
+      let first_pos := match constant with
+                       | Some sp => fst sp
+                       | None => node_start type_node
+                       end in
+      make_node "parameter" first_pos (loc_end parameter_name)
+        ([("name", loc_json parameter_name); ("type", node_syntax type_node)]
+         ++ const_fields constant)
+        [type_node]) }
+
+block:
+  open_b=LBRACE bindings=list(binding) terminal=exit close_b=RBRACE
+    { bind (sequence_outcomes bindings) (fun binding_nodes =>
+      bind terminal (fun terminal_node =>
+      if Nat.ltb max_block_bindings (List.length binding_nodes) then
+        Refused "limit" (fst open_b) "block exceeds 64 bindings"
+      else
+        make_node "block" (fst open_b) (snd close_b)
+          [("bindings", array_json binding_nodes); ("exit", node_syntax terminal_node)]
+          (terminal_node :: binding_nodes))) }
+
+binding:
+  kw=LET binding_name=name EQUAL value=expression s=SEMICOLON
+    { bind value (fun value_node =>
+      make_node "let" (fst kw) (snd s)
+        [("name", loc_json binding_name); ("value", node_syntax value_node)]
+        [value_node]) }
+| kw=LET annotation=value_type binding_name=name EQUAL value=expression s=SEMICOLON
+    { bind annotation (fun type_node =>
+      bind value (fun value_node =>
+      make_node "let" (fst kw) (snd s)
+        [("name", loc_json binding_name); ("type", node_syntax type_node);
+         ("value", node_syntax value_node)]
+        [type_node; value_node])) }
+| annotation=value_type binding_name=name EQUAL value=expression SEMICOLON
+    { bind annotation (fun type_node =>
+      bind value (fun _ =>
+      let _ := binding_name in
+      Refused "syntax" (node_start type_node)
+        "local declaration requires 'let' or 'var' before its type (write 'let T x = e;' or 'var T x = e;')")) }
+| binding_name=name EQUAL value=expression s=SEMICOLON
+    { bind value (fun value_node =>
+      make_node "reassignment" (loc_start binding_name) (snd s)
+        [("name", loc_json binding_name); ("value", node_syntax value_node)]
+        [value_node]) }
+| kw=CONST vtype=value_type constant_name=name EQUAL value=expression s=SEMICOLON
+    { bind vtype (fun type_node =>
+      bind value (fun value_node =>
+      make_node "constant_local" (fst kw) (snd s)
+        [("name", loc_json constant_name); ("type", node_syntax type_node);
+         ("value", node_syntax value_node)]
+        [type_node; value_node])) }
+
+exit:
+  kw=RETURN value=expression s=SEMICOLON
+    { bind value (fun value_node =>
+      make_node "return" (fst kw) (snd s)
+        [("value", node_syntax value_node)] [value_node]) }
+| kw=IF LPAREN condition=expression RPAREN yes=block ELSE no=block
+    { bind condition (fun cond_node =>
+      bind yes (fun yes_node =>
+      bind no (fun no_node =>
+      make_node "if" (fst kw) (node_end no_node)
+        [("condition", node_syntax cond_node); ("then", node_syntax yes_node);
+         ("else", node_syntax no_node)]
+        [cond_node; yes_node; no_node]))) }
+
+expression:
+  value=left_binary(conjunction, s_disjunction_operator)
+    { value }
+
+conjunction:
+  value=left_binary(comparison, s_conjunction_operator)
+    { value }
+
+comparison:
+  value=sum
+    { value }
+| left=sum op=comparison_operator right=sum
+    { binary_node op left right }
+
+comparison_operator:
+  sp=EQ { loc_text sp "==" }
+| sp=LE { loc_text sp "<=" }
+| sp=NE { loc_text sp "!=" }
+| sp=LT { loc_text sp "<" }
+| sp=GT { loc_text sp ">" }
+| sp=GE { loc_text sp ">=" }
+
+sum:
+  value=left_binary(product, s_sum_operator)
+    { value }
+
+plus_operator:
+  sp=PLUS { loc_text sp "+" }
+
+product:
+  value=left_binary(unary, s_product_operator)
+    { value }
+
+star_operator:
+  sp=STAR { loc_text sp "*" }
+
+unary:
+  value=atom
+    { value }
+| operator=negation_operator value=unary
+    { bind value (fun value_node =>
+      make_node "unary" (loc_start operator) (node_end value_node)
+        [("operator", loc_json operator); ("value", node_syntax value_node)]
+        [value_node]) }
+
+negation_operator:
+  sp=NOT { loc_text sp "!" }
+
+atom:
+  value=DECIMAL
+    { make_node "nat" (fst (fst value)) (snd (fst value))
+        [("value", JString (snd value))] [] }
+| sp=TRUE
+    { make_node "bool" (fst sp) (snd sp) [("value", JBoolean true)] [] }
+| sp=FALSE
+    { make_node "bool" (fst sp) (snd sp) [("value", JBoolean false)] [] }
+| value=name
+    { make_node "name" (loc_start value) (loc_end value)
+        [("name", loc_json value)] [] }
+| callee=name LPAREN arguments=comma_list(call_argument(expression, name)) close_p=RPAREN
+    { bind (sequence_outcomes arguments) (fun arg_nodes =>
+      make_node "call" (loc_start callee) (snd close_p)
+        [("callee", loc_json callee); ("arguments", array_json arg_nodes)]
+        arg_nodes) }
+| open_p=LPAREN value=expression close_p=RPAREN
+    { bind value (fun value_node =>
+      make_node "group" (fst open_p) (snd close_p)
+        [("value", node_syntax value_node)] [value_node]) }
+
+call_argument(expression, identifier):
+  value=expression
+    { bind value (fun value_node =>
+      make_node "argument" (node_start value_node) (node_end value_node)
+        [("label", JNull); ("value", node_syntax value_node)] [value_node]) }
+| label=identifier COLON value=expression
+    { bind value (fun value_node =>
+      make_node "argument" (loc_start label) (node_end value_node)
+        [("label", loc_json label); ("value", node_syntax value_node)] [value_node]) }
+
+left_binary(operand, operator):
+  value=operand
+    { value }
+| left=left_binary(operand, operator) op=operator right=operand
+    { binary_node op left right }
+
+s_disjunction_operator:
+  sp=OR { loc_text sp "||" }
+
+s_conjunction_operator:
+  sp=AND { loc_text sp "&&" }
+
+s_sum_operator:
+  value=plus_operator { value }
+| sp=MINUS { loc_text sp "-" }
+
+s_product_operator:
+  value=star_operator { value }
+| sp=SLASH { loc_text sp "/" }
+| sp=PERCENT { loc_text sp "%" }
+
+comma_list(item):
+  { (@nil _) }
+| values=comma_nonempty_list(item) { values }
+
+comma_nonempty_list(item):
+  first=item rest=comma_tail(item) { cons first rest }
+
+comma_tail(item):
+  { (@nil _) }
+| COMMA { (@nil _) }
+| COMMA first=item rest=comma_tail(item) { cons first rest }
+"""
+
+VELA_PURE_PROOFS_V = """(* SPDX-License-Identifier: Apache-2.0 *)
+From Stdlib Require Import Bool Arith List String.
+From MenhirLib Require Import VelaPureAst VelaPureGrammar.
+Import ListNotations.
+Import VelaPureGrammar.Gram VelaPureGrammar.Aut.GramDefs.
+Open Scope string_scope.
+
+Definition version_guard : unit := VelaPureGrammar.version_check.
+
+Theorem vela_file_safe :
+  VelaPureGrammar.MenhirLibParser.safe_validator tt = true.
+Proof. exact VelaPureGrammar.safe. Qed.
+
+Theorem vela_file_complete_validator :
+  VelaPureGrammar.MenhirLibParser.complete_validator tt = true.
+Proof. exact VelaPureGrammar.complete. Qed.
+
+Theorem vela_file_correct :
+  forall (log_fuel : nat) (buffer : VelaPureGrammar.MenhirLibParser.Inter.buffer),
+  match VelaPureGrammar.file log_fuel buffer with
+  | VelaPureGrammar.MenhirLibParser.Inter.Parsed_pr sem buffer_new =>
+      exists word (tree : parse_tree (NT file'nt) word),
+        buffer = VelaPureGrammar.MenhirLibParser.Inter.app_buf word buffer_new /\\
+        pt_sem tree = sem
+  | _ => True
+  end.
+Proof. exact VelaPureGrammar.file_correct. Qed.
+
+Theorem vela_file_complete :
+  forall (log_fuel : nat) (word : list VelaPureGrammar.token) (buffer_end : VelaPureGrammar.MenhirLibParser.Inter.buffer)
+         (tree : parse_tree (NT file'nt) word),
+  match VelaPureGrammar.file log_fuel (VelaPureGrammar.MenhirLibParser.Inter.app_buf word buffer_end) with
+  | VelaPureGrammar.MenhirLibParser.Inter.Fail_pr => False
+  | VelaPureGrammar.MenhirLibParser.Inter.Parsed_pr output_res buffer_end_res =>
+      output_res = pt_sem tree /\\
+      buffer_end_res = buffer_end /\\ (pt_size tree <= PeanoNat.Nat.pow 2 log_fuel)%nat
+  | VelaPureGrammar.MenhirLibParser.Inter.Timeout_pr =>
+      (PeanoNat.Nat.pow 2 log_fuel < pt_size tree)%nat
+  end.
+Proof. exact VelaPureGrammar.file_complete. Qed.
+
+Theorem vela_file_unambiguity :
+  forall (word : list VelaPureGrammar.token)
+         (tree1 tree2 : parse_tree (NT file'nt) word),
+    pt_sem tree1 = pt_sem tree2.
+Proof.
+  exact (VelaPureGrammar.MenhirLibParser.unambiguity
+           VelaPureGrammar.safe VelaPureGrammar.complete
+           (inhabits (VelaPureGrammar.EOF (0, 0)))
+           VelaPureGrammar.Aut.Init'0).
+Qed.
+
+CoFixpoint eof_buffer (sp : span) : VelaPureGrammar.MenhirLibParser.Inter.buffer :=
+  VelaPureGrammar.MenhirLibParser.Inter.Buf_cons (VelaPureGrammar.EOF sp) (eof_buffer sp).
+
+Definition token_stream (words : list VelaPureGrammar.token) (eof_span : span)
+  : VelaPureGrammar.MenhirLibParser.Inter.buffer :=
+  VelaPureGrammar.MenhirLibParser.Inter.app_buf words (eof_buffer eof_span).
+
+Definition parse_tokens (log_fuel : nat) (words : list VelaPureGrammar.token) (eof_span : span)
+  : option (outcome node) :=
+  match VelaPureGrammar.file log_fuel (token_stream words eof_span) with
+  | VelaPureGrammar.MenhirLibParser.Inter.Parsed_pr result _ => Some result
+  | _ => None
+  end.
+
+Definition sample_Precedence_tokens : list VelaPureGrammar.token := [
+  VelaPureGrammar.MODULE (0, 6);
+  VelaPureGrammar.IDENT ((7, 8), "M");
+  VelaPureGrammar.SEMICOLON (8, 9);
+  VelaPureGrammar.PUBLIC (10, 16);
+  VelaPureGrammar.NAT (17, 20);
+  VelaPureGrammar.IDENT ((21, 22), "F");
+  VelaPureGrammar.LPAREN (22, 23);
+  VelaPureGrammar.RPAREN (23, 24);
+  VelaPureGrammar.LBRACE (25, 26);
+  VelaPureGrammar.RETURN (27, 33);
+  VelaPureGrammar.DECIMAL ((34, 35), "1");
+  VelaPureGrammar.PLUS (36, 37);
+  VelaPureGrammar.DECIMAL ((38, 39), "2");
+  VelaPureGrammar.STAR (40, 41);
+  VelaPureGrammar.DECIMAL ((42, 43), "3");
+  VelaPureGrammar.SEMICOLON (43, 44);
+  VelaPureGrammar.RBRACE (45, 46);
+  VelaPureGrammar.EOF (46, 46)
+].
+
+Definition sample_BareLocal_tokens : list VelaPureGrammar.token := [
+  VelaPureGrammar.MODULE (0, 6);
+  VelaPureGrammar.IDENT ((7, 8), "M");
+  VelaPureGrammar.SEMICOLON (8, 9);
+  VelaPureGrammar.PUBLIC (10, 16);
+  VelaPureGrammar.NAT (17, 20);
+  VelaPureGrammar.IDENT ((21, 22), "F");
+  VelaPureGrammar.LPAREN (22, 23);
+  VelaPureGrammar.RPAREN (23, 24);
+  VelaPureGrammar.LBRACE (25, 26);
+  VelaPureGrammar.NAT (27, 30);
+  VelaPureGrammar.IDENT ((31, 32), "x");
+  VelaPureGrammar.EQUAL (33, 34);
+  VelaPureGrammar.DECIMAL ((35, 36), "1");
+  VelaPureGrammar.SEMICOLON (36, 37);
+  VelaPureGrammar.RETURN (38, 44);
+  VelaPureGrammar.IDENT ((45, 46), "x");
+  VelaPureGrammar.SEMICOLON (46, 47);
+  VelaPureGrammar.RBRACE (48, 49);
+  VelaPureGrammar.EOF (49, 49)
+].
+
+Definition sample_EmptyModule_tokens : list VelaPureGrammar.token := [
+  VelaPureGrammar.MODULE (0, 6);
+  VelaPureGrammar.IDENT ((7, 8), "M");
+  VelaPureGrammar.SEMICOLON (8, 9);
+  VelaPureGrammar.EOF (9, 9)
+].
+
+Theorem vela_file_positive_precedence :
+  match parse_tokens 6 sample_Precedence_tokens (46, 46) with
+  | Some (Accepted parsed) =>
+      (Nat.eqb (fst (node_span parsed)) 0 &&
+       Nat.eqb (snd (node_span parsed)) 46 &&
+       Nat.eqb (node_depth parsed) 7)%bool
+  | _ => false
+  end = true.
+Proof. lazy; reflexivity. Qed.
+
+Theorem vela_file_bare_local_refused :
+  parse_tokens 6 sample_BareLocal_tokens (49, 49) =
+  Some (Refused "syntax" 27
+    "local declaration requires 'let' or 'var' before its type (write 'let T x = e;' or 'var T x = e;')").
+Proof. lazy; reflexivity. Qed.
+
+Theorem vela_file_empty_module_rejected :
+  parse_tokens 6 sample_EmptyModule_tokens (9, 9) = None.
+Proof. lazy; reflexivity. Qed.
+
+Theorem vela_file_zero_fuel_timeout :
+  VelaPureGrammar.file 0 (token_stream sample_Precedence_tokens (46, 46)) =
+  VelaPureGrammar.MenhirLibParser.Inter.Timeout_pr.
+Proof. lazy; reflexivity. Qed.
+
+Print Assumptions vela_file_safe.
+Print Assumptions vela_file_complete_validator.
+Print Assumptions vela_file_correct.
+Print Assumptions vela_file_complete.
+Print Assumptions vela_file_unambiguity.
+Print Assumptions vela_file_positive_precedence.
+Print Assumptions vela_file_bare_local_refused.
+Print Assumptions vela_file_empty_module_rejected.
+Print Assumptions vela_file_zero_fuel_timeout.
+"""
+
+VELA_PURE_EXTRACTION_V = """(* SPDX-License-Identifier: Apache-2.0 *)
+From Stdlib Require Extraction.
+From MenhirLib Require Import VelaPureAst VelaPureGrammar VelaPureProofs.
+Extraction Language OCaml.
+Set Extraction Output Directory ".".
+Extraction "vela_checked_parser.ml" VelaPureGrammar.file.
+"""
+
+CHECKED_MAIN_ML = """(* SPDX-License-Identifier: Apache-2.0 *)
+(* Execute the extracted Rocq pure parser over the shared UTF-8/lexer boundary. *)
+
+let rec nat_of_int n =
+  let rec loop acc k =
+    if k <= 0 then acc
+    else loop (Vela_checked_parser.S acc) (k - 1)
+  in
+  loop Vela_checked_parser.O n
+
+let int_of_nat n =
+  let rec loop acc = function
+    | Vela_checked_parser.O -> acc
+    | Vela_checked_parser.S rest -> loop (acc + 1) rest
+  in
+  loop 0 n
+
+let bit b = if b then Vela_checked_parser.True else Vela_checked_parser.False
+
+let unbit = function
+  | Vela_checked_parser.True -> 1
+  | Vela_checked_parser.False -> 0
+
+let ascii_of_char ch =
+  let code = Char.code ch in
+  Vela_checked_parser.Ascii (
+    bit (code land 1 <> 0),
+    bit (code land 2 <> 0),
+    bit (code land 4 <> 0),
+    bit (code land 8 <> 0),
+    bit (code land 16 <> 0),
+    bit (code land 32 <> 0),
+    bit (code land 64 <> 0),
+    bit (code land 128 <> 0)
+  )
+
+let char_of_ascii = function
+  | Vela_checked_parser.Ascii (b0, b1, b2, b3, b4, b5, b6, b7) ->
+      Char.chr (
+        unbit b0
+        lor (unbit b1 lsl 1)
+        lor (unbit b2 lsl 2)
+        lor (unbit b3 lsl 3)
+        lor (unbit b4 lsl 4)
+        lor (unbit b5 lsl 5)
+        lor (unbit b6 lsl 6)
+        lor (unbit b7 lsl 7)
+      )
+
+let coq_string_of_string s =
+  let rec loop idx acc =
+    if idx < 0 then acc
+    else loop (idx - 1) (Vela_checked_parser.String (ascii_of_char s.[idx], acc))
+  in
+  loop (String.length s - 1) Vela_checked_parser.EmptyString
+
+let string_of_coq_string s =
+  let buf = Buffer.create 32 in
+  let rec loop = function
+    | Vela_checked_parser.EmptyString -> Buffer.contents buf
+    | Vela_checked_parser.String (ch, rest) ->
+        Buffer.add_char buf (char_of_ascii ch);
+        loop rest
+  in
+  loop s
+
+let rec list_of_coq_list = function
+  | Vela_checked_parser.Nil -> []
+  | Vela_checked_parser.Cons (head, tail) -> head :: list_of_coq_list tail
+
+let rec ast_json_of_coq_json = function
+  | Vela_checked_parser.JNull -> Ast.Null
+  | Vela_checked_parser.JBoolean Vela_checked_parser.True -> Ast.Boolean true
+  | Vela_checked_parser.JBoolean Vela_checked_parser.False -> Ast.Boolean false
+  | Vela_checked_parser.JNumber n -> Ast.Number (int_of_nat n)
+  | Vela_checked_parser.JString s -> Ast.String (string_of_coq_string s)
+  | Vela_checked_parser.JArray items ->
+      Ast.Array (List.map ast_json_of_coq_json (list_of_coq_list items))
+  | Vela_checked_parser.JObject fields ->
+      Ast.Object (
+        List.map
+          (fun (Vela_checked_parser.Pair (k, v)) ->
+            (string_of_coq_string k, ast_json_of_coq_json v))
+          (list_of_coq_list fields)
+      )
+
+let coq_span start_pos end_pos =
+  Vela_checked_parser.Pair (nat_of_int start_pos, nat_of_int end_pos)
+
+let convert_token start_pos end_pos (raw : Parser.token) : Vela_checked_parser.token0 =
+  let sp = coq_span start_pos end_pos in
+  match raw with
+  | Parser.MODULE -> Vela_checked_parser.MODULE sp
+  | Parser.PUBLIC -> Vela_checked_parser.PUBLIC sp
+  | Parser.NAT -> Vela_checked_parser.NAT sp
+  | Parser.BOOL -> Vela_checked_parser.BOOL sp
+  | Parser.LET -> Vela_checked_parser.LET sp
+  | Parser.CONST -> Vela_checked_parser.CONST sp
+  | Parser.RETURN -> Vela_checked_parser.RETURN sp
+  | Parser.IF -> Vela_checked_parser.IF sp
+  | Parser.ELSE -> Vela_checked_parser.ELSE sp
+  | Parser.TRUE -> Vela_checked_parser.TRUE sp
+  | Parser.FALSE -> Vela_checked_parser.FALSE sp
+  | Parser.LPAREN -> Vela_checked_parser.LPAREN sp
+  | Parser.RPAREN -> Vela_checked_parser.RPAREN sp
+  | Parser.LBRACE -> Vela_checked_parser.LBRACE sp
+  | Parser.RBRACE -> Vela_checked_parser.RBRACE sp
+  | Parser.SEMICOLON -> Vela_checked_parser.SEMICOLON sp
+  | Parser.COMMA -> Vela_checked_parser.COMMA sp
+  | Parser.COLON -> Vela_checked_parser.COLON sp
+  | Parser.FATARROW -> Vela_checked_parser.FATARROW sp
+  | Parser.EQUAL -> Vela_checked_parser.EQUAL sp
+  | Parser.PLUS -> Vela_checked_parser.PLUS sp
+  | Parser.MINUS -> Vela_checked_parser.MINUS sp
+  | Parser.STAR -> Vela_checked_parser.STAR sp
+  | Parser.SLASH -> Vela_checked_parser.SLASH sp
+  | Parser.PERCENT -> Vela_checked_parser.PERCENT sp
+  | Parser.EQ -> Vela_checked_parser.EQ0 sp
+  | Parser.LE -> Vela_checked_parser.LE sp
+  | Parser.NE -> Vela_checked_parser.NE sp
+  | Parser.LT -> Vela_checked_parser.LT0 sp
+  | Parser.GT -> Vela_checked_parser.GT0 sp
+  | Parser.GE -> Vela_checked_parser.GE sp
+  | Parser.AND -> Vela_checked_parser.AND sp
+  | Parser.OR -> Vela_checked_parser.OR sp
+  | Parser.NOT -> Vela_checked_parser.NOT sp
+  | Parser.EOF -> Vela_checked_parser.EOF sp
+  | Parser.IDENT s ->
+      Vela_checked_parser.IDENT (Vela_checked_parser.Pair (sp, coq_string_of_string s))
+  | Parser.DECIMAL s ->
+      Vela_checked_parser.DECIMAL (Vela_checked_parser.Pair (sp, coq_string_of_string s))
+  | _ ->
+      raise (Ast.Refusal ("syntax", start_pos, "unexpected token or incomplete input"))
+
+let read_source () =
+  let bytes = Bytes.create (Ast.max_source_bytes + 1) in
+  let rec read count =
+    if count = Bytes.length bytes then count
+    else
+      let got = input stdin bytes count (Bytes.length bytes - count) in
+      if got = 0 then count else read (count + got)
+  in
+  let count = read 0 in
+  if count > Ast.max_source_bytes then
+    raise (Ast.Refusal ("limit", 0, "source exceeds 65536 bytes"));
+  Bytes.sub_string bytes 0 count
+
+let validate_utf8 source =
+  let length = String.length source in
+  let byte index = Char.code source.[index] in
+  let continuation index = index < length && byte index >= 0x80 && byte index <= 0xbf in
+  let invalid index = raise (Ast.Refusal ("encoding", index, "source is not valid UTF-8")) in
+  let rec walk index =
+    if index < length then begin
+      let lead = byte index in
+      let width =
+        if lead <= 0x7f then 1
+        else if lead >= 0xc2 && lead <= 0xdf then 2
+        else if lead >= 0xe0 && lead <= 0xef then 3
+        else if lead >= 0xf0 && lead <= 0xf4 then 4
+        else invalid index
+      in
+      if index + width > length then invalid index;
+      for offset = 1 to width - 1 do
+        if not (continuation (index + offset)) then invalid index
+      done;
+      if width >= 3 then begin
+        let second = byte (index + 1) in
+        if (lead = 0xe0 && second < 0xa0) || (lead = 0xed && second >= 0xa0)
+           || (lead = 0xf0 && second < 0x90) || (lead = 0xf4 && second >= 0x90)
+        then invalid index
+      end;
+      walk (index + width)
+    end
+  in
+  walk 0
+
+let position source target =
+  let limit = min target (String.length source) in
+  let rec scan index line column =
+    if index >= limit then (line, column)
+    else match source.[index] with
+      | '\\r' ->
+          let width = if index + 1 < limit && source.[index + 1] = '\\n' then 2 else 1 in
+          scan (index + width) (line + 1) 1
+      | '\\n' -> scan (index + 1) (line + 1) 1
+      | character when Char.code character land 0xc0 = 0x80 ->
+          scan (index + 1) line column
+      | _ -> scan (index + 1) line (column + 1)
+  in
+  scan 0 1 1
+
+let diagnostic source kind offset message =
+  let line, column = position source offset in
+  Ast.Object [("kind", Ast.String kind); ("line", Ast.Number line);
+              ("column", Ast.Number column); ("message", Ast.String message)]
+
+let rec token_stream state lexbuf current =
+  lazy (
+    let raw = Lexer.token state lexbuf in
+    let start_pos = Lexing.lexeme_start lexbuf in
+    let end_pos = Lexing.lexeme_end lexbuf in
+    current := start_pos;
+    let tok = convert_token start_pos end_pos raw in
+    Vela_checked_parser.MenhirLibParser.Inter.Buf_cons
+      (tok, token_stream state lexbuf current)
+  )
+
+let () =
+  set_binary_mode_in stdin true;
+  set_binary_mode_out stdout true;
+  let source = ref "" in
+  let current = ref 0 in
+  let publish_failure kind offset message =
+    print_endline (Ast.encode (diagnostic !source kind offset message));
+    exit 1
+  in
+  try
+    (match Array.to_list Sys.argv with
+     | [_] -> ()
+     | _ -> raise (Ast.Refusal ("syntax", 0, "expected no arguments")));
+    source := read_source ();
+    validate_utf8 !source;
+    let lexbuf = Lexing.from_string !source in
+    let state = Lexer.create ~surface:false () in
+    let stream = token_stream state lexbuf current in
+    let log_fuel = nat_of_int 30 in
+    match Vela_checked_parser.file log_fuel stream with
+    | Vela_checked_parser.MenhirLibParser.Inter.Parsed_pr (Vela_checked_parser.Accepted node, _) ->
+        let syntax = ast_json_of_coq_json node.Vela_checked_parser.node_syntax in
+        print_endline (Ast.encode (Ast.Object [("schema", Ast.Number 1); ("ast", syntax)]))
+    | Vela_checked_parser.MenhirLibParser.Inter.Parsed_pr
+        (Vela_checked_parser.Refused (kind, offset, message), _) ->
+        publish_failure (string_of_coq_string kind) (int_of_nat offset) (string_of_coq_string message)
+    | Vela_checked_parser.MenhirLibParser.Inter.Fail_pr_full _ ->
+        publish_failure "syntax" !current "unexpected token or incomplete input"
+    | Vela_checked_parser.MenhirLibParser.Inter.Timeout_pr ->
+        publish_failure "limit" !current "checked parser step fuel exhausted"
+  with
+  | Ast.Refusal (kind, offset, message) -> publish_failure kind offset message
+  | Stack_overflow -> publish_failure "limit" !current "native parser stack limit exceeded"
+  | Sys_error message -> publish_failure "io" !current message
+"""
+
 
 def _sha256(source: bytes) -> str:
     return hashlib.sha256(source).hexdigest()
@@ -82,6 +968,99 @@ def _sha256(source: bytes) -> str:
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def _strip_comments_and_actions(body: str) -> str:
+    cleaned = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
+    out: list[str] = []
+    depth = 0
+    in_str = False
+    in_chr = False
+    escape = False
+    for ch in cleaned:
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+            if depth == 0:
+                out.append(ch)
+        elif in_chr:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "'":
+                in_chr = False
+            if depth == 0:
+                out.append(ch)
+        elif ch == '"' and depth > 0:
+            in_str = True
+        elif ch == "'" and depth > 0:
+            in_chr = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            if depth == 0:
+                raise ValueError("unbalanced closing brace in parser.mly")
+            depth -= 1
+        elif depth == 0:
+            out.append(ch)
+    if depth != 0:
+        raise ValueError("unbalanced opening brace in parser.mly")
+    return "".join(out)
+
+
+def _pure_grammar_view(mly_text: str) -> tuple[str, str]:
+    """Verify the pure grammar skeleton in parser.mly and emit VelaPureGrammar.mly and a token stub."""
+    header, sep, body = mly_text.partition("\n%%\n")
+    if sep != "\n%%\n":
+        raise ValueError("parser.mly is missing its %% section separator")
+    declared_tokens: set[str] = set()
+    constructors: list[str] = []
+    for raw_line in header.splitlines():
+        line = raw_line.strip()
+        match = re.match(r"^%token(?:\s*<([^>]+)>)?\s+(.+)$", line)
+        if match:
+            payload = match.group(1)
+            for token_name in match.group(2).split():
+                declared_tokens.add(token_name)
+                if payload:
+                    constructors.append(f"  | {token_name} of ({payload})")
+                else:
+                    constructors.append(f"  | {token_name}")
+    if not set(PURE_TERMINALS).issubset(declared_tokens):
+        raise ValueError("parser.mly omits required pure terminals")
+    cleaned = _strip_comments_and_actions(body)
+    rule_header_re = re.compile(r"(?m)^\s*(?:%inline\s+)?([a-z_][a-z0-9_]*(?:\([^)]*\))?)\s*:")
+    matches = list(rule_header_re.finditer(cleaned))
+    rules: dict[str, tuple[tuple[str, ...], ...]] = {}
+    for idx, match in enumerate(matches):
+        head = re.sub(r"\s+", "", match.group(1))
+        start = match.end()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(cleaned)
+        rhs_block = cleaned[start:end].strip()
+        alts: list[tuple[str, ...]] = []
+        for raw_alt in rhs_block.split("|"):
+            raw_e = re.sub(r"\b[a-z_][a-z0-9_]*\s*=\s*", "", raw_alt.strip())
+            raw_e = re.sub(r"\(\s*", "(", raw_e)
+            raw_e = re.sub(r"\s*\)", ")", raw_e)
+            raw_e = re.sub(r"\s*,\s*", ",", raw_e)
+            alts.append(tuple(raw_e.split()))
+        rules[head] = tuple(alts)
+    extracted = {name: rules.get(name, ()) for name in EXPECTED_PURE_SKELETON}
+    if extracted != EXPECTED_PURE_SKELETON:
+        raise ValueError("pure grammar skeleton in parser.mly drifted from the checked specification")
+    token_stub = f"""(* SPDX-License-Identifier: Apache-2.0 *)
+type token =
+{"\n".join(constructors)}
+
+exception Error
+let generic_call_prefix _ _ : unit = raise Error
+"""
+    return VELA_PURE_GRAMMAR_MLY, token_stub
 
 
 def _proof_openings(source: bytes, *, reference: bool = False) -> bytes:
@@ -110,6 +1089,51 @@ def _proof_openings(source: bytes, *, reference: bool = False) -> bytes:
     if _sha256(candidate) != wanted:
         raise ValueError("Menhir proof-command repair differs from the reviewed candidate")
     return candidate
+
+
+def _validator_items_map(source: bytes, *, reference: bool = False) -> bytes:
+    """Keep IsItemsMap abstract in is_validator_forall_items so rocqchk does not unroll items_map."""
+    if _sha256(source) != VALIDATOR_COMPLETE_SHA256:
+        raise ValueError("unsupported Menhir Validator_complete source; items_map repair refused")
+    if reference:
+        return source
+    old_block = (
+        "Proof.\n"
+        "  intros -> Hval1 Hval2 Val st prod fut lookahead (pos & -> & Hlookahead).\n"
+        "  rewrite /forallb_items StateProdPosMap.fold_1 in Val.\n"
+        "  assert (match future_of_prod prod pos with\n"
+        "          | [] => b1 st prod pos (find_items_map (items_map ()) st prod pos)\n"
+        "          | s :: fut' => b2 st prod pos (find_items_map (items_map ()) st prod pos) s fut'\n"
+        "          end = true).\n"
+        "  - unfold find_items_map in *.\n"
+        "    assert (Hfind := @StateProdPosMap.find_2 _ (items_map ()) (st, prod, pos))."
+    )
+    new_block = (
+        "Proof.\n"
+        "  intros Him Hval1 Hval2 Val st prod fut lookahead (pos & -> & Hlookahead).\n"
+        "  rewrite -Him in Hlookahead.\n"
+        "  rewrite /forallb_items StateProdPosMap.fold_1 in Val.\n"
+        "  assert (match future_of_prod prod pos with\n"
+        "          | [] => b1 st prod pos (find_items_map im st prod pos)\n"
+        "          | s :: fut' => b2 st prod pos (find_items_map im st prod pos) s fut'\n"
+        "          end = true).\n"
+        "  - unfold find_items_map in *.\n"
+        "    assert (Hfind := @StateProdPosMap.find_2 _ im (st, prod, pos))."
+    )
+    text = source.decode("utf-8")
+    if text.count(old_block) != 1:
+        raise ValueError("unsupported Validator_complete proof opening")
+    candidate = text.replace(old_block, new_block, 1).encode("utf-8")
+    if _sha256(candidate) != VALIDATOR_COMPLETE_CANDIDATE_SHA256:
+        raise ValueError("Menhir Validator_complete repair differs from the reviewed candidate")
+    return candidate
+
+
+def _check_closed_assumptions(reading: str, expected_count: int) -> None:
+    """Refuse any concrete theorem whose Print Assumptions output is not closed."""
+    lines = [line.strip() for line in reading.strip().splitlines() if line.strip()]
+    if lines != ["Closed under the global context"] * expected_count:
+        raise ValueError("concrete checked-parser theorem has unclosed assumptions")
 
 
 def _release_sources(archive: bytes) -> dict[str, bytes]:
@@ -157,8 +1181,8 @@ def _write_json(path: Path, value: dict[str, object]) -> None:
                            encoding="utf-8", newline="")
 
 
-def _opam(arguments: list[str]) -> list[str]:
-    return ["opam", "exec", "--switch", proofenv.ROCQ_SWITCH, "--", *arguments]
+def _opam(arguments: list[str], *, switch: str = proofenv.ROCQ_SWITCH) -> list[str]:
+    return ["opam", "exec", "--switch", switch, "--", *arguments]
 
 
 def _run(arguments: list[str], directory: Path, log: Path,
@@ -193,7 +1217,10 @@ def _run(arguments: list[str], directory: Path, log: Path,
 
 def _inputs(root: Path) -> dict[str, str]:
     return {name: _sha256((root / name).read_bytes()) for name in (
-        "tools/opam/rocq.lock", "tools/opam/sail.lock", "tools/toolchain/parser_checked.py")}
+        "tools/opam/rocq.lock", "tools/opam/sail.lock", "tools/toolchain/parser_checked.py",
+        "tools/toolchain/parser/ast.ml", "tools/toolchain/parser/parser.mly",
+        "tools/toolchain/parser/lexer.mll", "examples/pure.vela",
+        "examples/constants.vela", "examples/expressions.vela")}
 
 
 def _toolchain(root: Path, directory: Path, steps: list[dict[str, object]]) -> dict[str, object]:
@@ -218,9 +1245,27 @@ def _toolchain(root: Path, directory: Path, steps: list[dict[str, object]]) -> d
     binary_dir = Path(binary)
     if not binary_dir.is_absolute():
         raise ValueError("opam returned a relative support tool directory")
-    return {"switch": proofenv.ROCQ_SWITCH, "rocq": version.strip(), "ocamlc": compiler,
-            "binary_sha256": {name: _sha256((binary_dir / name).read_bytes())
-                              for name in ("rocq", "rocqchk", "ocamlc")}}
+    generator = _run(_opam(["menhir", "--version"], switch=env.SAIL_SWITCH), root,
+                     directory / "menhir.stdout", steps).strip()
+    if generator != f"menhir, version {RELEASE}":
+        raise ValueError("Menhir generator executable differs from the locked release")
+    sail_bin = _run(["opam", "var", "bin", "--switch", env.SAIL_SWITCH], root,
+                    directory / "sail-tool-path.stdout", steps).strip()
+    sail_bin_dir = Path(sail_bin)
+    if not sail_bin_dir.is_absolute():
+        raise ValueError("opam returned a relative generator tool directory")
+    return {
+        "switch": proofenv.ROCQ_SWITCH,
+        "generator_switch": env.SAIL_SWITCH,
+        "rocq": version.strip(),
+        "ocamlc": compiler,
+        "menhir": generator,
+        "binary_sha256": {
+            **{name: _sha256((binary_dir / name).read_bytes())
+               for name in ("rocq", "rocqchk", "ocamlc", "ocamllex")},
+            "menhir": _sha256((sail_bin_dir / "menhir").read_bytes()),
+        },
+    }
 
 
 def _runtime(directory: Path, steps: list[dict[str, object]]) -> dict[str, object]:
@@ -273,7 +1318,12 @@ def _stage(sources: dict[str, bytes], directory: Path, *, reference: bool) -> No
         # The selected license notices accompany every private build tree.
         if path in LICENSES:
             relative = "LICENSE.generator" if path == "LICENSE" else "LICENSE.support"
-        content = _proof_openings(source, reference=reference) if relative == "Interpreter.v" else source
+        if relative == "Interpreter.v":
+            content = _proof_openings(source, reference=reference)
+        elif relative == "Validator_complete.v":
+            content = _validator_items_map(source, reference=reference)
+        else:
+            content = source
         (directory / relative).write_bytes(content)
 
 
@@ -319,14 +1369,14 @@ def _observations(candidate: Path, reference: Path, guard: str,
 
 
 def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
-    """Freshly build, compare and kernel-check the support prerequisite; install nothing."""
+    """Freshly build, compare, kernel-check, extract and qualify the checked pure parser."""
     work = _work_root(root)
     with FileLock(work / "qualification.lock", timeout=1):
         latest = work / "qualification.json"
         latest.unlink(missing_ok=True)
         directory = Path(tempfile.mkdtemp(prefix="support-", dir=work))
         steps: list[dict[str, object]] = []
-        attempt: dict[str, object] = {"schema": 1, "scope": "menhir-rocq-support-prerequisite",
+        attempt: dict[str, object] = {"schema": 1, "scope": "vela-checked-pure-parser",
                                       "directory": str(directory), "steps": steps, "status": "running"}
         try:
             inputs = _inputs(root)
@@ -334,6 +1384,8 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
             runtime = _runtime(directory, steps)
             contents = _archive(archive, directory)
             sources = _release_sources(contents)
+            mly_source = (root / "tools/toolchain/parser/parser.mly").read_text(encoding="utf-8")
+            pure_mly, token_stub = _pure_grammar_view(mly_source)
             candidate, reference = directory / "candidate", directory / "reference"
             _stage(sources, candidate, reference=False)
             _stage(sources, reference, reference=True)
@@ -342,13 +1394,39 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
                 (tree / "Frozen.v").write_text(FROZEN_QUERY, encoding="utf-8", newline="")
                 _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "Frozen.v"]),
                      tree, tree / "frozen.stdout", steps)
+                (tree / "VelaPureAst.v").write_text(VELA_PURE_AST_V, encoding="utf-8", newline="")
+                (tree / "VelaPureGrammar.mly").write_text(pure_mly, encoding="utf-8", newline="")
+                _run(_opam(["menhir", "--coq", "--strict", "VelaPureGrammar.mly"], switch=env.SAIL_SWITCH),
+                     tree, tree / "menhir-coq.stdout", steps)
+                for module_name in GRAMMAR_MODULES:
+                    if module_name == "VelaPureProofs":
+                        (tree / "VelaPureProofs.v").write_text(VELA_PURE_PROOFS_V, encoding="utf-8", newline="")
+                    _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", f"{module_name}.v"]),
+                         tree, tree / f"{module_name.lower()}.stdout", steps)
+                (tree / "VelaPureExtraction.v").write_text(VELA_PURE_EXTRACTION_V, encoding="utf-8", newline="")
+                _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VelaPureExtraction.v"]),
+                     tree, tree / "extraction.stdout", steps)
+            generated_v = (candidate / "VelaPureGrammar.v").read_bytes()
+            _require(bool(generated_v) and generated_v == (reference / "VelaPureGrammar.v").read_bytes(),
+                     "fresh menhir --coq --strict generation changed VelaPureGrammar.v bytes")
+            _require(f"MenhirLib.Version.require_{RELEASE}".encode() in generated_v,
+                     "generated VelaPureGrammar.v omits the MenhirLib version guard")
+            extracted_ml = (candidate / "vela_checked_parser.ml").read_bytes()
+            extracted_mli = (candidate / "vela_checked_parser.mli").read_bytes()
+            _require(bool(extracted_ml) and extracted_ml == (reference / "vela_checked_parser.ml").read_bytes()
+                     and bool(extracted_mli) and extracted_mli == (reference / "vela_checked_parser.mli").read_bytes(),
+                     "fresh Rocq extraction changed vela_checked_parser.ml/.mli bytes")
             outputs = {str(tree.name): {f"{name}.vo": _sha256((tree / f"{name}.vo").read_bytes())
-                                       for name in MODULES} for tree in (candidate, reference)}
+                                       for name in ALL_MODULES} for tree in (candidate, reference)}
             frozen = (candidate / "frozen.stdout").read_bytes()
             _require(bool(frozen) and frozen == (reference / "frozen.stdout").read_bytes(),
                      "same-prover Menhir public types, bodies, universes or assumptions differ")
+            proofs_reading = (candidate / "velapureproofs.stdout").read_text(encoding="utf-8")
+            _require(proofs_reading.encode() == (reference / "velapureproofs.stdout").read_bytes(),
+                     "concrete checked-parser assumption reading differs between candidate and reference")
+            _check_closed_assumptions(proofs_reading, len(THEOREMS))
             _run(_opam(["rocqchk", "-R", ".", "MenhirLib",
-                        *(f"MenhirLib.{module}" for module in MODULES)]),
+                        *(f"MenhirLib.{module}" for module in ALL_MODULES)]),
                  candidate, candidate / "kernel.stdout", steps)
             (candidate / "Assumptions.v").write_text(ASSUMPTIONS_QUERY, encoding="utf-8", newline="")
             _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "Assumptions.v"]),
@@ -361,16 +1439,67 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
                 guard.replace(f"require_{RELEASE}", "require_unreleased"), encoding="utf-8", newline="")
             _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VersionRefused.v"]),
                  candidate, candidate / "guard-refused.stdout", steps, refusal="require_unreleased")
+            for name in ("ast.ml", "lexer.mll"):
+                shutil.copyfile(root / "tools/toolchain/parser" / name, candidate / name)
+            (candidate / "parser.ml").write_text(token_stub, encoding="utf-8", newline="")
+            (candidate / "checked_main.ml").write_text(CHECKED_MAIN_ML, encoding="utf-8", newline="")
+            ocaml_commands = (
+                ("ast-compile", ["ocamlc", "-c", "ast.ml"]),
+                ("token-stub-compile", ["ocamlc", "-c", "parser.ml"]),
+                ("lexer-generate", ["ocamllex", "lexer.mll"]),
+                ("lexer-compile", ["ocamlc", "-c", "lexer.ml"]),
+                ("extracted-mli-compile", ["ocamlc", "-w", "-a", "-c", "vela_checked_parser.mli"]),
+                ("extracted-ml-compile", ["ocamlc", "-w", "-a", "-c", "vela_checked_parser.ml"]),
+                ("checked-main-compile", ["ocamlc", "-c", "checked_main.ml"]),
+                ("checked-link", ["ocamlc", "-o", "vela-checked-parser", "ast.cmo",
+                                  "parser.cmo", "lexer.cmo", "vela_checked_parser.cmo", "checked_main.cmo"]),
+            )
+            for step_name, cmd in ocaml_commands:
+                _run(_opam(cmd), candidate, candidate / f"{step_name}.stdout", steps)
+            checked_exe = candidate / "vela-checked-parser"
+            checked_build = vela_parser.Build(
+                directory=candidate,
+                executable=checked_exe,
+                receipt={"generated_sha256": {"vela-parser": _sha256(checked_exe.read_bytes())}},
+            )
+            passed_fixtures = vela_parser._fixtures(checked_build)
+            dev_build = vela_parser.build(root)
+            examples_verified: dict[str, str] = {}
+            for rel_example in ("examples/pure.vela", "examples/constants.vela", "examples/expressions.vela"):
+                example_bytes = vela_parser.read_source(root / rel_example)
+                checked_parsed = vela_parser.parse_source(checked_build, example_bytes)
+                dev_parsed = vela_parser.parse_source(dev_build, example_bytes)
+                _require(checked_parsed == dev_parsed,
+                         f"vela-checked-parser disagreed with vela-parser on {rel_example}")
+                examples_verified[rel_example] = _sha256(example_bytes)
+            migration_cases = (
+                *migration.fixtures(vela_parser.read_source(root / "examples/pure.vela")),
+                migration.Fixture("authored-compositional-constants",
+                                  vela_parser.read_source(root / "examples/constants.vela"), "accepted"),
+                migration.Fixture("authored-extended-expressions",
+                                  vela_parser.read_source(root / "examples/expressions.vela"), "accepted"),
+            )
+            migration_report = migration.compare(checked_build, migration_cases)
+            _require(migration_report.get("status") == "agreed" and not migration_report.get("differences"),
+                     "vela-checked-parser disagreed with pure migration fixtures")
             _require(_inputs(root) == inputs and _toolchain(root, directory, steps) == tools,
                      "support qualification inputs or toolchain changed during execution")
             _require(_runtime(directory, steps) == runtime,
                      "support installed library inputs changed during execution")
-            for tree, wanted in ((candidate, CANDIDATE_SHA256), (reference, REFERENCE_SHA256)):
+            for tree, interp_wanted, vc_wanted in (
+                (candidate, CANDIDATE_SHA256, VALIDATOR_COMPLETE_CANDIDATE_SHA256),
+                (reference, REFERENCE_SHA256, VALIDATOR_COMPLETE_SHA256),
+            ):
                 for path, source in sources.items():
                     name = path.removeprefix("coq-menhirlib/src/")
                     if path in LICENSES:
                         name = "LICENSE.generator" if path == "LICENSE" else "LICENSE.support"
-                    digest = wanted if name == "Interpreter.v" else _sha256(source)
+                    if name == "Interpreter.v":
+                        digest = interp_wanted
+                    elif name == "Validator_complete.v":
+                        digest = vc_wanted
+                    else:
+                        digest = _sha256(source)
                     _require(_sha256((tree / name).read_bytes()) == digest,
                              "Menhir support source changed during qualification")
                 for name, digest in outputs[tree.name].items():
@@ -380,32 +1509,54 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
             report: dict[str, object] = {
                 **attempt, "status": "passed", "inputs": inputs, "toolchain": tools,
                 "installed_libraries": runtime, "compiled_sha256": outputs, "probes_sha256": probes,
-                "generator_pair_qualified": False, "checked_vela_parser": False,
+                "generator_pair_qualified": True, "checked_vela_parser": True, "python_retired": False,
                 "source": {"release": RELEASE, "url": ARCHIVE_URL,
                            "sha512": ARCHIVE_SHA512, "sha256": _sha256(contents),
                            "licenses": LICENSES, "files_sha256": {
                                path: _sha256(source) for path, source in sources.items()}},
                 "repair": {"upstream_commit": UPSTREAM_REPAIR,
-                           "scope": "relocate-three-existing-Proof-commands",
+                           "scope": "relocate-three-existing-Proof-commands-and-abstract-IsItemsMap-in-is_validator_forall_items",
                            "candidate_sha256": CANDIDATE_SHA256,
                            "diagnostic_reference_sha256": REFERENCE_SHA256,
+                           "validator_complete_candidate_sha256": VALIDATOR_COMPLETE_CANDIDATE_SHA256,
+                           "validator_complete_reference_sha256": VALIDATOR_COMPLETE_SHA256,
                            "public_reading_equal": True, "reading_sha256": _sha256(frozen),
                            "query_sha256": _sha256(FROZEN_QUERY.encode())},
+                "grammar": {
+                    "owner": "tools/toolchain/parser/parser.mly",
+                    "terminals": list(PURE_TERMINALS),
+                    "rules": list(EXPECTED_PURE_SKELETON),
+                    "vela_pure_ast_v_sha256": _sha256(VELA_PURE_AST_V.encode()),
+                    "vela_pure_grammar_mly_sha256": _sha256(pure_mly.encode()),
+                    "vela_pure_grammar_v_sha256": _sha256(generated_v),
+                    "vela_pure_proofs_v_sha256": _sha256(VELA_PURE_PROOFS_V.encode()),
+                    "deterministic_generation": True,
+                },
+                "extraction": {
+                    "vela_pure_extraction_v_sha256": _sha256(VELA_PURE_EXTRACTION_V.encode()),
+                    "vela_checked_parser_ml_sha256": _sha256(extracted_ml),
+                    "vela_checked_parser_mli_sha256": _sha256(extracted_mli),
+                    "vela_checked_parser_exe_sha256": _sha256(checked_exe.read_bytes()),
+                    "deterministic_extraction": True,
+                    "pure_fixtures_passed": len(passed_fixtures),
+                    "examples_verified_sha256": examples_verified,
+                    "migration_fixtures_agreed": len(migration_cases),
+                },
                 "kernel": {"status": "passed", "recursive": True,
-                           "roots": [f"MenhirLib.{module}" for module in MODULES]},
+                           "roots": [f"MenhirLib.{module}" for module in ALL_MODULES]},
                 "version_guard": {"preserved_source_sha256": VERSION_SHA256,
                                   "accepted": f"require_{RELEASE}", "refused": "require_unreleased"},
-                "assumptions": {"scope": "abstract-automaton-uninstantiated",
-                                "closed_assumptions_accepted": False,
+                "assumptions": {"scope": "concrete-pure-grammar-and-abstract-support-boundary",
+                                "closed_assumptions_accepted": True,
+                                "theorems": list(THEOREMS),
+                                "concrete_reading": proofs_reading,
+                                "concrete_reading_sha256": _sha256(proofs_reading.encode()),
                                 "roots": [f"SupportBoundary.Parser.{name}" for name in (
                                     "parse_correct", "parse_complete", "unambiguity")],
                                 "query_sha256": _sha256(ASSUMPTIONS_QUERY.encode()),
                                 "reading": (candidate / "assumptions.stdout").read_text(encoding="utf-8"),
                                 "reading_sha256": _sha256((candidate / "assumptions.stdout").read_bytes())},
-                "deferred": ["concrete generated grammar and its exact assumption audit",
-                             "exact generator executable and support-library pair",
-                             "Vela lexing, locations, extraction and runtime correspondence",
-                             "prototype migration and Python parser retirement"],
+                "deferred": ["supported Windows and Ubuntu host replacement route and Python parser retirement"],
             }
             _write_json(directory / "qualification.json", report)
             _write_json(latest, report)

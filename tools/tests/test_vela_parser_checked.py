@@ -94,6 +94,78 @@ def _proof_footprint() -> None:
                 raise AssertionError("unexpected repaired bytes accepted")
 
 
+def _validator_items_map_footprint() -> None:
+    original = (
+        b"Proof.\n"
+        b"  intros -> Hval1 Hval2 Val st prod fut lookahead (pos & -> & Hlookahead).\n"
+        b"  rewrite /forallb_items StateProdPosMap.fold_1 in Val.\n"
+        b"  assert (match future_of_prod prod pos with\n"
+        b"          | [] => b1 st prod pos (find_items_map (items_map ()) st prod pos)\n"
+        b"          | s :: fut' => b2 st prod pos (find_items_map (items_map ()) st prod pos) s fut'\n"
+        b"          end = true).\n"
+        b"  - unfold find_items_map in *.\n"
+        b"    assert (Hfind := @StateProdPosMap.find_2 _ (items_map ()) (st, prod, pos)).\n"
+    )
+    candidate = (
+        b"Proof.\n"
+        b"  intros Him Hval1 Hval2 Val st prod fut lookahead (pos & -> & Hlookahead).\n"
+        b"  rewrite -Him in Hlookahead.\n"
+        b"  rewrite /forallb_items StateProdPosMap.fold_1 in Val.\n"
+        b"  assert (match future_of_prod prod pos with\n"
+        b"          | [] => b1 st prod pos (find_items_map im st prod pos)\n"
+        b"          | s :: fut' => b2 st prod pos (find_items_map im st prod pos) s fut'\n"
+        b"          end = true).\n"
+        b"  - unfold find_items_map in *.\n"
+        b"    assert (Hfind := @StateProdPosMap.find_2 _ im (st, prod, pos)).\n"
+    )
+    with patch.object(checked, "VALIDATOR_COMPLETE_SHA256", checked._sha256(original)), \
+            patch.object(checked, "VALIDATOR_COMPLETE_CANDIDATE_SHA256", checked._sha256(candidate)):
+        ensure(checked._validator_items_map(original) == candidate, "items_map repair changed unexpected bytes")
+        ensure(checked._validator_items_map(original, reference=True) == original, "reference items_map changed")
+        for source in (original + b"changed", candidate):
+            try:
+                checked._validator_items_map(source)
+            except ValueError as error:
+                ensure("unsupported" in str(error), "unsupported Validator_complete source lost its cause")
+            else:
+                raise AssertionError("Validator_complete repair accepted unexpected source")
+        with patch.object(checked, "VALIDATOR_COMPLETE_CANDIDATE_SHA256", "0" * 64):
+            try:
+                checked._validator_items_map(original)
+            except ValueError as error:
+                ensure("reviewed candidate" in str(error), "changed Validator_complete digest lost its cause")
+            else:
+                raise AssertionError("unexpected Validator_complete repaired bytes accepted")
+
+
+def _pure_grammar_view_and_assumptions() -> None:
+    root = Path(__file__).resolve().parents[2]
+    mly_text = (root / "tools/toolchain/parser/parser.mly").read_text(encoding="utf-8")
+    pure_mly, token_stub = checked._pure_grammar_view(mly_text)
+    ensure(pure_mly == checked.VELA_PURE_GRAMMAR_MLY, "pure grammar view differed from checked specification")
+    ensure("type token =" in token_stub and "let generic_call_prefix _ _ : unit = raise Error" in token_stub,
+           "token stub omitted token definitions or prefix entry")
+    for mutated in (
+        mly_text.replace("MODULE module_name=name SEMICOLON", "MODULE module_name=name"),
+        mly_text.replace("%token MODULE ", "%token "),
+    ):
+        try:
+            checked._pure_grammar_view(mutated)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("drifted parser.mly pure grammar skeleton accepted")
+    closed = "Closed under the global context\n" * len(checked.THEOREMS)
+    checked._check_closed_assumptions(closed, len(checked.THEOREMS))
+    for unclosed in ("Axioms:\nAut.Gram.token : Type\n", "Closed under the global context\n"):
+        try:
+            checked._check_closed_assumptions(unclosed, len(checked.THEOREMS))
+        except ValueError as error:
+            ensure("unclosed assumptions" in str(error), "unclosed assumption refusal lost its cause")
+        else:
+            raise AssertionError("unclosed concrete theorem assumptions accepted")
+
+
 def _process_controls() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-support-") as temporary:
         directory = Path(temporary)
@@ -154,15 +226,20 @@ def _toolchain_controls() -> None:
         sail = locks / "sail.lock"
         sail.write_text(f'"menhir.{checked.RELEASE}"\n', encoding="utf-8")
         (locks / "rocq.lock").write_text(f'"rocq-core.{checked.proofenv.ROCQ_VERSION}"\n', encoding="utf-8")
-        for name in ("rocq", "rocqchk", "ocamlc"):
+        for name in ("rocq", "rocqchk", "ocamlc", "ocamllex", "menhir"):
             (directory / name).write_bytes(b"tool identity")
-        expected = [f"The Rocq Prover, version {checked.proofenv.ROCQ_VERSION}",
-                    checked.proofenv.OCAML_VERSION, str(directory)]
+        expected = [
+            f"The Rocq Prover, version {checked.proofenv.ROCQ_VERSION}",
+            checked.proofenv.OCAML_VERSION,
+            str(directory),
+            f"menhir, version {checked.RELEASE}",
+            str(directory),
+        ]
         with patch.object(checked, "_run", side_effect=expected):
             identity = checked._toolchain(directory, directory, [])
         digests = identity["binary_sha256"]
-        ensure(isinstance(digests, dict) and len(digests) == 3, "support tools lost executable identities")
-        for index in (0, 1, 2):
+        ensure(isinstance(digests, dict) and len(digests) == 5, "support tools lost executable identities")
+        for index in (0, 1, 2, 3, 4):
             changed = [*expected]
             changed[index] = "different identity"
             with patch.object(checked, "_run", side_effect=changed):
@@ -214,6 +291,8 @@ def _changed_observations() -> None:
 def cases() -> list[Case]:
     return [Case("immutable-source-and-version-controls", _archive_controls),
             Case("proof-opening-byte-footprint", _proof_footprint),
+            Case("validator-items-map-byte-footprint", _validator_items_map_footprint),
+            Case("pure-grammar-view-and-closed-assumptions", _pure_grammar_view_and_assumptions),
             Case("bounded-command-and-negative-verdict-controls", _process_controls),
             Case("locked-generator-and-prover-controls", _toolchain_controls),
             Case("changed-probes-and-transcripts-refuse", _changed_observations),
