@@ -1,18 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Component durations a gate member records beside its report.
+"""Diagnostic component timings recorded alongside a command's report.
 
-`run.py gate --summary` names one file per member in `ENV`. A member that measures its
-parts, the behavioral tests by module, the selftest by phase and case and the checker by
-fixed phase, rule group, and the generated group's blob read and rows, writes them there
-as a JSON list, and the gate folds that list into the member's record as `units`.
-Long-running members may checkpoint completed and still-running units so a timeout
-retains progress; a normal completed record carries only completed units. A member
-claims the variable as it starts, removing it from the
-environment its own children inherit, so a nested run cannot write over its parent's
-file. The durations are diagnostic: they never reach a member's printed report or its
-exit code, and a member's file that cannot be written or read records nothing rather
-than failing the run. The gate's scratch directory for those files is a temporary
-directory like the others a run needs.
+When `VOS_GATE_TIMINGS` names an output path, a command claims and removes the
+variable from `os.environ` (so child processes do not overwrite their parent's
+file) and writes its measured units as JSON. Timings are purely diagnostic:
+I/O errors are ignored and never affect a command's report or exit code.
 """
 
 import json
@@ -86,23 +78,16 @@ def read(path: Path) -> list[Unit] | None:
 
 
 class Clock:
-    """Durations measured from any thread, listed by kind, name and duration, so their
-    order does not depend on which measurement finished first.
+    """Thread-safe collector for wall-clock and optional CPU durations.
 
-    Each unit's `start` is its offset in seconds from the clock's origin, the
-    `perf_counter` reading it was made at unless it is given one, which places a member's
-    parts on that member's timeline. Its `at` is the wall-clock time it began, in seconds
-    since the epoch, which places the parts of the members that ran at once on one
-    machine on one timeline. A clock made with `cpu` also records over each block it
-    times this process's CPU seconds as `cpu_seconds`, and, except on Windows, those of
-    the child processes it waited for as `child_cpu_seconds`: they are the block's own
-    only where nothing else in the process runs beside it, as in the checker.
+    Each unit records `start` (seconds since the clock's `perf_counter` origin) and
+    `at` (wall-clock epoch seconds). When `cpu=True`, spans also record
+    `cpu_seconds` for the current process and, on POSIX platforms,
+    `child_cpu_seconds` for awaited child processes.
 
-    A `snapshot` path opts into best-effort atomic progress records after a duration
-    is added or a timed span starts or finishes. Active spans carry `status: running`
-    and elapsed time at the last snapshot; `units()` still returns completed spans
-    alone. The lock serializes both measurement updates and publication so an older
-    writer cannot replace a newer snapshot after another thread finishes work.
+    When `snapshot` is given, `Clock` writes atomic progress snapshots as spans
+    start and finish; active spans carry `status: "running"`, while `units()`
+    returns only completed measurements.
     """
 
     def __init__(self, cpu: bool = False, origin: float | None = None,

@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The command modules, one per command, and the dispatch they share.
+"""Command-module dispatch and argument helpers.
 
-[toolchain/commands.py](../commands.py) names each command's module and lane, and
-[run.py](../../run.py) imports the module a command names. Each module here keeps its
-docstring, its argparse and its `main(argv)`, so `run.py <name> --help` is that
-command's own help. This initializer runs whenever a command module is imported, so it
-holds only the helpers those modules share and never the table itself.
+[toolchain/commands.py](../commands.py) registers each command's module and lane, and
+[run.py](../../run.py) imports only the requested command module so `run.py <name> --help`
+displays that command's own help.
 """
 
 import argparse
@@ -13,10 +11,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-# What a subcommand handler is, and the table a command's module keeps them in: one
-# row per subcommand, the handler and the line `--help` prints for it. Four modules
-# wrote the same dispatch over the same shape, which is the two-copies-of-one-parse
-# defect these tools exist to catch, in the tools.
+# Subcommand handler and dispatch table mapping each subcommand name to its
+# handler and `--help` summary.
 type Handler = Callable[[argparse.Namespace], int]
 type Table = dict[str, tuple[Handler, str]]
 
@@ -32,11 +28,10 @@ def positive_int(value: str) -> int:
 def dispatch(doc: str | None, table: Table, argv: list[str] | None,
              flags: Callable[[str, argparse.ArgumentParser], None] | None = None,
              prog: str | None = None) -> int:
-    """Parse one command's own arguments and run the subcommand they name.
+    """Parse a command's subcommands and invoke the selected handler.
 
-    `flags` is where a module says what its subcommands take beyond their name; it
-    is handed each subparser as it is built, so a flag stays beside the subcommand
-    it belongs to rather than moving into a table nothing reads.
+    If provided, `flags(name, subparser)` registers subcommand-specific arguments as
+    each subparser is built.
     """
     parser = argparse.ArgumentParser(
         suggest_on_error=True, prog=prog, description=(doc or "").splitlines()[0] if bool(doc) else None)
@@ -51,12 +46,6 @@ def dispatch(doc: str | None, table: Table, argv: list[str] | None,
 
 
 def entry(command: str, *args: str) -> list[str]:
-    """The argv that runs one command again in a process of its own.
-
-    Two loops detach a child that re-runs them in the background, and both used to
-    name their own file. There is one entry point now, so the argv is written once
-    here rather than derived from `__file__` at each site, which is also what keeps a
-    detached child launching through the same table its parent was dispatched by.
-    """
+    """Build an argv list that invokes `run.py <command>` under the current interpreter."""
     return [sys.executable, str(Path(__file__).resolve().parents[2] / "run.py"),
             command, *args]

@@ -19,7 +19,7 @@ def _is_integer(_checker: object, value: object) -> bool:
 
 @cache
 def _validator_class() -> type[Validator]:
-    # Ring declarations are also imported by lightweight corpus readers.
+    # Defer importing jsonschema until validation is requested.
     from jsonschema import Draft202012Validator, validators  # noqa: PLC0415
 
     checker = Draft202012Validator.TYPE_CHECKER.redefine("integer", _is_integer)
@@ -28,12 +28,7 @@ def _validator_class() -> type[Validator]:
 
 def strict_integer_validator(schema: Mapping[str, Any] | bool, *,
                              check_schema: bool = False) -> Validator:
-    """Build a validator without coercion; callers choose schema self-validation.
-
-    JSON Schema normally accepts integral floats as integers. Generated Gallina
-    and C consumers require actual Python integers; booleans also remain distinct.
-    Each call binds its own schema, while the validator class is shared lazily.
-    """
+    """Build a Draft 2020-12 validator that rejects floats and booleans for `integer` fields."""
     validator = _validator_class()
     if check_schema:
         validator.check_schema(schema)
@@ -41,12 +36,7 @@ def strict_integer_validator(schema: Mapping[str, Any] | bool, *,
 
 
 def validate(schema_path: Path, value: object) -> None:
-    """Validate against an authored schema; unreadable or invalid owners refuse.
-
-    Dependencies remain lazy for readers that only import this module. Every
-    finding names its schema and the JSON path within the supplied value. Local
-    references are supported; an empty retrieval registry keeps validation offline.
-    """
+    """Validate `value` against the JSON Schema at `schema_path` with offline reference resolution."""
     from jsonschema.exceptions import SchemaError  # noqa: PLC0415
     from referencing import Registry  # noqa: PLC0415
     from referencing.exceptions import Unresolvable  # noqa: PLC0415

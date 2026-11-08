@@ -1,16 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Every document in the repository, read once.
+"""Repository document and Git index loader for static checks.
 
-A code block is shown as text, so an anchor inside one is not a bookmark, a link
-inside one is not a link, and an id inside one names nothing: the register's own
-entry template cites `#r-ss-nnn`, which must not read as a dangling trace. Every
-check that reads whole documents reads them through here, so the rule is stated
-once and every check inherits it.
-
-Each document keeps its raw text beside its lines, plus a table of line-start
-offsets. The checks scan the raw text once with one pattern and resolve a hit back
-to its line by binary search, rather than walking every line once per check; the
-reports are the same, arrived at in one pass instead of many.
+Parses tracked Markdown files once, recording raw text, line-start offsets for
+binary-search line resolution, fenced/indented code masks, headings, and HTML
+`<a id="...">` anchors outside code blocks.
 """
 
 import bisect
@@ -128,17 +121,9 @@ class Document:
 
     def unfenced(self, lead: str,
                  pattern: re.Pattern[str]) -> Iterator[tuple[int, re.Match[str]]]:
-        """Every line-anchored match outside code, as its line and its match.
+        """Yield `(line_index, match)` for each unfenced line containing `lead` and matching `pattern`.
 
-        The line's index comes back with it because the walk already knows it: where a
-        caller wants the raw offset instead it is `starts[index]`, and the binary search
-        `line_of` would otherwise perform is never paid for at all.
-
-        `lead` is a substring the pattern cannot match without, tested before the
-        pattern is. It is redundant with the pattern rather than a further condition, so
-        it can only skip lines the pattern would reject anyway; what it buys is that
-        nearly every line is rejected by a C substring scan instead of by entering the
-        regex engine.
+        Checks `lead in line` before invoking the regex engine to skip non-matching lines quickly.
         """
         for i, line in enumerate(self.lines):
             if lead in line and not self.fenced[i] and (m := pattern.match(line)):
@@ -149,18 +134,14 @@ def _read(path: Path, name: str) -> Document:
     try:
         raw = path.read_bytes().decode("utf-8")
     except UnicodeDecodeError as exc:
-        # named here because the bare exception names only offsets: the load runs
-        # before any rule reports, so the one thing a stopped run can still do is say
-        # which tracked document is not the UTF-8 the corpus requires
+        # Include the document path when UTF-8 decoding fails.
         raise RuntimeError(f"{name} is not valid UTF-8: {exc}") from exc
 
     return from_text(raw, name)
 
 
 def from_text(raw: str, name: str) -> Document:
-    """Parse bytes already decoded by an owner, including an in-memory repair."""
-    # one split hands back every segment with its terminator's length implied, so
-    # the offsets accumulate without touching the text again
+    """Build a `Document` from decoded text, computing line offsets, code masks, and headings."""
     parts = raw.split("\n")
     starts: list[int] = []
     offset = 0
@@ -168,8 +149,6 @@ def from_text(raw: str, name: str) -> Document:
         starts.append(offset)
         offset += len(part) + 1
 
-    # a file ending in a newline has no final empty line, which is what every
-    # line-oriented reader means by its line count
     body = parts[:-1] if parts and parts[-1] == "" else parts
     lines = [p.removesuffix("\r") for p in body]
 
@@ -184,12 +163,10 @@ def from_text(raw: str, name: str) -> Document:
 PROSE = "docs/spec.md"
 PROSE_SECTION_RE = re.compile(r"## (\d+)\.")
 
-# Shared by the corpus exclusion and the selftest's sandbox.
+# Directory prefix excluded from Markdown corpus loading.
 UNREAD_PREFIX = "model/"
 
-# Model files whose values are checked against documentation. The selftest copies
-# these files into its sandbox; other excluded model files may be empty placeholders.
-# Add a path here whenever a checker starts reading its values.
+# Model files whose values are checked against documentation.
 MODEL_FACTS = (
     "model/model/riscv.sail_project",
     "model/model/core/cap_format.sail",
@@ -208,24 +185,14 @@ MODEL_FACTS = (
     "model/.pre-commit-config.yaml",
 )
 
-# Citation checks cover these file kinds throughout the curated model, including
-# its emulator harness and build files. Selecting by kind includes new source files
-# automatically; MODEL_FACTS alone would miss their requirement citations.
-# The selftest copies citation sources rather than creating empty placeholders.
+# File suffixes and names included in model citation scans.
 MODEL_CITATION_SUFFIXES = (".sail", ".json", ".in", ".cpp", ".hpp", ".c", ".h",
                            ".cmake")
 MODEL_CITATION_NAMES = ("CMakeLists.txt",)
 
 
 def is_model_citation_path(rel: str) -> bool:
-    """Whether a tracked path is one the citation check reads.
-
-    `dependencies/` is excluded because it is somebody else's code vendored whole: a
-    requirement id appearing there would be a coincidence of digits rather than a
-    citation, and holding an upstream to this repository's register is not a claim
-    anyone should make. It carries none today, so the exclusion is a statement about
-    what the window means rather than a filter doing work.
-    """
+    """Whether `rel` is a tracked model file included in citation scans (excluding `model/dependencies/`)."""
     return (rel.startswith(UNREAD_PREFIX)
             and not rel.startswith(UNREAD_PREFIX + "dependencies/")
             and (rel.endswith(MODEL_CITATION_SUFFIXES)
@@ -312,17 +279,11 @@ class Corpus:
 
 
 def _git_environment(root: Path) -> dict[str, str] | None:
-    """This process's environment with whatever a `git` run in `root` needs laid over
-    it, or `None` where it needs nothing.
+    """Return an environment dict with [proofenv.py](proofenv.py)'s Git worktree overlay, or `None` if unneeded.
 
-    The translation is [proofenv.py](proofenv.py)'s and is reached rather than repeated.
-    A linked worktree created by the *host's* git holds a Windows path in its `.git` file, so
-    inside the guest a bare `git` in that lane exits 128 with `not a git repository`;
-    this parse is the one every rule reads the corpus through, so without the
-    translation `python3 tools/check.py` in a lane ends in a traceback rather than in a
-    verdict, and the rules decide nothing at all. On the primary worktree, and on the
-    host where the pointer is already usable, there is nothing to say and this answers
-    `None`, which leaves those lanes exactly as they were.
+    A linked worktree created by Windows Git stores a Windows path in its `.git`
+    pointer file; inside WSL, `proofenv.git_env(root)` translates that pointer into
+    `GIT_DIR` and `GIT_WORK_TREE` so `git` commands succeed.
     """
     overlay = proofenv.git_env(root)
     return {**os.environ, **overlay} if overlay else None
@@ -341,17 +302,7 @@ def _git(root: Path, *args: str) -> list[str]:
 
 
 def staged_bytes(root: Path, path: str) -> bytes | None:
-    """The bytes the index holds for one tracked path, or `None` where it holds none.
-
-    The index and not HEAD, for the reason `load` states: what this checker's corpus is
-    is what git has been told the tree says, so a generated artifact's authority is its
-    staged blob and a working tree that has drifted from it is the finding.
-
-    Read as bytes and through `stdout` whole rather than through `_git`'s line split,
-    because the caller compares byte for byte: a blob with no interior newline and one
-    at the end is indistinguishable from one without after a `splitlines` and a rejoin,
-    and that is exactly the difference a byte-identity rule exists to see.
-    """
+    """Return the stage-zero index blob for `path` as raw bytes, or `None` if absent."""
     proc = subprocess.run(["git", "cat-file", "blob", f":{path}"],
                           cwd=root, capture_output=True, check=False,
                           env=_git_environment(root))
@@ -408,13 +359,7 @@ def _batch_blobs(output: bytes, requests: dict[str, bytes]) -> dict[str, bytes |
 
 
 def find_root(start: Path | None = None) -> Path:
-    """The repository root, found from a path rather than from the caller's cwd.
-
-    Every path the tools name is repository-relative, so a run from anywhere else
-    would read a different tree and report on it confidently. Deriving the root from
-    the tool's own location removes the question: there is no wrong directory to run
-    from, which is one whole class of user error deleted rather than diagnosed.
-    """
+    """Locate the repository root by walking upward from `start` (or this file)."""
     here = (start or Path(__file__)).resolve()
     for candidate in [here, *here.parents]:
         if (candidate / ".git").exists() and (
@@ -469,24 +414,12 @@ def read_index(root: Path) -> Index:
 
 
 def load(root: Path) -> Corpus:
-    """Every tracked Markdown document, plus the gitlinks and the commit each records.
+    """Load all tracked Markdown documents and gitlinks from the repository at `root`.
 
-    The corpus is what the repository tracks, which git already knows: `ls-files`
-    skips ignored files and build output without this tool maintaining a list of
-    them, and a submodule is one gitlink entry rather than its contents, so upstream
-    prose stays out by construction rather than by a .gitmodules parse. What git
-    cannot see is that model/ is that same upstream prose vendored rather than
-    pinned, the curated tree M0.6a stands up from the sail-riscv blobs: tracked here,
-    answering to its own repository's house style, and so the one exclusion left to
-    state.
-
-    The index lists what is tracked, which is not quite what is readable: a document
-    deleted from the working tree is still an index entry until the deletion is
-    staged. Such a file is dropped from the corpus rather than read, because that is
-    what makes its absence *reportable*. Every rule that names it then fails on its
-    own terms, the view check finding the artifact gone and the link check finding
-    the pointers at it dead, which is a finding a person can act on; reading it
-    instead would abort the run on an IO error before any rule decided anything.
+    Uses `git ls-files` so ignored files and submodule contents are excluded
+    automatically, and skips tracked paths deleted from the working tree so
+    downstream checks can report missing files cleanly instead of aborting on I/O
+    errors.
     """
     # Read file membership, gitlink paths and pinned commits in one listing.
     # Gitlinks resolve for link and pin checks even when submodules are uninitialized.

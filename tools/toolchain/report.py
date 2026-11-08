@@ -1,18 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The reporting convention every check shares.
+"""Structured reporting for static checks and test runners.
 
-One rule, one verdict, one line. A rule that finds nothing prints what it decided;
-a rule that finds something prints how many and then each finding, indented under
-it. Nothing else is printed by a check, so a run reads as a list of decisions and a
-person scanning it sees only the rules that bit.
-
-Output is accumulated rather than streamed. The run is fast enough that streaming
-buys nothing, and accumulating is what lets the mutation selftest call a whole run
-in-process and read its verdict back as data instead of re-parsing a subprocess's
-stdout.
-
-The `FAIL `, `ok `, and `fixed:` prefixes and the seven-space finding indent are
-parsed by [toolchain/cli/typecheck.py](cli/typecheck.py), so they are API rather than styling.
+Each rule records a single verdict line: `ok <rule>: ...` when clean, or
+`FAIL <rule>: <count> <label>` followed by seven-space-indented finding lines.
+Output is accumulated in memory so callers can inspect `findings`, `decisions`,
+and `out` directly before printing.
 """
 
 from collections.abc import Iterable
@@ -31,19 +23,11 @@ class Reporter:
 
     def report(self, rule: str, label: str, items: Iterable[object],
                ok: str = "", pad: str = "", count: int | None = None) -> None:
-        """Decide one rule.
+        """Record one rule's verdict.
 
-        `items` is whatever the check produced; falsy members are dropped, because a
-        check that builds its findings inside a comprehension over a larger set
-        yields `None` for every member it cleared.
-
-        `count` is how many findings those lines stand for, and exists for the one
-        caller whose lines are a *summary* rather than one line per finding:
-        typecheck.py groups a checker's output by rule and prints a header and a
-        sample under each, so its line count is neither the number of findings nor a
-        bound on it, being larger than it while a rule is under the sample cap and
-        smaller once it is over. Everywhere else the lines are the findings one for
-        one and the default is what the docstring above promises.
+        Falsy items in `items` are ignored. `count` overrides `len(found)` when
+        `items` is a grouped summary (such as [toolchain/cli/typecheck.py](cli/typecheck.py)'s
+        per-rule sample cap) rather than one line per finding.
         """
         self.decisions.append(rule)
         found = [str(i) for i in items if i]
@@ -57,19 +41,14 @@ class Reporter:
 
 
 def sites(name: str, lines: list[int], cap: int = 12) -> str:
-    """A file plus the lines to visit, for the checks whose findings are per-line and
-    whose repair is always the same visit."""
+    """Format a filename and 1-based line numbers, truncating after `cap` lines."""
     shown = (", ".join(str(n) for n in lines[:cap]) + f", and {len(lines) - cap} more"
              if len(lines) > cap else ", ".join(str(n) for n in lines))
     return f"{name}: {len(lines)} line(s): {shown}"
 
 
 def apart(ref: str, commit: str) -> tuple[str, str]:
-    """Two revisions quoted at twelve digits, or one past what two different ones share.
-
-    A finding naming both then never prints one id for two different commits; equal ones
-    keep twelve, the finding then being about something other than the commit.
-    """
+    """Format two revision hashes to at least 12 characters, or one character past their common prefix."""
     if ref == commit:
         return ref[:12], commit[:12]
     shown = max(12, next((i + 1 for i, (a, b) in enumerate(zip(ref, commit, strict=False))
