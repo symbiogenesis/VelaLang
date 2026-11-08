@@ -2896,21 +2896,201 @@ class BrowserLspSession {
   }
 }
 
-const MATH_MULTI_SYMBOLS = [
-  "<==>",
-  "==>",
-  "..",
-  "=>",
-  "==",
-  "!=",
-  "<=",
-  ">=",
-  "&&",
-  "||",
-  "+=",
-  "-=",
-  "::",
-];
+export const VELA_GRAMMAR = Object.freeze({
+  keywords: Object.freeze([
+    "admits",
+    "add",
+    "alias",
+    "as",
+    "assert",
+    "async",
+    "await",
+    "break",
+    "by",
+    "calc",
+    "cancel",
+    "captures",
+    "carrier",
+    "coinductive",
+    "commit",
+    "const",
+    "continue",
+    "cycle",
+    "decreases",
+    "definition",
+    "dispose",
+    "domain",
+    "effect",
+    "effects",
+    "else",
+    "ensures",
+    "exists",
+    "foreach",
+    "forall",
+    "ghost",
+    "grade",
+    "grows",
+    "handle",
+    "hardware",
+    "if",
+    "impl",
+    "import",
+    "in",
+    "inductive",
+    "interface",
+    "internal",
+    "interpret",
+    "invariant",
+    "is",
+    "laws",
+    "lemma",
+    "let",
+    "lifts",
+    "machine",
+    "match",
+    "module",
+    "move",
+    "mul",
+    "namespace",
+    "next",
+    "on",
+    "one",
+    "open",
+    "out",
+    "owned",
+    "predicate",
+    "private",
+    "progress",
+    "proof",
+    "public",
+    "record",
+    "ref",
+    "register",
+    "region",
+    "rehandle",
+    "requires",
+    "restores",
+    "resume",
+    "resumes",
+    "return",
+    "rule",
+    "schedule",
+    "scope",
+    "scoped",
+    "shallow",
+    "spawn",
+    "state",
+    "struct",
+    "theorem",
+    "this",
+    "tracked",
+    "transition",
+    "type",
+    "union",
+    "universe",
+    "var",
+    "view",
+    "when",
+    "where",
+    "while",
+    "with",
+    "zero",
+  ]),
+  typeKeywords: Object.freeze([
+    "Eq",
+    "Fin",
+    "Fn",
+    "FnMut",
+    "FnOnce",
+    "Nat",
+    "Option",
+    "Prop",
+    "Result",
+    "Self",
+    "Seq",
+    "Slots",
+    "Span",
+    "String",
+    "TextBuilder",
+    "Type",
+    "Unit",
+    "Vec",
+    "bool",
+    "byte",
+    "char",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "int",
+    "long",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "uint",
+    "ulong",
+    "usize",
+    "void",
+  ]),
+  constants: Object.freeze(["true", "false"]),
+  retiredKeywords: Object.freeze(["case", "null", "operation", "trait"]),
+  multiOperators: Object.freeze([
+    "<==>",
+    "==>",
+    "..",
+    "=>",
+    "->",
+    "==",
+    "!=",
+    "<=",
+    ">=",
+    "&&",
+    "||",
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
+    "::",
+  ]),
+  singleOperators: Object.freeze([
+    "=",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "<",
+    ">",
+    "!",
+    "|",
+    "^",
+    "&",
+    "~",
+    "?",
+    "@",
+  ]),
+  brackets: Object.freeze([
+    ["{", "}"],
+    ["(", ")"],
+    ["[", "]"],
+  ]),
+  delimiters: Object.freeze([",", ";", ":", ".", "'"]),
+  semanticTokenTypes: Object.freeze([
+    "function",
+    "parameter",
+    "variable",
+    "type",
+    "typeParameter",
+  ]),
+  semanticTokenModifiers: Object.freeze(["declaration", "readonly"]),
+});
+
+const VELA_GRAMMAR_KEYWORD_SET = new Set(VELA_GRAMMAR.keywords);
+const VELA_GRAMMAR_TYPE_SET = new Set(VELA_GRAMMAR.typeKeywords);
+
+const MATH_MULTI_SYMBOLS = [...VELA_GRAMMAR.multiOperators];
 
 const MATH_SINGLE_SYMBOLS = new Set([
   "{",
@@ -2919,26 +3099,8 @@ const MATH_SINGLE_SYMBOLS = new Set([
   ")",
   "[",
   "]",
-  "<",
-  ">",
-  ",",
-  ";",
-  ":",
-  ".",
-  "=",
-  "+",
-  "-",
-  "*",
-  "/",
-  "%",
-  "!",
-  "|",
-  "^",
-  "&",
-  "~",
-  "?",
-  "@",
-  "'",
+  ...VELA_GRAMMAR.singleOperators,
+  ...VELA_GRAMMAR.delimiters,
 ]);
 
 function parseRawStringLiteral(sourceText, startIndex, startLine, startCol) {
@@ -3276,6 +3438,7 @@ class MathParser {
     this.tokens = tokens;
     this.index = 0;
     this.genericTypeBinders = [];
+    this.declarations = [];
   }
 
   get current() {
@@ -3377,16 +3540,19 @@ class MathParser {
         while (true) {
           const pType = this.parseType();
           let pName = null;
+          let pSite = null;
           if (this.current.kind === "word") {
-            pName = this.advance().text;
+            const pTok = this.advance();
+            pName = pTok.text;
+            pSite = pTok.site;
           }
-          params.push({ type: pType, name: pName });
+          params.push({ type: pType, name: pName, site: pSite });
           if (this.match("symbol", ")")) break;
           this.expect("symbol", ",");
           if (this.match("symbol", ")")) break;
         }
       }
-      if (this.match("symbol", "-") && this.match("symbol", ">")) {
+      if (this.match("symbol", "->") || (this.match("symbol", "-") && this.match("symbol", ">"))) {
         const result = this.parseType();
         return { kind: "fn_type", fnKind, params, result, site };
       }
@@ -3504,12 +3670,15 @@ class MathParser {
       if (!this.match("symbol", ")")) {
         while (true) {
           let label = null;
+          let labelSite = null;
           if (this.current.kind === "word" && this.peek().text === ":") {
-            label = this.advance().text;
+            const lTok = this.advance();
+            label = lTok.text;
+            labelSite = lTok.site;
             this.expect("symbol", ":");
           }
           const pat = this.parsePattern();
-          args.push({ label, pattern: pat });
+          args.push({ label, labelSite, pattern: pat });
           if (this.match("symbol", ")")) break;
           this.expect("symbol", ",");
           if (this.match("symbol", ")")) break;
@@ -3615,7 +3784,17 @@ class MathParser {
     this.expect("word", "module");
     const modName = this.parseDottedName("module name");
     this.expect("symbol", ";");
-    const declarations = [];
+    const declarations = this.parseDeclarations();
+    return {
+      name: modName.text,
+      site: modName.site,
+      declarations,
+      genericTypeBinders: this.genericTypeBinders,
+    };
+  }
+
+  parseDeclarations() {
+    const declarations = this.declarations;
     while (this.current.kind !== "eof") {
       if (this.match("word", "import")) {
         const impName = this.parseDottedName("imported module");
@@ -3626,7 +3805,7 @@ class MathParser {
       let visibility = "public";
       if (
         this.current.kind === "word" &&
-        (this.current.text === "public" || this.current.text === "private")
+        ["public", "private", "internal"].includes(this.current.text)
       ) {
         visibility = this.advance().text;
       } else {
@@ -3636,6 +3815,21 @@ class MathParser {
           this.current.site.column,
           `expected 'public' or 'private' declaration, found '${this.current.text}'`
         );
+      }
+      if (this.match("word", "alias") || this.match("word", "type")) {
+        const nameTok = this.expect("word", null, "type alias name");
+        const generics = this.parseGenericParameters();
+        const targetType = this.match("symbol", "=") ? this.parseType() : null;
+        this.expect("symbol", ";");
+        declarations.push({
+          kind: "alias",
+          visibility,
+          name: nameTok.text,
+          generics,
+          targetType,
+          site: nameTok.site,
+        });
+        continue;
       }
       if (this.match("word", "record")) {
         const nameTok = this.expect("word", null, "record name");
@@ -3651,7 +3845,7 @@ class MathParser {
         const properties = [];
         if (this.match("symbol", "{")) {
           while (this.current.kind !== "eof" && !this.match("symbol", "}")) {
-            if (this.current.text === "public" || this.current.text === "private") {
+            if (["public", "private", "internal"].includes(this.current.text)) {
               this.advance();
             }
             const propType = this.parseType();
@@ -3681,7 +3875,11 @@ class MathParser {
         });
         continue;
       }
-      if (this.match("word", "union") || this.match("word", "inductive")) {
+      if (
+        this.match("word", "union") ||
+        this.match("word", "inductive") ||
+        this.match("word", "coinductive")
+      ) {
         const nameTok = this.expect("word", null, "union name");
         const generics = this.parseGenericParameters();
         this.expect("symbol", "{");
@@ -3786,12 +3984,7 @@ class MathParser {
         site: nameTok.site,
       });
     }
-    return {
-      name: modName.text,
-      site: modName.site,
-      declarations,
-      genericTypeBinders: this.genericTypeBinders,
-    };
+    return declarations;
   }
 
   parseBlock() {
@@ -3853,7 +4046,14 @@ class MathParser {
         this.parseExpression();
       }
       const body = this.parseBlock();
-      return { kind: "foreach_stmt", binder: binder.text, range: rangeExpr, body, site: tok.site };
+      return {
+        kind: "foreach_stmt",
+        binder: binder.text,
+        binderSite: binder.site,
+        range: rangeExpr,
+        body,
+        site: tok.site,
+      };
     }
     if (this.match("word", "while")) {
       this.expect("symbol", "(");
@@ -3932,8 +4132,31 @@ class MathParser {
         role: kw.text,
         annotation,
         name: nameTok.text,
+        nameSite: nameTok.site,
         value,
         site: kw.site,
+      };
+    }
+    if (
+      this.current.kind === "word" &&
+      !VELA_GRAMMAR_KEYWORD_SET.has(this.current.text) &&
+      this.peek().kind === "word" &&
+      this.peek(2).text === "="
+    ) {
+      const startSite = this.current.site;
+      const annotation = this.parseType();
+      const nameTok = this.expect("word", null, "local variable name");
+      this.expect("symbol", "=");
+      const value = this.parseExpression();
+      this.expect("symbol", ";");
+      return {
+        kind: "local",
+        role: "let",
+        annotation,
+        name: nameTok.text,
+        nameSite: nameTok.site,
+        value,
+        site: startSite,
       };
     }
     const lhs = this.parseExpression();
@@ -4141,9 +4364,13 @@ class MathParser {
   }
 
   hasGenericCallAhead() {
-    if (this.current.text !== "<") return false;
+    let startIdx = this.index;
+    if (this.current.text === "::" && this.peek().text === "<") {
+      startIdx += 1;
+    }
+    if (!this.tokens[startIdx] || this.tokens[startIdx].text !== "<") return false;
     let depth = 0;
-    for (let i = this.index; i < this.tokens.length; i += 1) {
+    for (let i = startIdx; i < this.tokens.length; i += 1) {
       const t = this.tokens[i].text;
       if (t === "<") depth += 1;
       else if (t === ">") {
@@ -4163,11 +4390,18 @@ class MathParser {
     while (true) {
       if (this.match("symbol", ".")) {
         const memberTok = this.expect("word", null, "member name");
-        target = { kind: "member", object: target, member: memberTok.text, site: memberTok.site };
+        target = {
+          kind: "member",
+          object: target,
+          member: memberTok.text,
+          memberSite: memberTok.site,
+          site: memberTok.site,
+        };
         continue;
       }
       if (this.hasGenericCallAhead()) {
         const typeArgs = [];
+        this.match("symbol", "::");
         this.expect("symbol", "<");
         if (!this.match("symbol", ">")) {
           while (true) {
@@ -4218,8 +4452,11 @@ class MathParser {
     if (!this.match("symbol", ")")) {
       while (true) {
         let label = null;
+        let labelSite = null;
         if (this.current.kind === "word" && this.peek().text === ":") {
-          label = this.advance().text;
+          const lTok = this.advance();
+          label = lTok.text;
+          labelSite = lTok.site;
           this.expect("symbol", ":");
         }
         let mode = null;
@@ -4230,7 +4467,7 @@ class MathParser {
           mode = this.advance().text;
         }
         const value = this.parseExpression();
-        args.push({ label, mode, value, site: value.site });
+        args.push({ label, labelSite, mode, value, site: value.site });
         if (this.match("symbol", ")")) break;
         this.expect("symbol", ",");
         if (this.match("symbol", ")")) break;
@@ -4300,6 +4537,889 @@ class MathParser {
       `expected expression, found '${tok.text}'`
     );
   }
+}
+
+export function projectGrammarSemanticTokens(sourceText) {
+  if (typeof sourceText !== "string" || !sourceText.trim()) {
+    return { tokens: [], data: [] };
+  }
+  let declarations = [];
+  try {
+    const lexed = mathTokenize(sourceText);
+    const parser = new MathParser(lexed);
+    try {
+      if (parser.current.kind === "word" && parser.current.text === "module") {
+        const parsed = parser.parseModule();
+        declarations = parsed.declarations;
+      } else {
+        declarations = parser.parseDeclarations();
+      }
+    } catch {
+      declarations = parser.declarations;
+    }
+  } catch {
+    return { tokens: [], data: [] };
+  }
+
+  const tokenTypeIndices = new Map(
+    VELA_GRAMMAR.semanticTokenTypes.map((name, idx) => [name, idx])
+  );
+  const moduleTypes = new Set(VELA_GRAMMAR.typeKeywords);
+  const moduleCallables = new Set([
+    "VNil",
+    "VCons",
+    "At",
+    "FZero",
+    "FSucc",
+    "Zero",
+    "Succ",
+    "Some",
+    "None",
+    "Ok",
+    "Err",
+    "ByteLength",
+    "EmptyBuilder",
+    "Written",
+    "Fits",
+  ]);
+  const moduleConstants = new Set();
+  const moduleProperties = new Set();
+
+  for (const decl of declarations) {
+    if (decl.kind === "record") {
+      moduleTypes.add(decl.name);
+      for (const prop of decl.properties || []) {
+        moduleProperties.add(prop.name);
+      }
+    } else if (decl.kind === "union") {
+      moduleTypes.add(decl.name);
+      for (const c of decl.cases || []) {
+        moduleCallables.add(c.name);
+      }
+    } else if (["interface", "impl", "struct", "alias"].includes(decl.kind)) {
+      moduleTypes.add(decl.name);
+    } else if (decl.kind === "constant") {
+      moduleConstants.add(decl.name);
+    } else if (["function", "definition", "lemma"].includes(decl.kind)) {
+      if (decl.isProperty) {
+        moduleProperties.add(decl.name);
+      } else {
+        moduleCallables.add(decl.name);
+      }
+    }
+  }
+
+  const recordedBySite = new Map();
+
+  function recordToken(site, rawName, typeName, { declaration = false, readonly = false } = {}) {
+    if (!site || !rawName || !tokenTypeIndices.has(typeName)) return;
+    const baseName = String(rawName).split(".")[0];
+    if (!baseName || baseName === "_") return;
+    if (VELA_GRAMMAR_KEYWORD_SET.has(baseName)) return;
+    const start = diagnosticLspPosition(sourceText, site.line, site.column);
+    const end = diagnosticLspPosition(
+      sourceText,
+      site.line,
+      site.column + Array.from(baseName).length
+    );
+    const length = end.character - start.character;
+    if (length <= 0) return;
+    const key = `${start.line}:${start.character}`;
+    if (recordedBySite.has(key)) return;
+    const modifiers = (declaration ? 1 : 0) | (readonly ? 2 : 0);
+    recordedBySite.set(key, {
+      line: start.line,
+      character: start.character,
+      length,
+      type: typeName,
+      typeIndex: tokenTypeIndices.get(typeName),
+      modifiers,
+    });
+  }
+
+  function walkType(typeNode, typeParams, valueParams, locals) {
+    if (!typeNode) return;
+    if (typeNode.kind === "mode_type") {
+      walkType(typeNode.inner, typeParams, valueParams, locals);
+      return;
+    }
+    if (typeNode.kind === "fn_type") {
+      recordToken(typeNode.site, typeNode.fnKind, "type");
+      const fnValueParams = new Set(valueParams);
+      for (const p of typeNode.params || []) {
+        walkType(p.type, typeParams, fnValueParams, locals);
+        if (p.name && p.site) {
+          fnValueParams.add(p.name);
+          recordToken(p.site, p.name, "parameter", { declaration: true, readonly: true });
+        }
+      }
+      walkType(typeNode.result, typeParams, fnValueParams, locals);
+      return;
+    }
+    if (typeNode.kind === "tuple_type") {
+      for (const item of typeNode.items || []) {
+        walkType(item, typeParams, valueParams, locals);
+      }
+      return;
+    }
+    if (typeNode.kind === "region_arg") {
+      recordToken(typeNode.site, typeNode.name, "typeParameter", { readonly: true });
+      return;
+    }
+    if (typeNode.kind === "expr_index") {
+      walkExpr(typeNode.expr, typeParams, valueParams, locals);
+      return;
+    }
+    if (typeNode.kind === "named_type") {
+      const name = typeNode.name;
+      if (typeParams.has(name)) {
+        recordToken(typeNode.site, name, "typeParameter", { readonly: true });
+      } else if (locals.has(name)) {
+        recordToken(typeNode.site, name, "variable", { readonly: locals.get(name) });
+      } else if (valueParams.has(name)) {
+        recordToken(typeNode.site, name, "parameter", { readonly: true });
+      } else if (moduleConstants.has(name)) {
+        recordToken(typeNode.site, name, "variable", { readonly: true });
+      } else {
+        recordToken(typeNode.site, name, "type");
+      }
+      for (const arg of typeNode.args || []) {
+        walkType(arg, typeParams, valueParams, locals);
+      }
+    }
+  }
+
+  function walkPattern(pat, typeParams, valueParams, locals) {
+    if (!pat) return;
+    if (pat.kind === "tuple_pat") {
+      for (const item of pat.items || []) {
+        walkPattern(item, typeParams, valueParams, locals);
+      }
+      return;
+    }
+    if (pat.kind === "ctor_pat") {
+      recordToken(pat.site, pat.name, moduleTypes.has(pat.name) ? "type" : "function");
+      for (const arg of pat.args || []) {
+        if (arg.label && arg.labelSite) {
+          recordToken(arg.labelSite, arg.label, "parameter", { readonly: true });
+        }
+        walkPattern(arg.pattern, typeParams, valueParams, locals);
+      }
+      return;
+    }
+    if (pat.kind === "var_pat") {
+      locals.set(pat.name, true);
+      recordToken(pat.site, pat.name, "variable", { declaration: true, readonly: true });
+    }
+  }
+
+  function walkExpr(expr, typeParams, valueParams, locals) {
+    if (!expr) return;
+    if (expr.kind === "name") {
+      if (locals.has(expr.name)) {
+        recordToken(expr.site, expr.name, "variable", { readonly: locals.get(expr.name) });
+      } else if (valueParams.has(expr.name)) {
+        recordToken(expr.site, expr.name, "parameter", { readonly: true });
+      } else if (typeParams.has(expr.name)) {
+        recordToken(expr.site, expr.name, "typeParameter", { readonly: true });
+      } else if (moduleConstants.has(expr.name) || moduleProperties.has(expr.name)) {
+        recordToken(expr.site, expr.name, "variable", { readonly: true });
+      } else if (moduleCallables.has(expr.name)) {
+        recordToken(expr.site, expr.name, "function");
+      } else if (moduleTypes.has(expr.name)) {
+        recordToken(expr.site, expr.name, "type");
+      }
+      return;
+    }
+    if (expr.kind === "call") {
+      if (expr.callee.kind === "name") {
+        const cName = expr.callee.name;
+        if (valueParams.has(cName)) {
+          recordToken(expr.callee.site, cName, "parameter", { readonly: true });
+        } else if (locals.has(cName)) {
+          recordToken(expr.callee.site, cName, "variable", { readonly: locals.get(cName) });
+        } else if (moduleTypes.has(cName)) {
+          recordToken(expr.callee.site, cName, "type");
+        } else {
+          recordToken(expr.callee.site, cName, "function");
+        }
+      } else if (expr.callee.kind === "member") {
+        if (expr.callee.object.kind === "name" && /^[A-Z]/.test(expr.callee.object.name)) {
+          recordToken(expr.callee.object.site, expr.callee.object.name, "type");
+        } else {
+          walkExpr(expr.callee.object, typeParams, valueParams, locals);
+        }
+        if (expr.callee.memberSite) {
+          recordToken(expr.callee.memberSite, expr.callee.member, "function");
+        }
+      } else {
+        walkExpr(expr.callee, typeParams, valueParams, locals);
+      }
+      for (const tArg of expr.typeArgs || []) {
+        walkType(tArg, typeParams, valueParams, locals);
+      }
+      for (const arg of expr.args || []) {
+        if (arg.label && arg.labelSite) {
+          recordToken(arg.labelSite, arg.label, "parameter", { readonly: true });
+        }
+        walkExpr(arg.value, typeParams, valueParams, locals);
+      }
+      return;
+    }
+    if (expr.kind === "member") {
+      walkExpr(expr.object, typeParams, valueParams, locals);
+      if (expr.memberSite) {
+        recordToken(expr.memberSite, expr.member, "parameter", { readonly: true });
+      }
+      return;
+    }
+    if (expr.kind === "unary" || expr.kind === "loan_arg" || expr.kind === "try_expr") {
+      walkExpr(expr.operand, typeParams, valueParams, locals);
+      return;
+    }
+    if (expr.kind === "binary") {
+      walkExpr(expr.left, typeParams, valueParams, locals);
+      walkExpr(expr.right, typeParams, valueParams, locals);
+      return;
+    }
+    if (expr.kind === "range") {
+      walkExpr(expr.low, typeParams, valueParams, locals);
+      walkExpr(expr.high, typeParams, valueParams, locals);
+      return;
+    }
+    if (expr.kind === "if_expr") {
+      walkExpr(expr.condition, typeParams, valueParams, locals);
+      const thenLocals = new Map(locals);
+      if (expr.condition.kind === "is_expr") {
+        walkPattern(expr.condition.pattern, typeParams, valueParams, thenLocals);
+      }
+      walkExpr(expr.thenExpr, typeParams, valueParams, thenLocals);
+      walkExpr(expr.elseExpr, typeParams, valueParams, locals);
+      return;
+    }
+    if (expr.kind === "is_expr") {
+      walkExpr(expr.target, typeParams, valueParams, locals);
+      walkPattern(expr.pattern, typeParams, valueParams, new Map(locals));
+      return;
+    }
+    if (expr.kind === "with_update") {
+      walkExpr(expr.base, typeParams, valueParams, locals);
+      for (const upd of expr.updates || []) {
+        recordToken(upd.site, upd.field, "parameter", { readonly: true });
+        walkExpr(upd.value, typeParams, valueParams, locals);
+      }
+      return;
+    }
+    if (expr.kind === "quantifier" || expr.kind === "lambda") {
+      const innerParams = new Set(valueParams);
+      for (const p of expr.params || []) {
+        if (p.type) walkType(p.type, typeParams, innerParams, locals);
+        innerParams.add(p.name);
+        recordToken(p.site, p.name, "parameter", { declaration: true, readonly: true });
+      }
+      walkExpr(expr.body, typeParams, innerParams, locals);
+      return;
+    }
+    if (expr.kind === "match_expr") {
+      walkExpr(expr.scrutinee, typeParams, valueParams, locals);
+      for (const arm of expr.arms || []) {
+        const armLocals = new Map(locals);
+        walkPattern(arm.pattern, typeParams, valueParams, armLocals);
+        walkExpr(arm.expr, typeParams, valueParams, armLocals);
+      }
+      return;
+    }
+    if (expr.kind === "tuple") {
+      for (const item of expr.items || []) {
+        walkExpr(item, typeParams, valueParams, locals);
+      }
+    }
+  }
+
+  function walkBlock(block, typeParams, valueParams, locals) {
+    if (!block) return;
+    if (block.kind === "expr_body") {
+      walkExpr(block.expr, typeParams, valueParams, locals);
+      return;
+    }
+    const blockLocals = new Map(locals);
+    for (const stmt of block.statements || []) {
+      if (stmt.kind === "return") {
+        walkExpr(stmt.value, typeParams, valueParams, blockLocals);
+      } else if (stmt.kind === "local") {
+        if (stmt.annotation) {
+          walkType(stmt.annotation, typeParams, valueParams, blockLocals);
+        }
+        walkExpr(stmt.value, typeParams, valueParams, blockLocals);
+        if (stmt.name !== "_" && stmt.nameSite) {
+          const isReadonly = stmt.role !== "var";
+          blockLocals.set(stmt.name, isReadonly);
+          recordToken(stmt.nameSite, stmt.name, "variable", {
+            declaration: true,
+            readonly: isReadonly,
+          });
+        }
+      } else if (stmt.kind === "let_pattern") {
+        walkExpr(stmt.value, typeParams, valueParams, blockLocals);
+        if (stmt.elseBlock) {
+          walkBlock(stmt.elseBlock, typeParams, valueParams, new Map(blockLocals));
+        }
+        walkPattern(stmt.pattern, typeParams, valueParams, blockLocals);
+      } else if (stmt.kind === "if_stmt") {
+        walkExpr(stmt.condition, typeParams, valueParams, blockLocals);
+        const thenLocals = new Map(blockLocals);
+        if (stmt.condition.kind === "is_expr") {
+          walkPattern(stmt.condition.pattern, typeParams, valueParams, thenLocals);
+        }
+        walkBlock(stmt.thenBranch, typeParams, valueParams, thenLocals);
+        if (stmt.elseBranch) {
+          walkBlock(stmt.elseBranch, typeParams, valueParams, new Map(blockLocals));
+        }
+      } else if (stmt.kind === "match_stmt") {
+        walkExpr(stmt.scrutinee, typeParams, valueParams, blockLocals);
+        for (const arm of stmt.arms || []) {
+          const armLocals = new Map(blockLocals);
+          walkPattern(arm.pattern, typeParams, valueParams, armLocals);
+          walkBlock(arm.body, typeParams, valueParams, armLocals);
+        }
+      } else if (stmt.kind === "foreach_stmt") {
+        walkExpr(stmt.range, typeParams, valueParams, blockLocals);
+        const loopLocals = new Map(blockLocals);
+        loopLocals.set(stmt.binder, true);
+        if (stmt.binderSite) {
+          recordToken(stmt.binderSite, stmt.binder, "variable", {
+            declaration: true,
+            readonly: true,
+          });
+        }
+        walkBlock(stmt.body, typeParams, valueParams, loopLocals);
+      } else if (stmt.kind === "while_stmt") {
+        walkExpr(stmt.condition, typeParams, valueParams, blockLocals);
+        walkBlock(stmt.body, typeParams, valueParams, new Map(blockLocals));
+      } else if (stmt.kind === "open_stmt") {
+        walkBlock(stmt.body, typeParams, valueParams, new Map(blockLocals));
+      } else if (stmt.kind === "assign") {
+        walkExpr(stmt.target, typeParams, valueParams, blockLocals);
+        walkExpr(stmt.value, typeParams, valueParams, blockLocals);
+      } else if (stmt.kind === "expr_stmt") {
+        walkExpr(stmt.expr, typeParams, valueParams, blockLocals);
+      }
+    }
+  }
+
+  function walkProof(proof, typeParams, valueParams, locals) {
+    if (!proof) return;
+    for (const step of proof.steps || []) {
+      if (step.kind === "calc") {
+        for (const a of step.assertions || []) {
+          walkExpr(a.prop, typeParams, valueParams, locals);
+        }
+      } else if (step.kind === "assert") {
+        walkExpr(step.prop, typeParams, valueParams, locals);
+      }
+    }
+  }
+
+  for (const decl of declarations) {
+    const typeParams = new Set();
+    const valueParams = new Set();
+    for (const gp of decl.generics || []) {
+      if (gp.mode === "type" || gp.mode === "region") {
+        typeParams.add(gp.name);
+        recordToken(gp.site, gp.name, "typeParameter", { declaration: true, readonly: true });
+      } else {
+        walkType(gp.valueType, typeParams, valueParams, new Map());
+        valueParams.add(gp.name);
+        recordToken(gp.site, gp.name, "parameter", { declaration: true, readonly: true });
+      }
+    }
+    if (decl.kind === "alias") {
+      recordToken(decl.site, decl.name, "type", { declaration: true, readonly: true });
+      walkType(decl.targetType, typeParams, valueParams, new Map());
+    } else if (decl.kind === "record") {
+      recordToken(decl.site, decl.name, "type", { declaration: true, readonly: true });
+      for (const f of decl.fields || []) {
+        walkType(f.type, typeParams, valueParams, new Map());
+        valueParams.add(f.name);
+        recordToken(f.site, f.name, "parameter", { declaration: true, readonly: true });
+      }
+      for (const inv of decl.invariants || []) {
+        recordToken(inv.site, inv.name, "function", { declaration: true, readonly: true });
+        walkExpr(inv.expr, typeParams, valueParams, new Map());
+      }
+      for (const prop of decl.properties || []) {
+        walkType(prop.type, typeParams, valueParams, new Map());
+        recordToken(prop.site, prop.name, "function", { declaration: true, readonly: true });
+        walkExpr(prop.expr, typeParams, valueParams, new Map());
+      }
+    } else if (decl.kind === "union") {
+      recordToken(decl.site, decl.name, "type", { declaration: true, readonly: true });
+      for (const c of decl.cases || []) {
+        recordToken(c.site, c.name, "function", { declaration: true, readonly: true });
+        const caseParams = new Set(valueParams);
+        for (const f of c.fields || []) {
+          walkType(f.type, typeParams, caseParams, new Map());
+          caseParams.add(f.name);
+          recordToken(f.site, f.name, "parameter", { declaration: true, readonly: true });
+        }
+      }
+    } else if (["interface", "impl", "struct"].includes(decl.kind)) {
+      recordToken(decl.site, decl.name, "type", { declaration: true, readonly: true });
+    } else if (decl.kind === "constant") {
+      walkType(decl.valueType, typeParams, valueParams, new Map());
+      recordToken(decl.site, decl.name, "variable", { declaration: true, readonly: true });
+      walkExpr(decl.value, typeParams, valueParams, new Map());
+    } else if (["lemma", "function", "definition"].includes(decl.kind)) {
+      for (const p of decl.parameters || []) {
+        if (p.name && p.name !== "this") {
+          valueParams.add(p.name);
+        }
+      }
+      if (decl.returnType) {
+        walkType(decl.returnType, typeParams, valueParams, new Map());
+      }
+      recordToken(decl.site, decl.name, decl.isProperty ? "variable" : "function", {
+        declaration: true,
+        readonly: Boolean(decl.isProperty),
+      });
+      for (const p of decl.parameters || []) {
+        walkType(p.type, typeParams, valueParams, new Map());
+        if (p.name && p.name !== "this") {
+          recordToken(p.site, p.name, "parameter", {
+            declaration: true,
+            readonly: p.mode !== "ref" && p.mode !== "out",
+          });
+        }
+      }
+      const proofParams = new Set(valueParams);
+      if (decl.contracts) {
+        for (const req of decl.contracts.requires || []) {
+          walkExpr(req.expr, typeParams, valueParams, new Map());
+        }
+        for (const ens of decl.contracts.ensures || []) {
+          walkExpr(ens.expr, typeParams, valueParams, new Map());
+          if (ens.expr && ens.expr.kind === "quantifier") {
+            for (const qp of ens.expr.params || []) {
+              proofParams.add(qp.name);
+            }
+          }
+        }
+        if (decl.contracts.decreases) {
+          walkExpr(decl.contracts.decreases, typeParams, valueParams, new Map());
+        }
+      }
+      if (decl.proof) {
+        walkProof(decl.proof, typeParams, proofParams, new Map());
+      }
+      if (decl.body) {
+        walkBlock(decl.body, typeParams, valueParams, new Map());
+      }
+    }
+  }
+
+  const sorted = [...recordedBySite.values()].sort(
+    (a, b) => a.line - b.line || a.character - b.character
+  );
+  const tokens = [];
+  const data = [];
+  let prevLine = 0;
+  let prevChar = 0;
+  for (const tok of sorted) {
+    if (
+      tokens.length > 0 &&
+      tok.line === tokens[tokens.length - 1].line &&
+      tok.character < tokens[tokens.length - 1].character + tokens[tokens.length - 1].length
+    ) {
+      continue;
+    }
+    tokens.push(tok);
+    data.push(
+      tok.line - prevLine,
+      tok.line === prevLine ? tok.character - prevChar : tok.character,
+      tok.length,
+      tok.typeIndex,
+      tok.modifiers
+    );
+    prevLine = tok.line;
+    prevChar = tok.character;
+  }
+  return { tokens, data };
+}
+
+export function buildVelaMonarchLanguage() {
+  return {
+    keywords: [...VELA_GRAMMAR.keywords],
+    typeKeywords: [...VELA_GRAMMAR.typeKeywords],
+    callableTypeKeywords: ["Fn", "FnMut", "FnOnce"],
+    constants: [...VELA_GRAMMAR.constants],
+    tokenizer: {
+      root: [
+        [/[ \t\r\n]+/, "white"],
+        [/\/\/.*$/, "comment"],
+        [/\/\*/, "comment", "@blockComment"],
+        [/"""+/, "string", "@rawString"],
+        [/\$"/, "string", "@formatString"],
+        [/"(?:\\.|[^"\\])*"/, "string"],
+        [/'(?:\\.|[^'\\\r\n])'/, "string"],
+        [/'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/, "typeParameter"],
+        [/\?[A-Za-z_][A-Za-z0-9_]*/, "typeParameter"],
+        [
+          /0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/,
+          "number",
+        ],
+        [
+          /0[bB][01](?:_?[01])*(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/,
+          "number",
+        ],
+        [
+          /[0-9](?:_?[0-9])*(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/,
+          "number",
+        ],
+        [/::</, { token: "delimiter.angle", next: "@genericArgs" }],
+        [
+          /<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)/,
+          { token: "delimiter.angle", next: "@genericArgs" },
+        ],
+        [
+          /\b(?:record|struct|union|inductive|coinductive|interface|type|alias)\b(?=\s+[A-Za-z_][A-Za-z0-9_]*)/,
+          { token: "keyword", next: "@typeDeclarationName" },
+        ],
+        [
+          /[a-z_][A-Za-z0-9_]*(?=\s*:(?!:))/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "parameter",
+            },
+          },
+        ],
+        [
+          /[a-z_][A-Za-z0-9_]*(?=\s*=>)/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "parameter",
+            },
+          },
+        ],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*(?=\s*(?:<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)(?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>\s*\(|\())/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@callableTypeKeywords": "type",
+              "@constants": "constant",
+              "@default": "function",
+            },
+          },
+        ],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*(?=\s*<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>))/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "type",
+            },
+          },
+        ],
+        [
+          /\b(?:T[A-Z][A-Za-z0-9_]*|[A-Z])\b/,
+          {
+            cases: {
+              "@typeKeywords": "type",
+              "@default": "typeParameter",
+            },
+          },
+        ],
+        [
+          /[A-Z][A-Za-z0-9_]*(?=\s+[A-Za-z_][A-Za-z0-9_]*)/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "type",
+            },
+          },
+        ],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "identifier",
+            },
+          },
+        ],
+        [
+          /<==>|==>|::|\.\.|=>|->|==|!=|<=|>=|&&|\|\||\+=|-=|\*=|\/=|%=|[+*\/%!=<>~^&|?-]/,
+          "operator",
+        ],
+        [/[{}()\[\]]/, "@brackets"],
+        [/[;,.:@@]/, "delimiter"],
+      ],
+      typeDeclarationName: [
+        [/[ \t]+/, "white"],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*/,
+          {
+            cases: {
+              "@keywords": { token: "keyword", next: "@pop" },
+              "@typeKeywords": { token: "type", next: "@pop" },
+              "@default": { token: "type", next: "@pop" },
+            },
+          },
+        ],
+        [/./, { token: "@rematch", next: "@pop" }],
+      ],
+      genericArgs: [
+        [/[ \t\r\n]+/, "white"],
+        [/\/\/.*$/, "comment"],
+        [/\/\*/, "comment", "@blockComment"],
+        [
+          /<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)/,
+          { token: "delimiter.angle", next: "@genericArgs" },
+        ],
+        [/->/, "operator"],
+        [/>/, { token: "delimiter.angle", next: "@pop" }],
+        [/[;{}]/, { token: "@rematch", next: "@popall" }],
+        [/'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/, "typeParameter"],
+        [/\?[A-Za-z_][A-Za-z0-9_]*/, "typeParameter"],
+        [
+          /0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|[0-9](?:_?[0-9])*/,
+          "number",
+        ],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*(?=\s*<)/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@default": "type",
+            },
+          },
+        ],
+        [
+          /\b(?:T[A-Z][A-Za-z0-9_]*|[A-Z])\b/,
+          {
+            cases: {
+              "@typeKeywords": "type",
+              "@default": "typeParameter",
+            },
+          },
+        ],
+        [
+          /[A-Z][A-Za-z0-9_]*/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "typeParameter",
+            },
+          },
+        ],
+        [
+          /[a-z_][A-Za-z0-9_]*(?=\s*\()/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@default": "function",
+            },
+          },
+        ],
+        [
+          /[a-z_][A-Za-z0-9_]*/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "parameter",
+            },
+          },
+        ],
+        [/[,:.]/, "delimiter"],
+        [/[()\[\]]/, "@brackets"],
+        [/[+*\/%-]/, "operator"],
+      ],
+      blockComment: [
+        [/[^/*]+/, "comment"],
+        [/\/\*/, "comment", "@push"],
+        [/\*\//, "comment", "@pop"],
+        [/[/*]/, "comment"],
+      ],
+      rawString: [
+        [/"""+/, "string", "@pop"],
+        [/[^"]+/, "string"],
+        [/"/, "string"],
+      ],
+      formatString: [
+        [/\{\{/, "string"],
+        [/\}\}/, "string"],
+        [/\{/, { token: "delimiter", next: "@formatHole" }],
+        [/\\./, "string"],
+        [/"/, { token: "string", next: "@pop" }],
+        [/[^"\\{}]+/, "string"],
+      ],
+      formatHole: [
+        [/[ \t\r\n]+/, "white"],
+        [/\}/, { token: "delimiter", next: "@pop" }],
+        [/:/, "delimiter"],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*(?=\s*\()/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@callableTypeKeywords": "type",
+              "@default": "function",
+            },
+          },
+        ],
+        [
+          /[A-Za-z_][A-Za-z0-9_]*/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@typeKeywords": "type",
+              "@constants": "constant",
+              "@default": "identifier",
+            },
+          },
+        ],
+        [/[0-9](?:_?[0-9])*/, "number"],
+        [/[()\[\].,+*\/%-]/, "delimiter"],
+      ],
+    },
+  };
+}
+
+function escapeVelaHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+export function highlightVelaCodeHtml(sourceText) {
+  if (typeof sourceText !== "string" || !sourceText) return "";
+  const semantic = projectGrammarSemanticTokens(sourceText);
+  const semanticByPos = new Map();
+  for (const tok of semantic.tokens) {
+    semanticByPos.set(`${tok.line}:${tok.character}`, tok);
+  }
+  const lines = sourceText.split("\n");
+  const renderedLines = [];
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
+    const line = lines[lineIdx];
+    let col = 0;
+    let out = "";
+    let genericDepth = 0;
+    while (col < line.length) {
+      const rest = line.slice(col);
+      const ws = /^[ \t\r]+/.exec(rest);
+      if (ws) {
+        out += ws[0];
+        col += ws[0].length;
+        continue;
+      }
+      if (rest.startsWith("//")) {
+        out += `<span class="tok-comment">${escapeVelaHtml(rest)}</span>`;
+        break;
+      }
+      const strMatch = /^(?:\$"(?:\\.|[^"\\])*"|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])')/.exec(rest);
+      if (strMatch) {
+        out += `<span class="tok-string">${escapeVelaHtml(strMatch[0])}</span>`;
+        col += strMatch[0].length;
+        continue;
+      }
+      const regionOrVar = /^(?:'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*|\?[A-Za-z_][A-Za-z0-9_]*)/.exec(
+        rest
+      );
+      if (regionOrVar) {
+        out += `<span class="tok-typeParameter">${escapeVelaHtml(regionOrVar[0])}</span>`;
+        col += regionOrVar[0].length;
+        continue;
+      }
+      const numMatch =
+        /^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|[0-9](?:_?[0-9])*)(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/.exec(
+          rest
+        );
+      if (numMatch) {
+        out += `<span class="tok-number">${escapeVelaHtml(numMatch[0])}</span>`;
+        col += numMatch[0].length;
+        continue;
+      }
+      const wordMatch = /^[A-Za-z_][A-Za-z0-9_]*/.exec(rest);
+      if (wordMatch) {
+        const word = wordMatch[0];
+        const sem = semanticByPos.get(`${lineIdx}:${col}`);
+        const afterWord = rest.slice(word.length);
+        let cls = null;
+        if (VELA_GRAMMAR_KEYWORD_SET.has(word)) {
+          cls = "keyword";
+        } else if (sem) {
+          cls = sem.type;
+        } else if (VELA_GRAMMAR_TYPE_KEYWORD_SET.has(word)) {
+          cls = "type";
+        } else if (VELA_GRAMMAR_CONSTANT_SET.has(word)) {
+          cls = "constant";
+        } else if (/^(?:T[A-Z][A-Za-z0-9_]*|[A-Z])$/.test(word)) {
+          cls = "typeParameter";
+        } else if (
+          /^\s*(?:<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)(?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>\s*\(|\()/.test(
+            afterWord
+          )
+        ) {
+          cls = "function";
+        } else if (genericDepth > 0) {
+          cls = /^[A-Z]/.test(word) ? "typeParameter" : "parameter";
+        } else if (/^[A-Z]/.test(word)) {
+          cls = "type";
+        }
+        out += cls
+          ? `<span class="tok-${cls}">${escapeVelaHtml(word)}</span>`
+          : escapeVelaHtml(word);
+        col += word.length;
+        continue;
+      }
+      if (
+        /^<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)/.test(rest)
+      ) {
+        genericDepth += 1;
+        out += `<span class="tok-angle">&lt;</span>`;
+        col += 1;
+        continue;
+      }
+      if (genericDepth > 0 && rest[0] === ">" && !rest.startsWith(">=")) {
+        genericDepth -= 1;
+        out += `<span class="tok-angle">&gt;</span>`;
+        col += 1;
+        continue;
+      }
+      const opMatch =
+        /^(?:<==>|==>|::|\.\.|=>|->|==|!=|<=|>=|&&|\|\||\+=|-=|\*=|\/=|%=|[+*\/%!=<>~^&|?-])/.exec(
+          rest
+        );
+      if (opMatch) {
+        out += `<span class="tok-operator">${escapeVelaHtml(opMatch[0])}</span>`;
+        col += opMatch[0].length;
+        continue;
+      }
+      out += escapeVelaHtml(rest[0]);
+      col += 1;
+    }
+    renderedLines.push(out);
+  }
+  return renderedLines.join("\n");
 }
 
 function valuesEqual(a, b) {
@@ -5905,7 +7025,7 @@ function initPlaygroundUi() {
     $("refresh-outline").disabled = !available;
     $("inspect-symbol").disabled = !available;
     $("show-hints").disabled = !available || !state.editor;
-    $("show-semantics").disabled = !available || !state.editor;
+    $("show-semantics").disabled = !state.editor;
     for (const name of ["inspect", "authoring"]) {
       const tab = document.querySelector(`[data-tab="${name}"]`);
       if (tab) {
@@ -5922,7 +7042,7 @@ function initPlaygroundUi() {
     }
     state.editor?.updateOptions({
       inlayHints: { enabled: available && $("show-hints").checked ? "on" : "off" },
-      "semanticHighlighting.enabled": available && $("show-semantics").checked,
+      "semanticHighlighting.enabled": Boolean(state.editor && $("show-semantics").checked),
     });
     if (!state.editor && $("editor-notice").textContent.startsWith("Plain-text mode:")) {
       $("editor-notice").textContent = available
@@ -6760,135 +7880,44 @@ function initPlaygroundUi() {
     const monaco = window.monaco;
     monaco.languages.register({ id: "vela", extensions: [".vela"] });
     monaco.languages.setLanguageConfiguration("vela", {
-      comments: { lineComment: "//" },
+      comments: {
+        lineComment: "//",
+        blockComment: ["/*", "*/"],
+      },
       brackets: [
         ["{", "}"],
+        ["[", "]"],
         ["(", ")"],
       ],
       autoClosingPairs: [
         { open: "{", close: "}" },
+        { open: "[", close: "]" },
         { open: "(", close: ")" },
+        { open: '"', close: '"', notIn: ["string", "comment"] },
       ],
       surroundingPairs: [
         { open: "{", close: "}" },
+        { open: "[", close: "]" },
         { open: "(", close: ")" },
+        { open: "<", close: ">" },
+        { open: '"', close: '"' },
       ],
     });
-    monaco.languages.setMonarchTokensProvider("vela", {
-      keywords: [
-        "module",
-        "import",
-        "public",
-        "private",
-        "const",
-        "let",
-        "var",
-        "if",
-        "else",
-        "match",
-        "case",
-        "return",
-        "definition",
-        "alias",
-        "ghost",
-        "tracked",
-        "lemma",
-        "theorem",
-        "requires",
-        "ensures",
-        "restores",
-        "decreases",
-        "where",
-        "proof",
-        "calc",
-        "assert",
-        "by",
-        "type",
-        "forall",
-        "exists",
-        "in",
-        "ref",
-        "out",
-        "owned",
-        "move",
-        "record",
-        "union",
-        "interface",
-        "impl",
-        "struct",
-        "open",
-        "lifts",
-        "foreach",
-        "while",
-        "invariant",
-        "with",
-        "is",
-        "this",
-      ],
-      typeKeywords: [
-        "Nat",
-        "bool",
-        "Unit",
-        "Type",
-        "Prop",
-        "Fn",
-        "Vec",
-        "Fin",
-        "Seq",
-        "Span",
-        "Slots",
-        "Option",
-        "Result",
-        "Eq",
-        "String",
-        "TextBuilder",
-        "u8",
-        "u16",
-        "u32",
-        "u64",
-        "usize",
-        "byte",
-        "i8",
-        "i16",
-        "i32",
-        "i64",
-      ],
-      tokenizer: {
-        root: [
-          [/\/\/.*$/, "comment"],
-          [/"""[\s\S]*?"""/, "string"],
-          [/\$"(?:\\.|[^"\\])*"/, "string"],
-          [/"(?:\\.|[^"\\])*"/, "string"],
-          [/\b(?:true|false)\b/, "constant"],
-          [
-            /[A-Za-z_][A-Za-z0-9_]*/,
-            {
-              cases: {
-                "@keywords": "keyword",
-                "@typeKeywords": "type",
-                "@default": "identifier",
-              },
-            },
-          ],
-          [/[0-9](?:_?[0-9])*/, "number"],
-          [/=>|==|!=|<=|>=|&&|\|\||[+*\/%!=<>-]/, "operator"],
-          [/[{}()]/, "@brackets"],
-          [/[;,.:]/, "delimiter"],
-        ],
-      },
-    });
+    monaco.languages.setMonarchTokensProvider("vela", buildVelaMonarchLanguage());
     monaco.editor.defineTheme("vela-night", {
       base: "vs-dark",
       inherit: true,
       rules: [
         { token: "keyword", foreground: "C6AEED" },
         { token: "type", foreground: "93C6DA" },
+        { token: "typeParameter", foreground: "E5C07B", fontStyle: "italic" },
         { token: "identifier", foreground: "CDD7EB" },
         { token: "comment", foreground: "687D85", fontStyle: "italic" },
         { token: "string", foreground: "A8D4A2" },
         { token: "number", foreground: "D9BA8B" },
         { token: "constant", foreground: "D9BA8B" },
         { token: "operator", foreground: "AAB6D2" },
+        { token: "delimiter.angle", foreground: "89B4FA" },
         { token: "function", foreground: "BDCDFF" },
         { token: "parameter", foreground: "B5D4DB" },
         { token: "variable", foreground: "C8D4E9" },
@@ -7003,21 +8032,25 @@ function initPlaygroundUi() {
     });
     monaco.languages.registerDocumentSemanticTokensProvider("vela", {
       getLegend() {
-        return (
-          state.capabilities.semanticTokensProvider?.legend || {
-            tokenTypes: ["function", "parameter", "variable"],
-            tokenModifiers: ["declaration", "readonly"],
-          }
-        );
+        return {
+          tokenTypes: [...VELA_GRAMMAR.semanticTokenTypes],
+          tokenModifiers: [...VELA_GRAMMAR.semanticTokenModifiers],
+        };
       },
       async provideDocumentSemanticTokens(model, lastResultId, cancellation) {
-        const result = await languageQuery(
-          "textDocument/semanticTokens/full",
-          {},
-          snapshot(),
-          cancellation
-        );
-        return result ? { data: new Uint32Array(result.data) } : null;
+        if (state.connected && state.editorServices === true) {
+          const result = await languageQuery(
+            "textDocument/semanticTokens/full",
+            {},
+            snapshot(),
+            cancellation
+          );
+          if (result && Array.isArray(result.data) && result.data.length > 0) {
+            return { data: new Uint32Array(result.data) };
+          }
+        }
+        const projected = projectGrammarSemanticTokens(model.getValue());
+        return projected ? { data: new Uint32Array(projected.data) } : null;
       },
       releaseDocumentSemanticTokens() {},
     });
@@ -7093,8 +8126,7 @@ function initPlaygroundUi() {
         inlayHints: {
           enabled: state.editorServices === true && $("show-hints").checked ? "on" : "off",
         },
-        "semanticHighlighting.enabled":
-          state.editorServices === true && $("show-semantics").checked,
+        "semanticHighlighting.enabled": $("show-semantics").checked,
         quickSuggestions: false,
         suggestOnTriggerCharacters: false,
         wordBasedSuggestions: "off",
@@ -7464,6 +8496,9 @@ function initPlaygroundUi() {
     if (state.session) closeSession(state.session, { keepalive: true });
   });
 
+  document.querySelectorAll(".compact-code code").forEach((codeEl) => {
+    codeEl.innerHTML = highlightVelaCodeHtml(codeEl.textContent || "");
+  });
   renderSuggestions(EXAMPLES.squares.suggestions);
   updateServiceUI();
   void connect();

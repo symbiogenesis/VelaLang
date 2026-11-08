@@ -1449,6 +1449,53 @@ kbd {
     overflow-x: auto;
 }
 
+.compact-code .tok-keyword {
+    color: #c6aeed;
+}
+
+.compact-code .tok-type {
+    color: #93c6da;
+}
+
+.compact-code .tok-typeParameter {
+    color: #e5c07b;
+    font-style: italic;
+}
+
+.compact-code .tok-function {
+    color: #bdcdff;
+}
+
+.compact-code .tok-parameter {
+    color: #b5d4db;
+}
+
+.compact-code .tok-variable {
+    color: #c8d4e9;
+}
+
+.compact-code .tok-number,
+.compact-code .tok-constant {
+    color: #d9ba8b;
+}
+
+.compact-code .tok-string {
+    color: #a8d4a2;
+}
+
+.compact-code .tok-operator {
+    color: #aab6d2;
+}
+
+.compact-code .tok-angle {
+    color: #89b4fa;
+}
+
+.compact-code .tok-comment {
+    color: #687d85;
+    font-style: italic;
+}
+
 .pillar-foot {
     margin-top: auto;
     display: flex;

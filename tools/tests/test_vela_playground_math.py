@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import re
 import tempfile
 import threading
 from collections.abc import Generator
@@ -413,6 +414,43 @@ def _playground_formatting_example_assets() -> None:
            "playground selector omitted the records, properties, updates and guards example")
     ensure("ergonomics: {" in script and "counter with {" in script and "previous is Succ(" in script,
            "playground app.mjs omitted the records, properties, updates and guards example source")
+    lexer_source = (root / "tools/toolchain/parser/lexer.mll").read_text(encoding="utf-8")
+    identifier_table = lexer_source.split("let identifier state lexbuf =", 1)[1].split("let digit_run", 1)[0]
+    lexer_active: set[str] = set()
+    lexer_retired: set[str] = set()
+    for word, action in re.findall(r'\|\s*"([A-Za-z0-9_]+)"\s*->\s*([^|\n]+)', identifier_table):
+        if action.strip().startswith("refuse "):
+            lexer_retired.add(word)
+        else:
+            lexer_active.add(word)
+    grammar_block = script.split("export const VELA_GRAMMAR = Object.freeze({", 1)[1].split("});", 1)[0]
+
+    def _grammar_words(field: str) -> set[str]:
+        section = grammar_block.split(f"{field}: Object.freeze([", 1)[1].split("]),", 1)[0]
+        return set(re.findall(r'"([^"]+)"', section))
+
+    js_keywords = _grammar_words("keywords")
+    js_types = _grammar_words("typeKeywords")
+    js_constants = _grammar_words("constants")
+    js_retired = _grammar_words("retiredKeywords")
+    js_active = js_keywords | js_types | js_constants
+    ensure(lexer_active <= js_active,
+           f"playground VELA_GRAMMAR omitted lexer keywords: {sorted(lexer_active - js_active)}")
+    ensure(js_retired == lexer_retired and not (js_active & js_retired),
+           "playground VELA_GRAMMAR drifted on retired lexer keywords")
+    ensure(not (js_keywords & js_types) and not (js_keywords & js_constants) and not (js_types & js_constants),
+           "playground VELA_GRAMMAR keyword sets overlapped")
+    ensure("export function buildVelaMonarchLanguage()" in script
+           and "export function projectGrammarSemanticTokens(" in script
+           and "export function highlightVelaCodeHtml(" in script
+           and "[^<>=\\r\\n;{}&|-]+" not in script
+           and 'monaco.languages.setMonarchTokensProvider("vela", buildVelaMonarchLanguage())' in script
+           and "genericArgs:" in script
+           and '"typeParameter"' in script
+           and '"delimiter.angle"' in script
+           and ".compact-code .tok-typeParameter" in styles
+           and ".compact-code .tok-angle" in styles,
+           "playground app.mjs or style.css omitted grammar-coupled generic Monarch, semantic token, or static card highlighting")
     workflow = (root / ".github/workflows/pages.yml").read_text(encoding="utf-8")
     ensure("runs-on: ubuntu-26.04" in workflow and "ubuntu-latest" not in workflow,
            "GitHub Pages workflow must pin ubuntu-26.04 rather than ubuntu-latest")
