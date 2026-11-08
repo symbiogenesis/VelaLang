@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Proof-toolchain paths, filesystem classification, worktree Git overlays, and worker sizing.
 
-Shared by [env.py](env.py), [receipts.py](receipts.py), and [corpus.py](corpus.py) without
+Shared by [env.py](env.py) and [corpus.py](corpus.py) without
 importing model-build state from [env.py](env.py).
 """
 
@@ -188,7 +188,7 @@ def filesystem(path: Path | str) -> str:
 
 
 def opam_root() -> Path:
-    """Return the opam root directory (`OPAMROOT` or `~/.opam`), shared with [toolchain/gallina.py](gallina.py)."""
+    """Return the opam root directory (`OPAMROOT` or `~/.opam`)."""
     return _env_path("OPAMROOT", Path.home() / ".opam")
 
 
