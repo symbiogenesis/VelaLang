@@ -2,6 +2,8 @@
 
 **Vela** is a verification-aware systems and mathematical authoring language designed alongside [VerifiedOS](https://github.com/symbiogenesis/VerifiedOS). It combines explicit ownership and loan modes (`in`, `ref`, `out`), bounded loop and resource contracts, dependent mathematics and first-class proof terms, and hygienic elaboration to Rocq/Gallina (`rocq c` and `rocqchk`) and Clight/CompCert.
 
+Explore the **[Vela Language Overview, Reference & Interactive Playground](https://symbiogenesis.github.io/VelaLang/)** in your browser.
+
 ## Repository map
 
 | Path | Purpose |
