@@ -4,6 +4,9 @@
 import hashlib
 import json
 import re
+import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 from collections.abc import Generator
@@ -464,6 +467,368 @@ def _playground_formatting_example_assets() -> None:
            "GitHub Pages workflow must pin Node 24 actions by SHA without deprecated Node 20 artifacts")
 
 
+_NODE_RUNTIME_SCRIPT = r"""
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+const repoRoot = process.argv[2];
+const playgroundDir = path.join(repoRoot, "tools", "toolchain", "playground");
+const appPath = path.join(playgroundDir, "app.mjs");
+const htmlPath = path.join(playgroundDir, "index.html");
+const html = fs.readFileSync(htmlPath, "utf8");
+
+const appUrl = pathToFileURL(appPath).href;
+const mod = await import(appUrl);
+
+const codeRegex = /<pre class="compact-code"><code>([\s\S]*?)<\/code><\/pre>/g;
+const blocks = [];
+let match;
+while ((match = codeRegex.exec(html)) !== null) {
+  const unescaped = match[1]
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  blocks.push(unescaped);
+}
+if (blocks.length < 7) {
+  throw new Error(`Expected at least 7 .compact-code blocks, found ${blocks.length}`);
+}
+for (let i = 0; i < blocks.length; i += 1) {
+  const rendered = mod.highlightVelaCodeHtml(blocks[i]);
+  if (!rendered.includes("tok-keyword")) {
+    throw new Error(`Compact code block ${i + 1} produced no tok-keyword spans`);
+  }
+}
+
+const unparsedSnippet = [
+  "// line comment",
+  "/* block comment */",
+  "byte Nat usize true false Zero None 'a' 'lifetime \"str\" \"\"\"raw\"\"\" 0x1f_u8 0b1010 42",
+  "Read<TValue, capacity>(4)",
+].join("\n");
+const renderedUnparsed = mod.highlightVelaCodeHtml(unparsedSnippet);
+for (const expectedClass of [
+  "tok-comment",
+  "tok-type",
+  "tok-constant",
+  "tok-string",
+  "tok-number",
+  "tok-function",
+  "tok-typeParameter",
+  "tok-parameter",
+  "tok-angle",
+]) {
+  if (!renderedUnparsed.includes(expectedClass)) {
+    throw new Error(`highlightVelaCodeHtml omitted ${expectedClass}`);
+  }
+}
+
+const monarch = mod.buildVelaMonarchLanguage();
+const stateNames = new Set(Object.keys(monarch.tokenizer));
+for (const [stateName, rules] of Object.entries(monarch.tokenizer)) {
+  for (const rule of rules) {
+    if (Array.isArray(rule) && rule[0] instanceof RegExp) {
+      new RegExp(rule[0].source, rule[0].flags);
+    }
+    const action = Array.isArray(rule) ? rule[1] : null;
+    const targets = [];
+    if (Array.isArray(rule) && typeof rule[2] === "string" && rule[2].startsWith("@")) {
+      targets.push(rule[2]);
+    } else if (action && typeof action === "object" && !Array.isArray(action) && typeof action.next === "string") {
+      targets.push(action.next);
+    }
+    for (const target of targets) {
+      if (target !== "@pop" && target !== "@push" && target !== "@popall") {
+        const cleanTarget = target.replace(/^@/, "").split(".")[0];
+        if (!stateNames.has(cleanTarget)) {
+          throw new Error(`Monarch state ${stateName} references missing state ${target}`);
+        }
+      }
+    }
+  }
+}
+
+for (const [key, example] of Object.entries(mod.EXAMPLES)) {
+  const compiled = await mod.browserApi("/api/compile", { source: example.source });
+  if (!compiled.ok || !compiled.gallina) {
+    throw new Error(`Example ${key} failed browserApi compile: ${JSON.stringify(compiled)}`);
+  }
+  const evaluated = await mod.browserApi("/api/evaluate", {
+    source: example.source,
+    expression: example.expression,
+    valueType: example.valueType,
+  });
+  if (!evaluated.ok) {
+    throw new Error(`Example ${key} failed browserApi evaluate: ${JSON.stringify(evaluated)}`);
+  }
+}
+
+class MockElement {
+  constructor(tagName = "div", id = "") {
+    this.tagName = tagName.toUpperCase();
+    this.id = id;
+    this.className = "";
+    this.textContent = "";
+    this._innerHTML = "";
+    this.value = "";
+    this.hidden = false;
+    this.disabled = false;
+    this.checked = true;
+    this.open = false;
+    this.title = "";
+    this.type = "";
+    this.tabIndex = 0;
+    this.selectionStart = 0;
+    this.selectionEnd = 0;
+    this.dataset = {};
+    this.attributes = new Map();
+    this.children = [];
+    this.listeners = new Map();
+    const self = this;
+    this.classList = {
+      _set: new Set(),
+      add(... tokens) { tokens.forEach((t) => this._set.add(t)); },
+      remove(...tokens) { tokens.forEach((t) => this._set.delete(t)); },
+      toggle(token, force) {
+        const shouldAdd = force === undefined ? !this._set.has(token) : Boolean(force);
+        if (shouldAdd) this._set.add(token);
+        else this._set.delete(token);
+        return shouldAdd;
+      },
+      contains(token) { return this._set.has(token); },
+    };
+  }
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(val) { this._innerHTML = String(val); }
+  setAttribute(k, v) { this.attributes.set(k, String(v)); }
+  getAttribute(k) { return this.attributes.get(k) ?? null; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatchEvent(type, event = {}) {
+    const handlers = this.listeners.get(type) || [];
+    return Promise.all(handlers.map((fn) => fn({ preventDefault() {}, target: this, ...event })));
+  }
+  append(...nodes) {
+    this.children.push(...nodes);
+    for (const node of nodes) {
+      if (node && node.tagName === "SCRIPT" && typeof node.onload === "function") {
+        queueMicrotask(() => node.onload());
+      }
+    }
+  }
+  replaceChildren(...nodes) {
+    this.children = [...nodes];
+  }
+  contains(other) { return other === this || this.children.includes(other); }
+  focus() {}
+  scrollIntoView() {}
+  setRangeText(replacement, start, end) {
+    this.value = this.value.slice(0, start) + replacement + this.value.slice(end);
+  }
+}
+
+const elementsById = new Map();
+for (const m of html.matchAll(/\bid="([^"]+)"/g)) {
+  const id = m[1];
+  if (!elementsById.has(id)) {
+    const el = new MockElement("div", id);
+    if (id === "inspect-panel" || id === "authoring-panel") el.hidden = true;
+    if (id === "examples") el.value = "squares";
+    if (id === "expression") el.value = mod.EXAMPLES.squares.expression;
+    if (id === "value-type") el.value = mod.EXAMPLES.squares.valueType;
+    elementsById.set(id, el);
+  }
+}
+
+const tabButtons = [];
+for (const m of html.matchAll(/\bdata-tab="([^"]+)"/g)) {
+  const btn = new MockElement("button");
+  btn.dataset.tab = m[1];
+  tabButtons.push(btn);
+}
+
+const loadExampleButtons = [];
+for (const m of html.matchAll(/\bdata-load-example="([^"]+)"/g)) {
+  const btn = new MockElement("button");
+  btn.setAttribute("data-load-example", m[1]);
+  loadExampleButtons.push(btn);
+}
+
+const expandLinks = [];
+for (const m of html.matchAll(/\bdata-expand-target="([^"]+)"/g)) {
+  const link = new MockElement("a");
+  link.setAttribute("data-expand-target", m[1]);
+  expandLinks.push(link);
+}
+
+const compactCodes = blocks.map((text) => {
+  const code = new MockElement("code");
+  code.textContent = text;
+  return code;
+});
+
+const headEl = new MockElement("head");
+const bodyEl = new MockElement("body");
+
+globalThis.document = {
+  head: headEl,
+  body: bodyEl,
+  activeElement: null,
+  getElementById(id) {
+    if (!elementsById.has(id)) {
+      elementsById.set(id, new MockElement("div", id));
+    }
+    return elementsById.get(id);
+  },
+  createElement(tag) { return new MockElement(tag); },
+  querySelector(sel) {
+    const tabMatch = /^\[data-tab="([^"]+)"\]$/.exec(sel);
+    if (tabMatch) return tabButtons.find((b) => b.dataset.tab === tabMatch[1]) || null;
+    return null;
+  },
+  querySelectorAll(sel) {
+    if (sel === ".compact-code code") return compactCodes;
+    if (sel === "[data-tab]") return tabButtons;
+    if (sel === "[data-load-example]") return loadExampleButtons;
+    if (sel === "[data-expand-target]") return expandLinks;
+    return [];
+  },
+  addEventListener() {},
+};
+
+const mockModel = {
+  _val: mod.EXAMPLES.squares.source,
+  getValue() { return this._val; },
+  setValue(v) { this._val = String(v); },
+  onDidChangeContent() {},
+  dispose() {},
+};
+const mockEditor = {
+  updateOptions() {},
+  onDidChangeCursorPosition() {},
+  onDidChangeCursorSelection() {},
+  addCommand() {},
+  hasTextFocus() { return false; },
+  getPosition() { return { lineNumber: 1, column: 1 }; },
+  getSelection() { return { isEmpty() { return true; } }; },
+  setSelection() {},
+  revealRangeInCenter() {},
+  focus() {},
+  trigger() {},
+  dispose() {},
+};
+
+globalThis.window = {
+  MonacoEnvironment: null,
+  require: Object.assign(
+    (_deps, onLoad) => { queueMicrotask(() => onLoad({})); },
+    { config() {} }
+  ),
+  monaco: {
+    KeyMod: { CtrlCmd: 2048 },
+    KeyCode: { Enter: 3 },
+    MarkerSeverity: { Error: 8, Warning: 4 },
+    SymbolKind: { Module: 1, Function: 11, Constant: 13, Variable: 12 },
+    InlayHintKind: { Parameter: 2, Type: 1 },
+    Uri: { parse(u) { return u; } },
+    languages: {
+      register() {},
+      setMonarchTokensProvider() {},
+      setLanguageConfiguration() {},
+      registerHoverProvider() {},
+      registerDefinitionProvider() {},
+      registerReferenceProvider() {},
+      registerDocumentHighlightProvider() {},
+      registerDocumentSymbolProvider() {},
+      registerInlayHintsProvider() {},
+      registerDocumentSemanticTokensProvider() {},
+      registerDocumentFormattingEditProvider() {},
+    },
+    editor: {
+      defineTheme() {},
+      createModel(text) {
+        mockModel._val = text;
+        return mockModel;
+      },
+      create() { return mockEditor; },
+      setModelMarkers() {},
+    },
+  },
+  addEventListener() {},
+};
+globalThis.location = { hash: "", pathname: "/", search: "" };
+globalThis.history = { replaceState() {} };
+globalThis.sessionStorage = { getItem() { return null; }, setItem() {} };
+
+await import(`${appUrl}?ui=1`);
+await new Promise((resolve) => setTimeout(resolve, 60));
+
+const connLabel = elementsById.get("connection-label").textContent;
+if (connLabel !== "In-browser engine ready") {
+  throw new Error(`Expected connection-label 'In-browser engine ready', got '${connLabel}'`);
+}
+if (elementsById.get("editor-notice").hidden !== true || elementsById.get("editor").hidden !== false) {
+  throw new Error("Expected Monaco editor to finish loading and hide #editor-notice");
+}
+for (let i = 0; i < compactCodes.length; i += 1) {
+  if (!compactCodes[i].innerHTML.includes("tok-keyword")) {
+    throw new Error(`UI startup failed to highlight .compact-code block ${i + 1}`);
+  }
+}
+
+await elementsById.get("compile-button").dispatchEvent("click");
+if (!elementsById.get("gallina-output").textContent.includes("Module Playground.")) {
+  throw new Error(`UI compile failed: ${elementsById.get("gallina-output").textContent}`);
+}
+
+await elementsById.get("evaluate-form").dispatchEvent("submit");
+const resultCard = elementsById.get("console-result").children[0];
+const cardTexts = resultCard ? resultCard.children.map((c) => c.textContent) : [];
+if (!cardTexts.includes("49")) {
+  throw new Error(`UI evaluate failed: ${JSON.stringify(cardTexts)}`);
+}
+"""
+
+
+def _node_command(root: Path) -> tuple[list[str], str] | None:
+    node = shutil.which("node")
+    if node is not None:
+        return [node, "--input-type=module", "-", str(root)], _NODE_RUNTIME_SCRIPT
+    if sys.platform == "win32" and shutil.which("wsl.exe") is not None:
+        resolved = root.resolve()
+        drive = resolved.drive.rstrip(":").lower()
+        rel = resolved.as_posix().split(":/", 1)[1]
+        wsl_root = f"/mnt/{drive}/{rel}"
+        return ["wsl.exe", "-u", "root", "-e", "node", "--input-type=module", "-", wsl_root], _NODE_RUNTIME_SCRIPT
+    return None
+
+
+def _playground_browser_runtime_and_ui_startup() -> None:
+    root = Path(__file__).resolve().parents[2]
+    cmd_info = _node_command(root)
+    if cmd_info is None:
+        raise AssertionError("Node.js runtime is required on host or WSL to execute playground app.mjs")
+    cmd, script_input = cmd_info
+    done = subprocess.run(
+        cmd,
+        input=script_input,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=30,
+    )
+    ensure(
+        done.returncode == 0,
+        f"playground app.mjs runtime or UI startup check failed (exit {done.returncode}):\n{done.stderr or done.stdout}",
+    )
+
+
 def cases() -> list[Case]:
     return [Case("unified-capabilities-authentication-and-source-selection", _capabilities_and_automatic_selection),
             Case("unified-http-source-routing-and-request-field-refusals", _http_dispatch_and_strict_fields),
@@ -474,4 +839,5 @@ def cases() -> list[Case]:
             Case("mathematical-naming-findings-source-shape-budget-and-recovery", _mathematical_naming_reply_validation),
             Case("pure-authoring-refuses-mathematical-only-naming-finding", _pure_authoring_rejects_mathematical_lint),
             Case("mathematical-cli-prepares-native-parser-once-and-refuses-missing-tools", _native_cli_startup),
-            Case("playground-formatting-example-assets", _playground_formatting_example_assets)]
+            Case("playground-formatting-example-assets", _playground_formatting_example_assets),
+            Case("playground-browser-runtime-and-ui-startup", _playground_browser_runtime_and_ui_startup)]
