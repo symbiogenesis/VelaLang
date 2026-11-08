@@ -3,6 +3,13 @@
 Landing evidence for Vela design, parser, elaborator, LSP, playground, and first-slice items extracted from [VerifiedOS](https://github.com/symbiogenesis/VerifiedOS).
 
 <a id="q19-qualify-existing-proof-tooling-and-one-reusable-component"></a>
+
+## Q19 · Qualify existing proof tooling and one reusable component
+
+Retained the locked batch Rocq workflow (`rocq c` and `rocqchk`); rejected the interactive presentation candidate, declined adopting external library and tactic candidates without a concrete consumer, and canceled the conditional Q19c pilot before execution after Q2c's foundation rejection.
+
+Landed: Tier A.
+
 <a id="q20-test-the-combined-language-and-production-artifact-goal"></a>
 
 ## Q20 · Test the combined language and production-artifact goal
@@ -63,10 +70,6 @@ implementation or executed qualification case is claimed.
 Landed: Tier A. The read accepts this commissioning rejection and reopening
 contract. It establishes no performance comparison, route infeasibility, licence
 grant or production theorem.
-
-<a id="q22a-qualify-revocation-completion-and-reuse"></a>
-
-### Q22a · Qualify revocation completion and reuse
 
 <a id="q25-design-the-full-graded-dependent-language-and-its-control-and-mutation-rules"></a>
 
@@ -722,3 +725,5 @@ package-trial measurement obligations.
 
 The original 12 h estimate, range 8–16, is retained because authoring intervals
 were shared across the Q25af–Q25ai batch; both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of the compact language reference, extension-dossier separation, and first-release authoring-cost documentation.

@@ -4,13 +4,10 @@ This document is the source of truth for Vela language design, parser and elabor
 
 <a id="q-assessment-actions"></a>
 <a id="checklist-conventions"></a>
-<a id="m1-toolchain-spine-incl-the-cheri-compcert-prerequisite"></a>
-<a id="12-build-order-milestones-and-execution-state"></a>
-<a id="machine-logic-compatibility-continuation"></a>
 
 ## Checklist items (Q25 series)
 
-The [first-release delivery sequence](#vela-first-release-delivery) governs new Vela work. Existing parser, mathematical and editor increments may finish their frozen qualification; broader surface and adapter work waits for the concrete synchronous component.
+Each checklist item pairs with a single [completion-log](docs/assurance/completion-log.md) entry carrying the exact `Q25* · Title` heading when landed, and records its prospective estimate, range, class (`I` implementation or `X` investigation), and actual hours (`n/a` when shared across a batch). The [first-release delivery sequence](#vela-first-release-delivery) governs new Vela work: existing parser, mathematical, and editor increments may finish their frozen qualification, while broader surface and adapter work waits for the concrete synchronous component.
 
 - [x] **Q25 · Design the full graded dependent language and its control and mutation rules**
   - The graded, control, mutation and assurance-policy designs are reviewed together, with implementation debts and admission decisions recorded by Q25d ([note](docs/assurance/completion-log.md#q25-design-the-full-graded-dependent-language-and-its-control-and-mutation-rules))
@@ -82,7 +79,7 @@ The [first-release delivery sequence](#vela-first-release-delivery) governs new 
 - [ ] **Q25z · Qualify the familiar Vela authoring surface** · 32 h, range 24–40 · I · agent-parallel
   - **Start:** the landed [familiar authoring migration](docs/language/surface-grammar.md#familiar-authoring-migration), [ergonomic syntax contract](docs/language/surface-grammar.md#ergonomic-authoring-and-bounded-collection-iteration), and current parser/consumer baselines for bounded syntax preparation. Represented-library and runtime qualification additionally require the accepted synchronous `vela-first-slice`. **Owns:** canonical local bindings, exact integer aliases, expression-match arms, mathematical expression bodies, ordinary generic calls, `if (cond) a else b` expressions, declaration-order `label: pattern` constructor fields, postfix `with { ... }` record/model updates, `let Pattern = expr else { ... }` and flow-refined `if (x is Pattern)` guards, total read-only `=>` expression properties, collection-loop syntax, raw string literals, allocation-free interpolated format templates, contextual-inference contracts, pure typed immutable locals and the explicit-binding lint/preview, with source-bound AST consumers and migrated examples. **Check:** every linked migration and authoring predicate, independent ambiguous-token and malformed-neighbor cases, aggregate probe-budget refusal, original-byte validation, annotated/inferred pure agreement, source-preserving preview and strict conflict-free native generation. Existing mathematical interpretations remain equivalent apart from provenance. Alias identity/ranges, represented inference, collection borrowing, static `Format<T>` / `TextBuilder<capacity>` buffer formatting and resource-exit laws require their real future consumers; unsupported syntax or parsing success supplies no semantic verdict. Focused host feedback precedes user-managed Host CI and affected model-lane parser/kernel qualification; checked-parser or proof changes retain their existing acceptance. **Join:** independent grammar/consumer review, exact-source correspondence, locked-generator evidence and truthful supported-subset diagnostics. **Execute:** reuse the single Menhir grammar and compiler facts; permit its internal token-only probe entry to reuse the same generic productions. Migrate supported consumers without fallback, preserve explicit generic application and all arithmetic/loan/proof duties, and stop at the upper estimate with an owned gap if a predicate cannot be met.
   - **Estimate basis:** bounded lexer/parser preparation, pure annotated locals, source-validating consumer migration, lint/preview and independent controls; represented alias libraries, iterator checking, concrete inference and broader editor producers retain their delivery prerequisites. This increment extends neither Q25g–Q25u's frozen qualification nor the concrete-foundation investigation and is not a prerequisite for the first slice. Production and exact-version hosted acceptance remain separate from local implementation.
-  - **Implementation checkpoint:** the native grammar uses ordinary generic calls, mathematical `=>` bodies, comma-separated expression arms, `if (cond) a else b` expressions, declaration-order `labeled_pattern` constructor fields, postfix `with { ... }` record/model updates, `let_else`/`var_else` guards, total read-only `property` declarations, multi-quote raw string literals and `$"..."` interpolated format templates; the mathematical consumer validates exact-source calls, bodies, `char` and fixed-width integer primitives (`u8`..`i64`, `usize`, `byte`) plus `Vela.Numerics` aliases, `Seq<T>` and `.Model` combinators, mutable `var` locals and bounded `foreach`/`while` loops, records with read-only properties, member methods and named `invariant` conjuncts (`open ... lifts`), `with { ... }` updates, `Slots<T, capacity>` with `CopyRepresentation`/`TransferType<T>`, `calc` chains, `out T` initialization loans, `interface`/`impl` declarations with `where Interface(type T)` witness dispatch, multi-module `import` composition, labeled patterns, `if_expression`, `is`, flow-refined `if (x is Pattern)` and `let_else` in its supported fragment. Collection loops retain explicit value/read/exclusive modes as located syntax; represented target lowering, general `IBoundedIterable<T>` iterator laws, `Format<T>` / `TextBuilder<capacity>` checking and wider borrowing/editor facts remain with their qualified producers. Both pure routes preserve typed immutable locals, while `VELA104` and `vela lint --preview-bindings` provide an advisory, rechecked source-preserving edit candidate. Local focused controls and strict exact-version native generation (`vela-parser elaborate-qualify`) are diagnostic evidence. The `vela-ergonomics-20261103-implementation` fanout journal owns the local handoff and recommended hosted selection; hosted parser/kernel and production verdicts remain pending, so this item stays open.
+  - **Implementation checkpoint:** the native grammar accepts ordinary generic calls, mathematical `=>` bodies, comma-separated expression arms, `if (cond) a else b` expressions, declaration-order `labeled_pattern` constructor fields, postfix `with { ... }` record/model updates, `let_else`/`var_else` guards, total read-only `property` declarations, multi-quote raw string literals, and `$"..."` interpolated format templates, and the mathematical consumer validates the supported subset listed in **Q25k**. Collection loops retain explicit value/read/exclusive modes as located syntax; represented target lowering, general `IBoundedIterable<T>` iterator laws, `Format<T>` / `TextBuilder<capacity>` checking and wider borrowing/editor facts remain with their qualified producers. Both pure routes preserve typed immutable locals, while `VELA104` and `vela lint --preview-bindings` provide an advisory, rechecked source-preserving edit candidate. Local focused controls and strict exact-version native generation (`vela-parser elaborate-qualify`) are diagnostic evidence. The `vela-ergonomics-20261103-implementation` fanout journal owns the local handoff and recommended hosted selection; hosted parser/kernel and production verdicts remain pending, so this item stays open.
   - **Remaining work:** the [ergonomics follow-through](#remaining-vela-ergonomics) assigns qualification, represented semantics, library, diagnostic, editor and adoption duties to their existing owners, with entry conditions and independently checked outcomes. Runtime and wider tooling implementation is outside this syntax increment's estimate.
 - [x] **Q25aa · Build a local Vela browser playground** · 12 h retained estimate, actual n/a · agent-parallel
   - The local Monaco playground connects the pure compiler and LSP to source editing, Gallina output and a bounded compile-time expression console. ([note](docs/assurance/completion-log.md#q25aa-build-a-local-vela-browser-playground))
@@ -108,27 +105,27 @@ The [first-release delivery sequence](#vela-first-release-delivery) governs new 
 
 ## Calibration record (Q25 series)
 
-| Item | Estimate (h) | Range (h) | Actual (h) | Ratio | Notes |
+| Item | Class | Estimate (h) | Range (h) | Actual (h) | Ratio |
 | --- | --- | --- | --- | --- | --- |
-| Q25a | X-authored | 10 | | | |
-| Q25b | X-authored | 12 | | | |
-| Q25c | X-authored | 10 | | | |
-| Q25d | X-authored | 10 | | | |
-| Q25e | I | 8 | | | |
-| Q25f | I | 2 | | | |
-| Q25j | n/a | n/a | | | |
-| Q25l | I | 2 | | | |
-| Q25m | n/a | n/a | | | |
-| Q25s | n/a | n/a | | | |
-| Q25t | n/a | n/a | | | |
-| Q25v | I | 4 | | | |
-| Q25w | n/a | n/a | | | |
-| Q25aa | n/a | n/a | | | |
-| Q25ab | n/a | n/a | | | |
-| Q25af | n/a | n/a | | | |
-| Q25ag | n/a | n/a | | | |
-| Q25ah | n/a | n/a | | | |
-| Q25ai | n/a | n/a | | | |
+| Q25a | X-authored | 10 | n/a | 0.2 | 0.02 |
+| Q25b | X-authored | 12 | n/a | 0.2 | 0.02 |
+| Q25c | X-authored | 10 | n/a | 0.2 | 0.02 |
+| Q25d | X-authored | 10 | n/a | 0.9 | 0.09 |
+| Q25e | I | 8 | n/a | 0.3 | 0.04 |
+| Q25f | I | 2 | n/a | 0.1 | 0.05 |
+| Q25j | I | 12 | 8–16 | n/a | n/a |
+| Q25l | I | 2 | n/a | 0.3 | 0.15 |
+| Q25m | n/a | n/a | n/a | 0.5 | n/a |
+| Q25s | I | 12 | 8–16 | n/a | n/a |
+| Q25t | I | 24 | 16–32 | n/a | n/a |
+| Q25v | I | 4 | 2–6 | 0.7 | 0.18 |
+| Q25w | X | 24 | 16–32 | n/a | n/a |
+| Q25aa | I | 12 | 8–16 | n/a | n/a |
+| Q25ab | I | 8 | 6–10 | n/a | n/a |
+| Q25af | I | 24 | 16–32 | n/a | n/a |
+| Q25ag | I | 24 | 16–32 | n/a | n/a |
+| Q25ah | I | 16 | 12–20 | n/a | n/a |
+| Q25ai | I | 12 | 8–16 | n/a | n/a |
 
 ## Language core proposals
 

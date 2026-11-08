@@ -25,7 +25,6 @@
 - **Reviewed checker schemas**: [tools/ty.toml](ty.toml), [tools/ruff.toml](ruff.toml), and [tools/rumdl.toml](rumdl.toml) are validated against [tools/ty-config.schema.json](ty-config.schema.json), [tools/ruff-config.schema.json](ruff-config.schema.json), and [tools/rumdl-config.schema.json](rumdl-config.schema.json) before any checker runs.
 
 <a id="checked-references-in-source-comments"></a>
-<a id="the-three-generators-and-what-each-answers"></a>
 
 ## Checked references in source comments
 

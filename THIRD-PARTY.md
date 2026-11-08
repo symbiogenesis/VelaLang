@@ -3,52 +3,43 @@
 This file records third-party dependencies, development tools, and reference readings for the VelaLang repository, following [COPYRIGHT.md](COPYRIGHT.md).
 
 <a id="browser-editor-assets"></a>
-<a id="pinned-as-submodules"></a>
-<a id="compcert-and-secomp"></a>
-<a id="the-cryptography-upstreams"></a>
-<a id="vélus"></a>
 
 ## Browser playground assets
 
-The local [Vela playground](docs/tooling/playground.md) loads
-`monaco-editor` 0.55.1's browser distribution from the version-pinned jsDelivr
-package URL. The selected release's own
-[LICENSE.txt](https://github.com/microsoft/monaco-editor/blob/v0.55.1/LICENSE.txt)
-and [package manifest](https://github.com/microsoft/monaco-editor/blob/v0.55.1/package.json),
-with its [third-party notices](https://github.com/microsoft/monaco-editor/blob/v0.55.1/ThirdPartyNotices.txt),
-were read on 2026-11-03: Monaco is MIT, copyright Microsoft Corporation. The
-notices retain included TypeScript, Unicode, DOM, WebGL, HTML, beautifier and
-documentation material under their stated terms.
-The license permits use, modification and distribution with its copyright and
-permission notice. Browser assets and their upstream notices are served by the
-package CDN, rather than copied into this repository or shipped in a VerifiedOS
-image. This is a development-host editor dependency; no editor source is
-copied or redistributed.
+The [Vela playground](docs/tooling/playground.md) loads `monaco-editor` 0.55.1's
+browser distribution from its version-pinned jsDelivr package URL. The release's
+[LICENSE.txt](https://github.com/microsoft/monaco-editor/blob/v0.55.1/LICENSE.txt),
+[package manifest](https://github.com/microsoft/monaco-editor/blob/v0.55.1/package.json),
+and [third-party notices](https://github.com/microsoft/monaco-editor/blob/v0.55.1/ThirdPartyNotices.txt)
+were read on 2026-11-03: Monaco is MIT, copyright Microsoft Corporation, and
+its notices cover bundled TypeScript, Unicode, DOM, WebGL, HTML, beautifier, and
+documentation material under their stated terms. The license permits use,
+modification, and distribution with its copyright and permission notice. Browser
+assets and upstream notices are served directly from the package CDN rather than
+vendored into this repository or shipped in a VerifiedOS image.
 
-### Vela parser support library
-
-Vela's [Q25h checked-parser and support-library qualification](docs/tooling/parser.md#rocq-support-prerequisite)
-builds `coq-menhirlib` from the same authenticated Menhir 20260209 archive the
-table below records. Its root `LICENSE` was re-read on 2026-10-31 at SHA-256
-`9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`;
-`coq-menhirlib/LICENSE`, SHA-256
-`218c42550a9b4ff6e48bf38218908755fe156b2e5c586531c2eb8893248a102d`,
-states `LGPL-3.0-or-later`. The bounded `Interpreter.v` proof-command relocation and
-`Validator_complete.v` abstract `IsItemsMap` proof adaptation, the generated
-`VelaPureGrammar.v`, the compiled Rocq library and the extracted `vela-checked-parser`
-executable remain in isolated native build directories with `LICENSE.generator` and
-`LICENSE.support` staged alongside them. Only JSON receipts are exported; this use
-conveys no upstream source, library, generator or runtime binary into the tracked
-tree. Host distribution of generated sources or binaries retains Q25h's separate
-terms qualification.
-
-### Development tools, contained by use
+<a id="development-tools-contained-by-use"></a>
 
 ## Development parser generator
 
 | Package | Version | License | Role |
 | --- | --- | --- | --- |
-| Menhir | 20260209 | Generator `GPL-2.0-only`; `MenhirLib`, `MenhirSdk`, `MenhirCST` and `MenhirGLR` `LGPL-2.0-only WITH OCaml-LGPL-linking-exception` | Parser generator installed in the Sail, QuickChick, CertiRocq and contained compiler snapshots at 20260209, each installing all five packages. The `LICENSE` that release installs, SHA-256 `9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`, puts the generator under GPL version 2, its runtime libraries and SDK under the Library General Public License version 2 with the static-linking exception, and its separately packaged Rocq library `coq-menhirlib`, which the CertiRocq snapshot installs for CompCert, as the private Q35e `vst2` qualification switch does ([its record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/c-refinement-qualification-switches.md)), under `LGPL-3.0-or-later`. Q39 builds the contained compiler's parser from that release and reads its vendored Rocq runtime terms in the [license receipt](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/implementation/evidence/q39-20261010-license-readings.json); the source and compiled parser stay contained. The generator and generated parser sources remain outside the tracked tree. Vela Q25g uses its code backend only in native build directories, links no Menhir runtime, and retains JSON receipts rather than generated source or binaries. The 20260209 source archive was re-read for this use on 2026-10-31: its `LICENSE` has the SHA-256 above and its archive has the [opam-recorded SHA-512](https://opam.ocaml.org/packages/menhir/menhir.20260209/) `aafad186f328ae8dd4cc69af0f30c1a0b208cf5148a7a94c150099be03838503c5ec12918de26cd7f794b5a72f114bc1bae8d81058bd0ea10372a3b06818687e`. GPL section 0 conditions coverage of output on whether it constitutes a work based on the program; this reading grants no blanket licence to generated artifacts. Distribution of generated sources, binaries or a compiler bootstrap closure needs its own terms qualification under [Q25h](docs/tooling/parser.md#promotion-and-retirement). |
+| Menhir | 20260209 | Generator `GPL-2.0-only`; `MenhirLib`, `MenhirSdk`, `MenhirCST`, and `MenhirGLR` `LGPL-2.0-only WITH OCaml-LGPL-linking-exception` | Parser generator installed in the Sail, QuickChick, CertiRocq, and contained compiler snapshots at 20260209, each installing all five packages. The release `LICENSE` (SHA-256 `9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`, re-read 2026-10-31; source archive [opam SHA-512](https://opam.ocaml.org/packages/menhir/menhir.20260209/) `aafad186f328ae8dd4cc69af0f30c1a0b208cf5148a7a94c150099be03838503c5ec12918de26cd7f794b5a72f114bc1bae8d81058bd0ea10372a3b06818687e`) places the generator under `GPL-2.0-only`, its OCaml runtime libraries and SDK under `LGPL-2.0-only WITH OCaml-LGPL-linking-exception`, and its separately packaged Rocq library `coq-menhirlib` (installed in the CertiRocq snapshot and the private Q35e `vst2` switch; see [its record](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/opam/c-refinement-qualification-switches.md)) under `LGPL-3.0-or-later`. VerifiedOS Q39 builds the contained compiler's parser from that release and records its vendored Rocq runtime terms in the [license receipt](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/implementation/evidence/q39-20261010-license-readings.json). Vela Q25g runs the code backend only in native build directories, links no Menhir runtime, and retains JSON receipts rather than generated source or binaries. GPL v2 section 0 conditions coverage of generator output on whether the output is a work based on the generator; this reading claims no blanket license over generated artifacts. Distributing generated sources, binaries, or a compiler bootstrap closure requires separate terms qualification under [Q25h](docs/tooling/parser.md#promotion-and-retirement). |
+
+### Vela parser support library
+
+Vela's [Q25h checked-parser and support-library qualification](docs/tooling/parser.md#rocq-support-prerequisite)
+builds `coq-menhirlib` from the authenticated Menhir 20260209 archive above.
+Its root `LICENSE` (`9c97527b92b577647880abd2a5eaf5bf0f3b3df1bd09d9f93fc4e103eb1d30d5`)
+and `coq-menhirlib/LICENSE` (`218c42550a9b4ff6e48bf38218908755fe156b2e5c586531c2eb8893248a102d`,
+`LGPL-3.0-or-later`) were re-read on 2026-10-31. The bounded `Interpreter.v`
+proof-command relocation and `Validator_complete.v` abstract `IsItemsMap` proof
+adaptation, the generated `VelaPureGrammar.v`, the compiled Rocq library, and the
+extracted `vela-checked-parser` executable remain in isolated native build
+directories with `LICENSE.generator` and `LICENSE.support` staged alongside them.
+Only JSON receipts are exported; this use conveys no upstream source, library,
+generator, or runtime binary into the tracked tree. Host distribution of
+generated sources or binaries retains Q25h's separate terms qualification.
 
 ### Vela development and proof-reuse candidates
 
@@ -72,7 +63,7 @@ MPL-2.0) across its
 (`67d17e8b91d3913e7aa2b1179957df4e0634caea3868b5ba4fe2bf1945334134`,
 `hypothesis/_native.cpython-314-aarch64-linux-gnu.so`
 `1a25e29e9b879fb3de4bdd805e11d416dc8a4fc62d2f81472095fbfa8630ea61`), and
-[Linux x86_64 wheel](https://files.pythonhosted.org/packages/f8/41/573468979e9579eb6df937e6a96c1a944dfe2765c73624156571e3cc4b34/hypothesis-6.170.14-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl)
+[Linux x86_64 wheel](https://files.pythonhosted.org/packages/f8/41/573468979e9579eb6df937e6a94c1a944dfe2765c73624156571e3cc4b34/hypothesis-6.170.14-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl)
 (`96f9f8a684c88ad2280129b28bc609adb6b31cd63b1b83b397b86d552391e947`,
 `hypothesis/_native.cpython-314-x86_64-linux-gnu.so`
 `e40780bfbfb364b2fcc2b65e7baba953e4e1eaacb19fdd39578130889f0ec427`).

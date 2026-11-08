@@ -140,7 +140,7 @@ Before candidate proofs are authored, an independent reviewer freezes expected b
 
 Freeze wrong-store, off-by-one, omitted-fill, bad failure-result and second-image variants that are syntactically valid and reach the intended obligation. Distinguish malformed/stillborn construction, intended kill, unrelated failure, timeout, unsupported and survivor. Parse/type/compile failures elsewhere supply no ownership/specification evidence; any required survivor prevents success.
 
-Use [oracle, seed and QuickChick](../../tools/README.md#the-three-generators-and-what-each-answers) where supported; retain independent specification review and keep test guards out of theorem premises. Name each guarantee's theorem. Removing a required frame-preservation theorem while retaining operation laws must make P's frame-requiring client fail for that omission. Profile flags and source ownership alone establish no adversarial-context isolation.
+Use [oracle, seed and QuickChick](https://github.com/symbiogenesis/VerifiedOS/blob/main/tools/README.md#the-three-generators-and-what-each-answers) where supported; retain independent specification review and keep test guards out of theorem premises. Name each guarantee's theorem. Removing a required frame-preservation theorem while retaining operation laws must make P's frame-requiring client fail for that omission. Profile flags and source ownership alone establish no adversarial-context isolation.
 
 ### Change and weakening probes
 
