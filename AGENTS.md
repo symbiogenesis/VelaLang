@@ -6,8 +6,10 @@ Read [README.md](README.md) first for the project's purpose, design goals, and c
 
 AGENTS.md owns shared agent instructions. Edit shared rules here. The linked artifacts own the detailed contracts summarized below; check them before changing the relevant area and resolve disagreements at their source.
 
-Follow the [validation handoff](#tool-execution-and-validation): finish locally,
-record the selected checks, and leave all pushes and hosted CI to the user.
+Follow the [git workflow](#git-workflow-and-worktrees) and [validation handoff](#tool-execution-and-validation):
+develop in dedicated worktree(s), record each logical change in a separate commit,
+merge back to local `main`, finish validation locally, and never push to remote `main`
+or dispatch hosted CI.
 
 ## Repository map
 
@@ -43,6 +45,13 @@ when a comment or docstring sends readers to a local file, document section, or
 supported declaration. `python tools/run.py check` reports stale references
 across tracked Python, OCaml, Menhir, Coq, JavaScript, and Vela sources.
 
+## Git workflow and worktrees
+
+- **Work in worktrees.** Put changes into dedicated Git worktree(s) under `.worktrees/` (`git worktree add .worktrees/<branch> -b <branch>`) rather than making edits directly on `main`.
+- **Commit logical changes separately.** Record each logical change in its own separate commit. Stage intended deliverables explicitly by path (`git status --short`, `git diff -- <path>`, and `git add -- <path>`); never use `git add -A`.
+- **Merge back to local `main` and clean up.** After validation passes, merge the worktree branch(es) back into local `main` using a fast-forward or regular merge that preserves the individual logical commits on `main`, then remove the temporary worktree (`git worktree remove .worktrees/<branch>`) and delete the merged branch (`git branch -d <branch>`).
+- **Never push to remote `main`.** Do not push to remote `main` or dispatch hosted CI unless the user explicitly directs that action.
+
 ## Tool execution and validation
 
 Use one universal Python minor version everywhere. `project.requires-python` in
@@ -55,6 +64,7 @@ Use `python tools/run.py <command>` on Windows; it dispatches guest-only command
 
 For a settled change:
 
-1. Run `python tools/run.py gate` to execute the full static gate (`check`, `markdown`, and `typecheck`) and `python tools/run.py test` to run the behavioral test suite.
-2. Track intended deliverables by path (`git status --short` and `git diff -- <path>`); never use `git add -A`.
-3. Never push or dispatch hosted CI unless the user explicitly directs that action.
+1. Develop in dedicated worktree(s) and commit each logical change separately, staging intended deliverables by path (`git status --short` and `git diff -- <path>`; never use `git add -A`).
+2. Run `python tools/run.py gate` to execute the full static gate (`check`, `markdown`, and `typecheck`) and `python tools/run.py test` to run the behavioral test suite.
+3. Merge the validated worktree branch(es) back to local `main` (preserving the individual logical commits) and remove the worktree(s).
+4. Never push to remote `main` or dispatch hosted CI unless the user explicitly directs that action.
