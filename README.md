@@ -20,7 +20,7 @@ Vela brings the code and the proof together on one explicit surface:
 
 Here is a small Vela module from the [authored examples](examples/dependent.vela). It defines a range window that must stay ordered, a method that temporarily lifts that rule while updating both bounds, an `out`-parameter initializer, and a small proof:
 
-```csharp
+```dafny
 module Demo.Window;
 
 public record RangeWindow(u32 Low, u32 High)
