@@ -24,7 +24,20 @@ _SPDX_FENCE_RE = re.compile(rf"```(?:text)?\n(# {_SPDX_TAG} ([A-Za-z0-9.-]+))\n`
 _LINK_RE = re.compile(r"(?<!!)\[([^\]\n]+)\]\(([^)\s]+)\)")
 _HASH_NAMES = frozenset({".editorconfig", ".gitattributes", ".gitignore", "REUSE.toml"})
 _NO_MARK_SUFFIXES = (".md", ".json", ".lock")
-_SOURCE_REF_SUFFIXES = (".py", ".vela", ".ml", ".mli", ".mll", ".mly", ".v", ".mjs", ".js", ".css")
+_SOURCE_REF_SUFFIXES = (
+    ".py",
+    ".vela",
+    ".ml",
+    ".mli",
+    ".mll",
+    ".mly",
+    ".v",
+    ".mjs",
+    ".js",
+    ".css",
+    ".yml",
+    ".yaml",
+)
 _PURE_EXAMPLES = frozenset({
     "examples/pure.vela",
     "examples/constants.vela",
@@ -131,6 +144,8 @@ def marks_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
     expected_by_suffix: dict[str, tuple[str, ...]] = {
         ".py": (f"# {tag}",),
         ".toml": (f"# {tag}",),
+        ".yml": (f"# {tag}",),
+        ".yaml": (f"# {tag}",),
         ".ml": (f"(* {tag} *)",),
         ".mli": (f"(* {tag} *)",),
         ".mll": (f"(* {tag} *)",),
@@ -253,6 +268,13 @@ def _comment_and_docstring_chunks(rel: str, text: str) -> list[tuple[int, str]]:
             )
         except (SyntaxError, tokenize.TokenError) as err:
             chunks.append((1, f"[invalid-python](__syntax_error__:{err})"))
+        return chunks
+    if rel.endswith((".yml", ".yaml")):
+        chunks.extend(
+            (lineno, line)
+            for lineno, line in enumerate(text.splitlines(), 1)
+            if line.lstrip().startswith("#")
+        )
         return chunks
     chunks.extend(
         (lineno, line)

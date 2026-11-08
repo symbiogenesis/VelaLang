@@ -73,7 +73,8 @@ The editor uses pinned Monaco 0.55.1 browser assets from jsDelivr. Internet acce
 is needed for those editor assets; authored source is sent only to the local
 compiler service when launched with a `#token=...` loopback URL, or evaluated
 locally in the browser when served statically from [docs/index.html](../index.html)
-([docs/app.mjs](../app.mjs), [docs/style.css](../style.css)) on GitHub Pages.
+([docs/app.mjs](../app.mjs), [docs/style.css](../style.css)) on GitHub Pages via
+[.github/workflows/pages.yml](../../.github/workflows/pages.yml).
 The static `docs/` bundle and [tools/toolchain/playground/](../../tools/toolchain/playground/)
 share identical `index.html`, `style.css`, and `app.mjs` assets with relative
 `./style.css` and `./app.mjs` paths so both static hosting and `PlaygroundServer`

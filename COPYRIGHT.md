@@ -9,7 +9,7 @@ Copyright 2026 Edward Miller.
 | Path | License | Ground |
 | --- | --- | --- |
 | Every original `.md` file and `docs/evidence/*.json`, including [docs/](docs/) and [README.md](README.md) | `CC-BY-4.0`, in [LICENSES/CC-BY-4.0.txt](LICENSES/CC-BY-4.0.txt) | The prose is a language specification meant to be cited, quoted, and inherited, and a document license says what a software license only gestures at. |
-| Every non-Markdown original file, including [examples/](examples/), [tools/](tools/), [.editorconfig](.editorconfig), [.gitattributes](.gitattributes), [.gitignore](.gitignore), and [REUSE.toml](REUSE.toml) | `Apache-2.0`, in [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) | Explicit software and patent grant for the toolchain, parser, elaborator, playground, and verification harnesses. |
+| Every non-Markdown original file, including [.github/](.github/), [examples/](examples/), [tools/](tools/), [.editorconfig](.editorconfig), [.gitattributes](.gitattributes), [.gitignore](.gitignore), and [REUSE.toml](REUSE.toml) | `Apache-2.0`, in [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) | Explicit software and patent grant for the toolchain, parser, elaborator, playground, and verification harnesses. |
 | [tools/uv.lock](tools/uv.lock) | `Apache-2.0`, via [REUSE.toml](REUSE.toml) | Resolver-generated dependency lock metadata recording package names, versions, sources, and SHA-256 checksums; each upstream package retains its own terms. |
 | [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt), [LICENSES/CC-BY-4.0.txt](LICENSES/CC-BY-4.0.txt) | the stewards' own terms | Verbatim license texts required by the REUSE Specification v3.3. |
 
@@ -23,7 +23,7 @@ Every original file whose kind can carry a comment opens with an SPDX line, in t
 
 `python tools/run.py check` reads the identifier out of that block, holds every markable file against it, and runs the pinned FSFE `reuse lint` checker against [REUSE.toml](REUSE.toml) and [LICENSES/](LICENSES/). A file that arrives unmarked, marked with another identifier, or marked in another kind's comment syntax is a finding. The tool carries an explicit table of comment syntaxes rather than a list of files to skip, so a file kind it has no ruling for is a finding too.
 
-Authored Menhir `.mly` grammars, CSS `.css` stylesheets, and Vela `.vela` sources use `/* ... */` (or `// ...` for `.vela`) for their opening mark; OCaml `.ml`/`.mli` sources, `.mll` lexer definitions, and Coq/Rocq `.v` files use `(* ... *)`; JavaScript `.mjs`/`.js` files use `// ...`; HTML `.html` files use `<!-- ... -->`.
+Python `.py`, TOML `.toml`, and YAML `.yml`/`.yaml` files use `# ...` for their opening mark; authored Menhir `.mly` grammars, CSS `.css` stylesheets, and Vela `.vela` sources use `/* ... */` (or `// ...` for `.vela`); OCaml `.ml`/`.mli` sources, `.mll` lexer definitions, and Coq/Rocq `.v` files use `(* ... *)`; JavaScript `.mjs`/`.js` files use `// ...`; HTML `.html` files use `<!-- ... -->`.
 
 These kinds carry no in-file mark and are covered by [REUSE.toml](REUSE.toml):
 

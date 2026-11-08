@@ -413,6 +413,17 @@ def _playground_formatting_example_assets() -> None:
            "playground selector omitted the records, properties, updates and guards example")
     ensure("ergonomics: {" in script and "counter with {" in script and "previous is Succ(" in script,
            "playground app.mjs omitted the records, properties, updates and guards example source")
+    workflow = (root / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+    ensure("runs-on: ubuntu-26.04" in workflow and "ubuntu-latest" not in workflow,
+           "GitHub Pages workflow must pin ubuntu-26.04 rather than ubuntu-latest")
+    ensure("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1" in workflow
+           and "persist-credentials: false" in workflow
+           and "actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0" in workflow
+           and "actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0" in workflow
+           and "actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1" in workflow
+           and "upload-artifact@v4" not in workflow
+           and "upload-pages-artifact@v3" not in workflow,
+           "GitHub Pages workflow must pin Node 24 actions by SHA without deprecated Node 20 artifacts")
 
 
 def cases() -> list[Case]:

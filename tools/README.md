@@ -29,4 +29,4 @@
 
 ## Checked references in source comments
 
-Inline Markdown links in source comments and Python docstrings (`[label](target)` and `[label](target#fragment)`) are checked by `python tools/run.py check` across tracked `.py`, `.vela`, `.ml`, `.mli`, `.mll`, `.mly`, `.v`, `.mjs`, `.js`, and `.css` files. Relative paths resolve from the containing source file's directory against the Git index, and `#fragment` anchors resolve against the target Markdown document's headings and `<a id="...">` bookmarks.
+Inline Markdown links in source comments and Python docstrings (`[label](target)` and `[label](target#fragment)`) are checked by `python tools/run.py check` across tracked `.py`, `.vela`, `.ml`, `.mli`, `.mll`, `.mly`, `.v`, `.mjs`, `.js`, `.css`, `.yml`, and `.yaml` files. Relative paths resolve from the containing source file's directory against the Git index, and `#fragment` anchors resolve against the target Markdown document's headings and `<a id="...">` bookmarks.

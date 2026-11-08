@@ -71,11 +71,12 @@ def _spdx_marks_controls() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-marks-") as td:
         root = Path(td)
         (root / "ok.py").write_text(f"# {tag}\nx = 1\n", encoding="utf-8")
+        (root / "ok.yml").write_text(f"# {tag}\nname: pages\n", encoding="utf-8")
         (root / "ok.ml").write_text(f"(* {tag} *)\n", encoding="utf-8")
         (root / "ok.vela").write_text(f"// {tag}\nmodule M;\n", encoding="utf-8")
         (root / "data.json").write_text("{}\n", encoding="utf-8")
         clean_corpus = corpus.Corpus(
-            root, [copyright_doc], {}, ["COPYRIGHT.md", "data.json", "ok.ml", "ok.py", "ok.vela"]
+            root, [copyright_doc], {}, ["COPYRIGHT.md", "data.json", "ok.ml", "ok.py", "ok.vela", "ok.yml"]
         )
         ensure(checks.marks_findings(root, clean_corpus) == [],
                "valid SPDX marks across file kinds must pass")
