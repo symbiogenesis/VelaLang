@@ -151,7 +151,7 @@ The [pure translation contract](vela-prototype.md) landed at
 functions, immutable bindings, branches and prior-function calls, then emits
 hygienic Gallina definitions bound to exact source bytes. Diagnostics retain source
 locations; rejected source and failed atomic file writes preserve existing output.
-The [authored example](../tools/vela/examples/pure.vela) and independent expected
+The [authored example](../examples/pure.vela) and independent expected
 terms exercise the fragment. Boolean equality binds operands once to keep emitted
 text linear in source size.
 
@@ -175,7 +175,7 @@ The [surface contract](vela-prototype.md#source-fragment) landed at
 `2cac393c` before the parser correction. Public declarations and parameters put
 types first, Boolean types use `bool`, and immutable locals precede explicit
 returns or fully returning `if (condition)` blocks. The
-[example](../tools/vela/examples/pure.vela), independent term oracle and rejection
+[example](../examples/pure.vela), independent term oracle and rejection
 cases use those conventions from the
 [proposed surface](verification-strategy.md#an-ideal-surface).
 The superseded prototype spellings, missing returns, trailing statements,
@@ -398,7 +398,7 @@ delivery stages closed:
 
 1. **Concrete `Span<byte>` carrier, inhabited byte case and contract elaboration
    ([tools/vela/elaborate.py](../tools/vela/elaborate.py),
-   [tools/vela/examples/first_slice.vela](../tools/vela/examples/first_slice.vela)):**
+   [examples/first_slice.vela](../examples/first_slice.vela)):**
    `Span<byte>` elaborates to `vela_Span` over `vela_ByteStore` (`nat -> vela_u8`)
    paired with `Base`, `Length`, `Tag`, `PermRead`, `PermWrite` and derived
    `CanRead`/`CanWrite` predicates. Bounded operations `Span.AllocZeroed`,
@@ -627,7 +627,7 @@ accounting, bit-list Gallina primitive definitions and local kernel replay.
 
 Accepted on 2026-11-07 under the [synchronous core](core-design.md#loans-and-control-flow)
 and [first-slice qualification contract](first-release.md#first-slice-qualification).
-[tools/vela/examples/first_slice.vela](../tools/vela/examples/first_slice.vela)
+[examples/first_slice.vela](../examples/first_slice.vela)
 and [tools/vela/first_slice.py](../tools/vela/first_slice.py) conform
 to the synchronous design:
 

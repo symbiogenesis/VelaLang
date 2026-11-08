@@ -17,7 +17,7 @@
 | [docs/lsp-prototype.md](docs/lsp-prototype.md) | Language Server Protocol lifecycle, diagnostics, navigation, hints, and formatting |
 | [docs/playground.md](docs/playground.md) | Local browser playground with Monaco editor, pure and dependent elaboration, and expression console |
 | [docs/extensions/](docs/extensions/README.md) | Extension dossiers: graded foundation, handlers/async, interior mutability, metaprogramming, assurance profiles, unified source |
-| [tools/vela/examples/](tools/vela/examples/) | Authored `.vela` examples (`pure.vela`, `constants.vela`, `expressions.vela`, `surface.vela`, `dependent.vela`, `first_slice.vela`) |
+| [examples/](examples/) | Authored `.vela` examples (`pure.vela`, `constants.vela`, `expressions.vela`, `surface.vela`, `dependent.vela`, `first_slice.vela`) |
 | [tools/vela/parser/](tools/vela/parser/) | Menhir grammar (`parser.mly`), OCaml lexer (`lexer.mll`), AST, and native driver |
 | [tools/vela/playground/](tools/vela/playground/) | Browser playground UI (`index.html`, `app.mjs`, `style.css`) |
 | [tools/vela/](tools/vela/) | Vela compiler, elaborator, loan analysis, formatter, linter, LSP server, playground worker, and first-slice harness |

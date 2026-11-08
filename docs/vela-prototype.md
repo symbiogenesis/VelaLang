@@ -311,15 +311,15 @@ retain the [unified-source acceptance contract](extensions/unified-source-contra
 From the repository root on Windows (use `python3` on Linux):
 
 ```console
-python tools/run.py vela check tools/vela/examples/pure.vela
-python tools/run.py vela emit tools/vela/examples/pure.vela --output out/Pure.v
+python tools/run.py vela check examples/pure.vela
+python tools/run.py vela emit examples/pure.vela --output out/Pure.v
 ```
 
 Create the output directory first, or omit `--output` to print definitions.
-The [example](../tools/vela/examples/pure.vela) defines a cube and Boolean
+The [example](../examples/pure.vela) defines a cube and Boolean
 selection: intended `Choose(true, 1)` is true, `Choose(true, 2)` false. Output is
 module `Vela_Oracle` with `f_Cube`/`f_Choose`. The
-[expression example](../tools/vela/examples/expressions.vela) adds Boolean
+[expression example](../examples/expressions.vela) adds Boolean
 logic, comparisons and saturating natural subtraction. The playground console
 evaluates closed expressions through the bounded static evaluator; kernel
 acceptance requires the separate replay.

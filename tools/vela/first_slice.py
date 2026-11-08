@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Run the Q25w / Q25ag Span<byte> carrier and vela-first-slice packet validator harness.
 
-This module connects the authored Vela source (`tools/vela/examples/first_slice.vela`)
+This module connects the authored Vela source (`examples/first_slice.vela`)
 to:
 1. Rocq elaboration (`rocq c`, `Print Assumptions`, and `rocqchk`) of the concrete
    `Span<byte>` carrier laws, `PrepareAndValidatePacket` functional and `restores`
@@ -56,7 +56,7 @@ from vela import (
 from vela.atomic import atomic_path
 
 TIMEOUT: Final = 120
-EXAMPLE: Final = "tools/vela/examples/first_slice.vela"
+EXAMPLE: Final = "examples/first_slice.vela"
 
 DEFAULT_CCOMP_CANDIDATES: Final[tuple[str, ...]] = (
     "/root/build/lane-scalar-effects-20260926/kernel-protected-final/plain/ccomp",
@@ -987,7 +987,7 @@ def lower_to_c(source: bytes, parsed: object, *, perturb_check: int = 0) -> tupl
         return val + (1 if check_num == perturb_check else 0)
 
     c_source = f"""/* SPDX-License-Identifier: Apache-2.0 */
-/* Lowered from tools/vela/examples/first_slice.vela (SHA256: {_sha256(source)}) */
+/* Lowered from examples/first_slice.vela (SHA256: {_sha256(source)}) */
 /* Source profile: verifiedos-scalar-source-v1 */
 
 {union_c}

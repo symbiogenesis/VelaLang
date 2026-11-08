@@ -35,7 +35,7 @@ from vela import (
 from vela.atomic import atomic_path
 
 TIMEOUT = 120
-EXAMPLE = "tools/vela/examples/dependent.vela"
+EXAMPLE = "examples/dependent.vela"
 
 
 @dataclass(frozen=True)

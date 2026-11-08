@@ -70,7 +70,7 @@ def _diagnostics() -> None:
 
 
 def _fixture_baseline() -> None:
-    example = (TOOLS / "vela/examples/pure.vela").read_bytes()
+    example = (TOOLS.parent / "examples/pure.vela").read_bytes()
     cases = migration.fixtures(example)
     ensure(len({case.name for case in cases}) == len(cases), "duplicate migration identity")
     ensure(any(case.name == "group-boundary" for case in cases), "known limit difference omitted")

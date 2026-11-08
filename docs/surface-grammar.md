@@ -111,7 +111,7 @@ public hardware RegisterCounter {
 ```
 
 Proof holes and theorem signatures parse without establishing a theorem. The
-[authored surface example](../tools/vela/examples/surface.vela) combines
+[authored surface example](../examples/surface.vela) combines
 dependent data, contracts, loans and task cleanup;
 the independent qualification fixtures exercise every feature row above.
 

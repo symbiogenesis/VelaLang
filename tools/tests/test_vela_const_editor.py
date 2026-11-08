@@ -172,7 +172,7 @@ def _compositional_signatures_and_recovery() -> None:
 
 
 def _authored_compositional_example() -> None:
-    source = (TOOLS / "vela/examples/constants.vela").read_bytes()
+    source = (TOOLS.parent / "examples/constants.vela").read_bytes()
     result = vela.translate(source).gallina
     ensure("Definition c_StaticResult" in result and "(16 : Corelib.Init.Datatypes.nat)" in result,
            "authored constant example lost its independently expected square")

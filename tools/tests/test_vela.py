@@ -77,7 +77,7 @@ def _oracle() -> None:
     ensure(translation.gallina == expected,
            f"translation differs from independently selected terms:\n{translation.gallina}")
     ensure(translate(_ORACLE).gallina == expected, "translation is nondeterministic")
-    example = (TOOLS / "vela/examples/pure.vela").read_bytes()
+    example = (TOOLS.parent / "examples/pure.vela").read_bytes()
     emitted = translate(example).gallina
     ensure(emitted[len(_header(example)):] == expected[len(_header(_ORACLE)):],
            "authored example diverges from independent oracle")

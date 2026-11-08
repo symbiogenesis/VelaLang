@@ -305,11 +305,11 @@ production obligations in the command guide.
 Run from the repository root on Windows, using `python3` on Linux:
 
 ```console
-python tools/run.py vela-parser elaborate tools/vela/examples/dependent.vela
+python tools/run.py vela-parser elaborate examples/dependent.vela
 python tools/run.py vela-parser elaborate-qualify
 ```
 
-The [example](../tools/vela/examples/dependent.vela) combines a generic
+The [example](../examples/dependent.vela) combines a generic
 identity, higher-order application, inferred vector lengths, finite-index lookup,
 a dependent callable and equality proofs. `elaborate` prints Gallina or writes
 `--output FILE` in an existing directory. It requires the parser's locked native

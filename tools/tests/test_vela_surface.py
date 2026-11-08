@@ -76,15 +76,15 @@ def _qualification_input_binding() -> None:
         root = Path(temporary)
         files = [*(f"tools/vela/parser/{name}" for name in parser.SOURCES),
                  "tools/opam/sail.lock", "tools/vela/parser.py", "tools/vela/surface.py",
-                 "tools/vela/examples/pure.vela", "tools/vela/examples/surface.vela",
-                 "tools/vela/examples/constants.vela", "tools/vela/examples/expressions.vela"]
+                 "examples/pure.vela", "examples/surface.vela",
+                 "examples/constants.vela", "examples/expressions.vela"]
         for name in files:
             path = root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(name.encode())
         initial = parser._inputs(root)
-        for name in ("tools/vela/surface.py", "tools/vela/examples/surface.vela",
-                     "tools/vela/examples/constants.vela", "tools/vela/examples/expressions.vela"):
+        for name in ("tools/vela/surface.py", "examples/surface.vela",
+                     "examples/constants.vela", "examples/expressions.vela"):
             path = root / name
             original = path.read_bytes()
             path.write_bytes(original + b" changed")

@@ -227,9 +227,9 @@ def _failed_build() -> None:
         (root / "tools/vela").mkdir(parents=True, exist_ok=True)
         (root / "tools/vela/parser.py").write_text("driver\n", encoding="utf-8")
         (root / "tools/vela/surface.py").write_text("fixtures\n", encoding="utf-8")
-        (root / "tools/vela/examples").mkdir()
+        (root / "examples").mkdir()
         for name in ("pure.vela", "surface.vela", "constants.vela", "expressions.vela"):
-            (root / "tools/vela/examples" / name).write_text("example\n", encoding="utf-8")
+            (root / "examples" / name).write_text("example\n", encoding="utf-8")
         output = root / "native-build"
         output.mkdir()
         with patch.object(parser, "_run", side_effect=RuntimeError("generator refused grammar")):
@@ -258,7 +258,7 @@ def _qualification_freshness() -> None:
         root = Path(temporary)
         output = root / "build"
         output.mkdir()
-        example = root / "tools/vela/examples/pure.vela"
+        example = root / "examples/pure.vela"
         example.parent.mkdir(parents=True)
         source = b"module M; public Nat F() { return 1; }\r\n"
         inputs, toolchain = {"source": "original"}, {"compiler": "original"}
@@ -310,10 +310,10 @@ def _qualification_freshness() -> None:
                     ensure(not latest.exists(), "refused qualification preserved a stale passing report")
                 else:
                     ensure(change == "none", f"changed {change} accepted after qualification fixtures")
-                    ensure(report["example"] == {"path": "tools/vela/examples/pure.vela",
+                    ensure(report["example"] == {"path": "examples/pure.vela",
                                                   "source_sha256": hashlib.sha256(source).hexdigest()},
                            "qualification omitted tested example byte identity")
-                    ensure(report["expression_example"] == {"path": "tools/vela/examples/expressions.vela",
+                    ensure(report["expression_example"] == {"path": "examples/expressions.vela",
                                                              "source_sha256": hashlib.sha256(expression_source).hexdigest()},
                            "qualification omitted tested extended-expression example identity")
                     ensure(json.loads(latest.read_text(encoding="utf-8")) == report,

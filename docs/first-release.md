@@ -411,7 +411,7 @@ product acceptance by implication.
 
 ### First-slice component and concrete `Span<byte>` carrier <a id="first-slice-qualification"></a>
 
-[tools/vela/examples/first_slice.vela](../tools/vela/examples/first_slice.vela)
+[examples/first_slice.vela](../examples/first_slice.vela)
 authors the bounded packet/manifest validator `PrepareAndValidatePacket(ref Span<byte> dst, in Span<byte> pkt) -> Result<ValidatedPacket<'dst>, ValidationError>`
 and its slot-backed round-trip pipeline (`DecodePacketIntoFrame`,
 `PrepareSliceHeader`, `RunRoundTripPipeline`) over the concrete `Span<byte>` and

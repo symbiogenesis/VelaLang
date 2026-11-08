@@ -287,7 +287,7 @@ def compare(compiled: vela_parser.Build, cases: tuple[Fixture, ...]) -> dict[str
 
 def _inputs(root: Path) -> dict[str, str]:
     paths = ("tools/vela/__init__.py", "tools/vela/ast.py", "tools/vela/migration.py",
-             "tools/vela/examples/pure.vela")
+             "examples/pure.vela")
     return {**vela_parser._inputs(root),
             **{path: hashlib.sha256((root / path).read_bytes()).hexdigest() for path in paths}}
 
@@ -301,11 +301,11 @@ def qualify(root: Path) -> dict[str, object]:
     receipt = cast("dict[str, object]", syntax["build"])
     directory = Path(cast("str", receipt["directory"]))
     compiled = vela_parser.Build(directory, directory / "vela-parser", receipt)
-    cases = (*fixtures(vela_parser.read_source(root / "tools/vela/examples/pure.vela")),
+    cases = (*fixtures(vela_parser.read_source(root / "examples/pure.vela")),
              Fixture("authored-compositional-constants",
-                     vela_parser.read_source(root / "tools/vela/examples/constants.vela"), "accepted"),
+                     vela_parser.read_source(root / "examples/constants.vela"), "accepted"),
              Fixture("authored-extended-expressions",
-                     vela_parser.read_source(root / "tools/vela/examples/expressions.vela"), "accepted"))
+                     vela_parser.read_source(root / "examples/expressions.vela"), "accepted"))
     report = compare(compiled, cases)
     if _inputs(root) != inputs or vela_parser._toolchain(root) != receipt["toolchain"]:
         raise ValueError("migration inputs or toolchain changed during comparison")

@@ -9,7 +9,7 @@ Copyright 2026 Edward Miller.
 | Path | License | Ground |
 | --- | --- | --- |
 | Every original `.md` file and `docs/evidence/*.json`, including [docs/](docs/) and [README.md](README.md) | `CC-BY-4.0`, in [LICENSES/CC-BY-4.0.txt](LICENSES/CC-BY-4.0.txt) | The prose is a language specification meant to be cited, quoted, and inherited, and a document license says what a software license only gestures at. |
-| Every non-Markdown original file, including [tools/](tools/), [.editorconfig](.editorconfig), [.gitattributes](.gitattributes), [.gitignore](.gitignore), and [REUSE.toml](REUSE.toml) | `Apache-2.0`, in [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) | Explicit software and patent grant for the toolchain, parser, elaborator, playground, and verification harnesses. |
+| Every non-Markdown original file, including [examples/](examples/), [tools/](tools/), [.editorconfig](.editorconfig), [.gitattributes](.gitattributes), [.gitignore](.gitignore), and [REUSE.toml](REUSE.toml) | `Apache-2.0`, in [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) | Explicit software and patent grant for the toolchain, parser, elaborator, playground, and verification harnesses. |
 | [tools/uv.lock](tools/uv.lock) | `Apache-2.0`, via [REUSE.toml](REUSE.toml) | Resolver-generated dependency lock metadata recording package names, versions, sources, and SHA-256 checksums; each upstream package retains its own terms. |
 | [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt), [LICENSES/CC-BY-4.0.txt](LICENSES/CC-BY-4.0.txt) | the stewards' own terms | Verbatim license texts required by the REUSE Specification v3.3. |
 

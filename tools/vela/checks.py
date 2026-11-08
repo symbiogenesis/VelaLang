@@ -26,13 +26,13 @@ _HASH_NAMES = frozenset({".editorconfig", ".gitattributes", ".gitignore", "REUSE
 _NO_MARK_SUFFIXES = (".md", ".json", ".lock")
 _SOURCE_REF_SUFFIXES = (".py", ".vela", ".ml", ".mli", ".mll", ".mly", ".v", ".mjs", ".js", ".css")
 _PURE_EXAMPLES = frozenset({
-    "tools/vela/examples/pure.vela",
-    "tools/vela/examples/constants.vela",
-    "tools/vela/examples/expressions.vela",
+    "examples/pure.vela",
+    "examples/constants.vela",
+    "examples/expressions.vela",
 })
 _FORMATTED_EXAMPLES = frozenset({
-    "tools/vela/examples/pure.vela",
-    "tools/vela/examples/constants.vela",
+    "examples/pure.vela",
+    "examples/constants.vela",
 })
 
 _FORBIDDEN_CODEPOINTS = frozenset({

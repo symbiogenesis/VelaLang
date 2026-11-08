@@ -764,7 +764,7 @@ def _build_executable_slice_ast(*, checksum_seed: str = "0x5A") -> Node:
 
 
 def _clight_lowering_and_purecap_assembly() -> None:
-    source = (TOOLS / "vela/examples/first_slice.vela").read_bytes()
+    source = (TOOLS.parent / "examples/first_slice.vela").read_bytes()
     inv = vela_first_slice.build_foundation_inventory()
     ensure(len(cast("list[str]", inv["carrier_laws"])) == 11, "expected 11 carrier laws in foundation inventory")
     ensure(
