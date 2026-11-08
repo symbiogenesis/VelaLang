@@ -61,7 +61,7 @@ def inspect_source(source: bytes, parsed: object) -> Compilation:
 
 
 def compile_source(source: bytes, parser: Path) -> Compilation:
-    """Use the selected native parser and the existing exact-source elaborator."""
+    """Parse and elaborate Vela source with the given native parser binary."""
     parsed = vela_parser.parse_source(_build(parser), source, surface=True)
     return inspect_source(source, parsed)
 

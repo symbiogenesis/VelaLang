@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded, untrusted elaboration of mathematical Vela into existing CIC terms.
+"""Bounded, untrusted elaboration of mathematical Vela into CIC terms.
 
 The surface parser owns syntax. This consumer checks its exact-source protocol,
 then proposes terms for independent kernel checking; it supplies neither checked
@@ -1935,7 +1935,7 @@ def evaluate(source: bytes, parsed: object, expression: str, value_type: ValueTy
     """Reduce one source-bound console constant in the checked module's environment.
 
     The [mathematical console contract](../../docs/tooling/elaboration-prototype.md#commands-and-acceptance)
-    retains the native parser and existing bounded constant reducer.
+    uses the native parser and bounded constant reducer.
     """
     _, elaborator = _checked_elaboration(source, parsed)
     if value_type not in {"Nat", "bool"}:

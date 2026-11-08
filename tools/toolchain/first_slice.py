@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Run the Q25w / Q25ag Span<byte> carrier and vela-first-slice packet validator harness.
+"""Run the Span<byte> carrier and vela-first-slice packet validator harness.
 
-This module connects the authored Vela source (`examples/first_slice.vela`)
-to:
+This module connects `examples/first_slice.vela` to:
 1. Rocq elaboration (`rocq c`, `Print Assumptions`, and `rocqchk`) of the concrete
    `Span<byte>` carrier laws, `PrepareAndValidatePacket` functional and `restores`
    contracts, format-model agreement (`SpecPacketValid`), and expected-byte/status
@@ -26,7 +25,7 @@ to:
 
 This qualifies the synchronous first-slice vertical prototype and concrete carrier
 laws; it does not claim a closed mechanized Sail-to-Clight/CompCert refinement theorem
-(owned by Q35d / M1.2g) or replace user-managed hosted CI.
+or replace user-managed hosted CI.
 """
 
 import hashlib
@@ -421,7 +420,7 @@ proof {{
 
 
 def build_foundation_inventory() -> dict[str, object]:
-    """Return the explicit checked law, assumption, and blocking-dependency inventory for Q25w / Q25ag."""
+    """Return the checked law, assumption, and blocking-dependency inventory."""
     return {
         "carrier_representation": (
             "vela_Span (vela_ByteStore = nat -> vela_u8, Base, Length, Tag, PermRead, PermWrite)"
@@ -1660,7 +1659,7 @@ def _qualify_attempt(
 
 
 def qualify(root: Path, *, ccomp_path: Path | None = None) -> dict[str, object]:
-    """Qualify the Q25w / Q25ag concrete `Span<byte>` carrier and `vela-first-slice` end to end."""
+    """Qualify the concrete `Span<byte>` carrier and `vela-first-slice` end to end."""
     work = _work_root(root)
     with FileLock(work / "qualification.lock", timeout=5):
         latest = work / "qualification.json"
