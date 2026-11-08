@@ -366,13 +366,13 @@ public record RangeWindow(u32 Low, u32 High)
 }
 
 public RangeWindow RebalanceWindow()
-    ensures result.Low == 4u32 && result.High == 9u32
+    ensures result.Low == 4 && result.High == 9
 {
-    var window = RangeWindow(2u32, 5u32);
+    var window = RangeWindow(2, 5);
     open (ref window) lifts Ordered
     {
-        window.Low = 4u32;
-        window.High = 9u32;
+        window.Low = 4;
+        window.High = 9;
     }
     return window;
 }
@@ -392,21 +392,21 @@ public lemma CalcChainCheck(Nat a, Nat b, Nat c)
     }
 
 public Unit InitBounds(u32 base, out u32 low, out u32 high)
-    requires base <= 100u32
-    ensures low == base + 1u32
-    ensures high == base + 2u32
+    requires base <= 100
+    ensures low == base + 1
+    ensures high == base + 2
 {
-    low = base + 1u32;
-    high = low + 1u32;
+    low = base + 1;
+    high = low + 1;
     return;
 }
 
 public u32 SumInitializedBounds()
-    ensures result == 23u32
+    ensures result == 23
 {
     var low = 0u32;
     var high = 0u32;
-    InitBounds(10u32, out low, out high);
+    InitBounds(10, out low, out high);
     return low + high;
 }
 

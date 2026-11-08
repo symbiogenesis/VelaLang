@@ -30,24 +30,24 @@ public record RangeWindow(u32 Low, u32 High)
 }
 
 public RangeWindow RebalanceWindow()
-    ensures result.Low == 4u32 && result.High == 9u32
+    ensures result.Low == 4 && result.High == 9
 {
-    var window = RangeWindow(2u32, 5u32);
+    var window = RangeWindow(2, 5);
     open (ref window) lifts Ordered
     {
-        window.Low = 4u32;
-        window.High = 9u32;
+        window.Low = 4;
+        window.High = 9;
     }
     return window;
 }
 
 public Unit InitBounds(u32 baseVal, out u32 low, out u32 high)
-    requires baseVal <= 100u32
-    ensures low == baseVal + 1u32
-    ensures high == baseVal + 2u32
+    requires baseVal <= 100
+    ensures low == baseVal + 1
+    ensures high == baseVal + 2
 {
-    low = baseVal + 1u32;
-    high = low + 1u32;
+    low = baseVal + 1;
+    high = low + 1;
     return;
 }
 
