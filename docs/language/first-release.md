@@ -516,6 +516,13 @@ recursive checking with these assumptions do not close the source proof.
   these identities against the current checkout and installed inputs, refusing
   changed, missing or malformed data. Its `status: matched` reports byte binding;
   `proof_replayed: false` states that it does not rerun the proof commands.
+  Before matching, it checks the declared source, Gallina and C subjects against
+  their retained hashes, requires the source compilation, complete export
+  assumption query, recursive kernel check and proof-corruption transcripts,
+  and re-reads the retained Gallina and assumption reports. Missing exports,
+  omitted libraries, changed process subjects or verdicts and source-proof
+  status inconsistent with the actual solver-trust ledger refuse, including
+  attempts to promote a nonempty ledger by changing `accepted` or `kernel_checked`.
   Output directories must belong to the current checkout's local lane; inventories
   reject aliases and exceedance of 4,096 entries or 256 MiB. Runtime identity
   normalizes only the qualification working-directory load-path entry, retaining

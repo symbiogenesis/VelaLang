@@ -17,6 +17,78 @@ from toolchain.cli import vela_parser as cli
 INDEPENDENT_CASES = True
 
 
+def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False) -> dict[str, object]:
+    """Retain an independently assembled local proof report for binding-only checks."""
+    labels = (
+        "LawInhabitedByteCase", "LawAllocZeroedRead", "LawReadOverWriteSame", "LawReadOverWriteOther",
+        "LawLoopFramePreservesDisjointSuffix", "LawFillAndFrame", "LawSliceMetadataAndRead",
+        "LawReadOnlyAndInvalidate", "LawDisjointCopyAndFrame", "LawCapacityInvarianceSmall",
+        "LawCapacityInvarianceLarge", "PrepareAndValidatePacket_restores_0_Base",
+        "PrepareAndValidatePacket_restores_0_Length", "PrepareAndValidatePacket_restores_0_Tag",
+        "PrepareAndValidatePacket_restores_0_PermRead", "PrepareAndValidatePacket_restores_0_PermWrite",
+        "PrepareAndValidatePacket_ensures_0", "PrepareAndValidatePacket_ensures_1",
+        "PrepareAndValidatePacket_ensures_2", "ValidateEmptyPacketOk", "ValidateFullPacketOk",
+        "ValidatePartialPacketScrubsStaleAndTrailingBytes", "RejectFramingShort", "RejectBadMagic",
+        "RejectLengthOutOfBounds", "RejectChecksumScrubsDestinationAndRestores",
+    )
+    names = [f"vela_d{index}_{label}" for index, label in enumerate(labels)]
+    module = "Vela_Vela_FirstSlice"
+    axiom = f"vela_solver_{names[16]}"
+    prefix = (f"(* vela-solver-trust: {names[16]} at 12:7; retained test residual *)\n"
+              f"Axiom {axiom} : True.\n" if trusted else "")
+    gallina = f"Module {module}.\n" + prefix + "".join(
+        f"Definition {name} : True := {axiom if trusted and index == 16 else 'I'}.\n"
+        for index, name in enumerate(names)) + f"End {module}.\n"
+    (outputs / "FirstSlice.v").write_text(gallina, encoding="utf-8")
+    (outputs / "FirstSliceAssumptions.v").write_text(
+        "From VelaFirstSlice Require Import FirstSlice.\n" + "".join(
+            f"Print Assumptions FirstSlice.{module}.{name}.\n" for name in names), encoding="utf-8")
+    (outputs / "FirstSlice.assumptions.log").write_text("".join(
+        f"Axioms:\n{module}.{axiom} : True\n" if trusted and index == 16
+        else "Closed under the global context\n" for index in range(len(names))), encoding="utf-8")
+    for name in ("FirstSlice.vo", "FirstSliceAssumptions.vo", "first_slice.c"):
+        (outputs / name).write_bytes(f"retained {name}".encode())
+    source = root / slice_harness.EXAMPLE
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(b"module Vela.FirstSlice;")
+    commands = {
+        "FirstSlice.compile.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "FirstSlice.v"],
+        "FirstSlice.assumptions.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "FirstSliceAssumptions.v"],
+        "FirstSlice.kernel.log": ["rocqchk", "-R", str(outputs), "VelaFirstSlice", "VelaFirstSlice.FirstSlice"],
+        "FirstSliceCorrupted.compile.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "FirstSliceCorrupted.v"],
+    }
+    steps: list[dict[str, object]] = []
+    for name, command in commands.items():
+        log = outputs / name
+        if not log.is_file():
+            log.write_bytes(b"independent retained transcript")
+        refused = name == "FirstSliceCorrupted.compile.log"
+        row: dict[str, object] = {
+            "command": ["opam", "exec", "--switch", slice_harness.proofenv.ROCQ_SWITCH, "--", *command],
+            "cwd": str(outputs), "returncode": 1 if refused else 0,
+            "log": str(log), "log_sha256": slice_harness._sha256(log.read_bytes()),
+        }
+        if refused:
+            row["expected_refusal"] = True
+        steps.append(row)
+    report: dict[str, object] = {
+        "steps": steps, "accepted": not trusted, "kernel_checked": not trusted,
+        "proof_corruption_refused": True, "assumption_exports_count": len(names),
+        "solver_trusted_count": int(trusted),
+        "solver_trusted_axioms": [f"{module}.{axiom}"] if trusted else [],
+        "inventory": {"solver_trusted_obligations": [
+            {"export": names[16], "axiom": axiom, "line": 12, "column": 7,
+             "reason": "retained test residual"}] if trusted else [],
+            "global_assumptions": "1 solver-trusted axioms; no other assumptions" if trusted
+            else "Closed under the global context (0 axioms)"},
+    }
+    for field, path in (("source", source), ("gallina", outputs / "FirstSlice.v"),
+                         ("lowered_c", outputs / "first_slice.c")):
+        report[field] = str(path)
+        report[f"{field}_sha256"] = slice_harness._sha256(path.read_bytes())
+    return report
+
+
 def _source_inventory() -> None:
     inputs = slice_harness._inputs(TOOLS.parent)
     expected = {slice_harness.EXAMPLE, "tools/generated/dialect-table.json",
@@ -152,6 +224,7 @@ def _binding_checks() -> None:
             "parser": {"directory": str(parser), "generated_sha256": parser_hashes,
                        "inputs": {}, "toolchain": {}},
             "parser_outputs": parser_hashes, "directory": str(outputs),
+            **_proof_fixture(root, outputs),
             "artifacts_sha256": slice_harness._artifacts(outputs),
         }
         receipt = root / "receipt.json"
@@ -178,7 +251,14 @@ def _binding_checks() -> None:
                                ("artifact_accepted", True), ("source_correspondence", True),
                                ("execution_inputs", None), ("parser", {}),
                                ("artifacts_sha256", {}), ("directory", str(root)),
-                               ("runtime", {"changed": True})):
+                               ("runtime", {"changed": True}),
+                               ("source", str(outputs / "FirstSlice.v")),
+                               ("source_sha256", "0" * 64), ("gallina", str(artifact)),
+                               ("lowered_c_sha256", "0" * 64), ("steps", []),
+                               ("steps", [None]), ("accepted", False), ("kernel_checked", False),
+                               ("solver_trusted_count", True), ("solver_trusted_axioms", ["invented"]),
+                               ("assumption_exports_count", 0), ("inventory", {}),
+                               ("proof_corruption_refused", False)):
             damaged = copy.deepcopy(report)
             damaged[field] = changed
             write(damaged)
@@ -188,6 +268,20 @@ def _binding_checks() -> None:
                 pass
             else:
                 raise AssertionError(f"changed {field} was accepted")
+        for field, changed in (("command", ["rocqchk", "another.subject"]),
+                               ("cwd", str(root)), ("returncode", True), ("returncode", 0),
+                               ("expected_refusal", False), ("log_sha256", "0" * 64),
+                               ("log", str(root / "outside.log"))):
+            damaged = copy.deepcopy(report)
+            steps = cast("list[dict[str, object]]", damaged["steps"])
+            steps[-1][field] = changed
+            write(damaged)
+            try:
+                slice_harness.verify_bindings(root, receipt)
+            except (ValueError, TypeError, OSError):
+                pass
+            else:
+                raise AssertionError(f"changed process {field} was accepted")
         write(report)
         for path in (artifact, parser / "vela-parser"):
             before = path.read_bytes()
@@ -219,6 +313,53 @@ def _binding_checks() -> None:
                 ensure("size bound" in str(error), "oversized receipt lost its bounded refusal")
             else:
                 raise AssertionError("oversized receipt was accepted")
+        trusted_report = {**report, **_proof_fixture(root, outputs, trusted=True),
+                          "artifacts_sha256": slice_harness._artifacts(outputs)}
+        write(trusted_report)
+        ensure(slice_harness.verify_bindings(root, receipt)["status"] == "matched",
+               "binding-only check refused honestly reported source residuals")
+        for field, changed in (("accepted", True), ("kernel_checked", True),
+                               ("solver_trusted_count", 0), ("solver_trusted_axioms", [])):
+            damaged = copy.deepcopy(trusted_report)
+            damaged[field] = changed
+            write(damaged)
+            try:
+                slice_harness.verify_bindings(root, receipt)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"solver-trusted report promoted by changing {field}")
+
+
+def _retained_coverage() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-proof-coverage-") as temporary:
+        root = Path(temporary)
+        outputs = root / "slice-fixture"
+        outputs.mkdir()
+        for mutation in ("missing-export", "audit-query", "audit-log", "missing-library", "unledgered-axiom"):
+            report = _proof_fixture(root, outputs)
+            if mutation == "missing-export":
+                path = outputs / "FirstSlice.v"
+                path.write_text(path.read_text(encoding="utf-8").replace("RejectBadMagic", "SkippedError"),
+                                encoding="utf-8")
+                report["gallina_sha256"] = slice_harness._sha256(path.read_bytes())
+            elif mutation == "audit-query":
+                (outputs / "FirstSliceAssumptions.v").write_bytes(b"Print Assumptions I.\n")
+            elif mutation == "audit-log":
+                (outputs / "FirstSlice.assumptions.log").write_bytes(b"Closed under the global context\n")
+            elif mutation == "missing-library":
+                (outputs / "FirstSlice.vo").unlink()
+            else:
+                path = outputs / "FirstSlice.v"
+                path.write_text(path.read_text(encoding="utf-8") + "Axiom hidden : False.\n", encoding="utf-8")
+                report["gallina_sha256"] = slice_harness._sha256(path.read_bytes())
+            artifacts: dict[str, object] = dict(slice_harness._artifacts(outputs))
+            try:
+                slice_harness._retained_proof(root, report, outputs, artifacts)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"rehashed {mutation} concealed incomplete local proof coverage")
 
 
 def _output_bounds() -> None:
@@ -267,5 +408,6 @@ def cases() -> list[Case]:
     return [Case("local producer source and dependency inventory", _source_inventory),
             Case("changed inputs withdraw first-slice publication", _publication_freshness),
             Case("retained first-slice identities and malformed refusals", _binding_checks),
+            Case("retained proof coverage and assumption consistency", _retained_coverage),
             Case("first-slice output directory and inventory bounds", _output_bounds),
             Case("first-slice binding CLI and refusal", _cli_dispatch)]

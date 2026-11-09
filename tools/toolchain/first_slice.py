@@ -419,6 +419,93 @@ def _reported_outputs(report: dict[str, object]) -> dict[str, str]:
     return outputs
 
 
+def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[str, object]) -> None:
+    """Bind every declared process observation and the required local proof steps."""
+    steps = report.get("steps")
+    if not isinstance(steps, list) or not steps or len(steps) > ARTIFACT_ENTRIES:
+        raise ValueError("first-slice receipt process coverage is missing or exceeds its bound")
+    required = {
+        "FirstSlice.compile.log": _opam(["rocq", "c", "-q", "-R", str(directory),
+                                          "VelaFirstSlice", "FirstSlice.v"]),
+        "FirstSlice.assumptions.log": _opam(["rocq", "c", "-q", "-R", str(directory),
+                                              "VelaFirstSlice", "FirstSliceAssumptions.v"]),
+        "FirstSlice.kernel.log": _opam(["rocqchk", "-R", str(directory), "VelaFirstSlice",
+                                         "VelaFirstSlice.FirstSlice"]),
+        "FirstSliceCorrupted.compile.log": _opam(["rocq", "c", "-q", "-R", str(directory),
+                                                   "VelaFirstSlice", "FirstSliceCorrupted.v"]),
+    }
+    covered: set[str] = set()
+    for step in steps:
+        if not isinstance(step, dict):
+            raise TypeError("first-slice receipt process observation is malformed")
+        command, log = step.get("command"), step.get("log")
+        code, refused = step.get("returncode"), step.get("expected_refusal", False)
+        if (not isinstance(command, list) or not command or len(command) > 128
+                or any(not isinstance(argument, str) or not argument for argument in command)
+                or type(code) is not int or type(refused) is not bool
+                or step.get("cwd") != str(directory) or not isinstance(log, str)
+                or log not in artifacts or step.get("log_sha256") != artifacts[log]
+                or Path(log).parent != directory):
+            raise ValueError("first-slice receipt process observation is not bound to retained output")
+        name = Path(log).name
+        if refused != (name == "FirstSliceCorrupted.compile.log") or (code != 0) != refused:
+            raise ValueError("first-slice receipt process verdict contradicts its declared coverage")
+        if name in required:
+            if command != required[name]:
+                raise ValueError("first-slice receipt proof command differs from its declared subject")
+            covered.add(name)
+    if covered != required.keys() or report.get("proof_corruption_refused") is not True:
+        raise ValueError("first-slice receipt omits required local proof or corruption coverage")
+
+
+def _retained_proof(root: Path, report: dict[str, object], directory: Path,
+                    artifacts: dict[str, object]) -> None:
+    """Recheck retained declarations and assumption ledgers without native proof replay."""
+    for field, path in (("source", root / EXAMPLE), ("gallina", directory / "FirstSlice.v"),
+                         ("lowered_c", directory / "first_slice.c")):
+        if report.get(field) != str(path):
+            raise ValueError(f"first-slice receipt {field} names another subject")
+    outputs = _reported_outputs(report)
+    if any(artifacts.get(str(directory / name)) != outputs.get(str(directory / name))
+           for name in ("FirstSlice.v", "first_slice.c")):
+        raise ValueError("first-slice receipt generated identities differ from its output inventory")
+    for name in ("FirstSlice.vo", "FirstSliceAssumptions.v", "FirstSliceAssumptions.vo",
+                 "FirstSlice.assumptions.log"):
+        if str(directory / name) not in artifacts:
+            raise ValueError("first-slice receipt omits a required retained proof artifact")
+    gallina = (directory / "FirstSlice.v").read_text(encoding="utf-8")
+    modules = re.findall(r"^Module (Vela_[A-Za-z0-9_]+)\.$", gallina, flags=re.MULTILINE)
+    exports = re.findall(r"^Definition (vela_d[0-9]+_[A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|:)",
+                         gallina, flags=re.MULTILINE)
+    if modules != ["Vela_Vela_FirstSlice"] or len(set(exports)) != len(exports):
+        raise ValueError("first-slice receipt Gallina module or exports are malformed")
+    for suffix in (*EXPECTED_LAWS, *EXPECTED_CONTRACT_OBLIGATIONS, *EXPECTED_SCENARIO_THEOREMS):
+        if not any(name.endswith(f"_{suffix}") for name in exports):
+            raise ValueError(f"first-slice receipt omits required local obligation '{suffix}'")
+    expected_query = "From VelaFirstSlice Require Import FirstSlice.\n" + "".join(
+        f"Print Assumptions FirstSlice.{modules[0]}.{name}.\n" for name in exports)
+    if (directory / "FirstSliceAssumptions.v").read_text(encoding="utf-8") != expected_query:
+        raise ValueError("first-slice receipt assumption query omits or changes an audited export")
+    trusted = solver_ledger.ledger(gallina)
+    reported = solver_ledger.audit((directory / "FirstSlice.assumptions.log").read_text(encoding="utf-8"),
+                                    len(exports), modules[0], trusted)
+    inventory = report.get("inventory")
+    assumptions = ("Closed under the global context (0 axioms)" if not trusted
+                   else f"{len(trusted)} solver-trusted axioms; no other assumptions")
+    if (type(report.get("assumption_exports_count")) is not int
+            or report["assumption_exports_count"] != len(exports)
+            or type(report.get("solver_trusted_count")) is not int
+            or report["solver_trusted_count"] != len(trusted)
+            or report.get("solver_trusted_axioms") != reported
+            or report.get("accepted") is not (not trusted)
+            or report.get("kernel_checked") is not (not trusted)
+            or not isinstance(inventory, dict)
+            or inventory.get("solver_trusted_obligations") != [entry.as_json() for entry in trusted]
+            or inventory.get("global_assumptions") != assumptions):
+        raise ValueError("first-slice receipt source-proof status contradicts its retained assumption ledger")
+    _retained_steps(report, directory, artifacts)
+
+
 def _write(path: Path, payload: object) -> None:
     with atomic_path(path) as pending:
         pending.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -1863,6 +1950,7 @@ def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
     output_directory = _receipt_directory(directory_name, _work_root(root), "slice-")
     if _artifacts(output_directory) != artifacts:
         raise ValueError("first-slice receipt outputs changed")
+    _retained_proof(root, receipt, output_directory, artifacts)
     with tempfile.TemporaryDirectory(prefix="bindings-", dir=_work_root(root)) as temporary:
         steps: list[dict[str, object]] = []
         if (replay._toolchain(root, Path(temporary), steps) != receipt.get("toolchain")
