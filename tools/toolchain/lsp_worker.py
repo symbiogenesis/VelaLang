@@ -8,6 +8,7 @@ from pathlib import Path
 
 from toolchain import MAX_SOURCE_BYTES, VelaError, inspect_source, translate
 from toolchain.authoring import format_source
+from toolchain.concrete import parts
 from toolchain.protocol_json import MAX_BODY_BYTES
 
 
@@ -32,10 +33,12 @@ def main() -> int:
             return 1
         print(encoded, end="")
         return 0
-    if sys.argv[1:] == ["--inspect"]:
+    if sys.argv[1:] in (["--inspect"], ["--inspect-snapshot"]):
         digest = hashlib.sha256(source).hexdigest()
         try:
             inspection = inspect_source(source)
+            if sys.argv[1:] == ["--inspect-snapshot"]:
+                inspection["concrete"] = parts(source)
         except VelaError as error:
             inspection = {"status": "unavailable", "reason": error.kind}
         inspection["source_sha256"] = digest

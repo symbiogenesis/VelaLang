@@ -12,7 +12,7 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from toolchain import inspect_source, inspection
+from toolchain import concrete, inspect_source, inspection
 from toolchain.cli import vela as cli
 from toolchain.lsp_services import InspectionError
 from toolchain.schema import validate
@@ -25,7 +25,7 @@ SOURCE = ("module Inspect;\r\n// supplementary: 😀\r\n"
 
 
 def _request(snapshot: inspection.Snapshot, operation: str, **fields: object) -> dict[str, object]:
-    return {"schema": 2, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
+    return {"schema": 3, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
 
 
 def _symbols(value: dict[str, object]) -> list[dict[str, object]]:
@@ -152,7 +152,7 @@ def _structured_types_consumer() -> None:
 
 
 def _malformed_type_refusal() -> None:
-    raw = inspect_source(SOURCE)
+    raw = {**inspect_source(SOURCE), "concrete": concrete.parts(SOURCE)}
     scalar = {"kind": "scalar", "name": "Nat"}
     callable_type = {"kind": "function", "result": "Nat", "const": False,
                      "parameters": [{"type": "Nat", "required_static": False}]}
@@ -194,7 +194,7 @@ def _malformed_type_refusal() -> None:
 def _parameter_inventory_refusal() -> None:
     source = (b"module Types; public Nat F(Nat first, bool second) { "
               b"let local = first; let tail = second; return local; }")
-    raw = inspect_source(source)
+    raw = {**inspect_source(source), "concrete": concrete.parts(source)}
     for retained in (0, 1):
         changed = copy.deepcopy(raw)
         function = cast("list[dict[str, object]]", changed["symbols"])[0]
@@ -232,7 +232,8 @@ def _binding_invalidation() -> None:
         ensure(snapshot.query(SOURCE, request)["reason"] == "stale-input", "dependency edit retained facts")
     with patch.object(inspection, "producer_identity", side_effect=[producer, changed]):
         current = inspection.inspect(SOURCE).export()
-    ensure(current["status"] == "refused" and current["symbols"] == [], "mid-check producer edit published facts")
+    ensure(current["status"] == "refused" and current["symbols"] == [] and current["concrete"] == [],
+           "mid-check producer edit published facts")
 
 
 def _bounded_and_malformed_queries() -> None:
@@ -285,7 +286,7 @@ def _unavailable_status_and_schema() -> None:
 
 def _export_bound() -> None:
     full = inspection.inspect(SOURCE).export()
-    empty = {**full, "symbols": [], "occurrences": [], "status": "unavailable", "complete": False,
+    empty = {**full, "symbols": [], "occurrences": [], "concrete": [], "status": "unavailable", "complete": False,
              "reason": "export-limit"}
     bound = len(json.dumps(empty, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()) + 1
     with patch.object(inspection, "MAX_EXPORT_BYTES", bound):
@@ -293,7 +294,7 @@ def _export_bound() -> None:
     value = snapshot.export()
     validate(inspection.SCHEMA_PATH, value)
     ensure(len(snapshot.publication) <= bound and value["status"] == "unavailable"
-           and value["reason"] == "export-limit" and value["symbols"] == [],
+           and value["reason"] == "export-limit" and value["symbols"] == [] and value["concrete"] == [],
            "export bound published truncated facts as a successful snapshot")
 
 
@@ -308,7 +309,7 @@ def _cli_source_preservation() -> None:
         value = json.loads(output.getvalue())
         validate(inspection.SCHEMA_PATH, value)
         query = Path(directory) / "query.json"
-        query.write_text(json.dumps({"schema": 2, "snapshot": value["snapshot"], "operation": "symbols"}),
+        query.write_text(json.dumps({"schema": 3, "snapshot": value["snapshot"], "operation": "symbols"}),
                          encoding="utf-8")
         with redirect_stdout(output := StringIO()), redirect_stderr(errors := StringIO()):
             code = cli.main(["inspect", str(path), "--query", str(query)])

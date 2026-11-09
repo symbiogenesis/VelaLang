@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from toolchain import VelaError
+from toolchain import VelaError, concrete
 from toolchain.lsp_services import (
     Inspection,
     InspectionError,
@@ -17,7 +17,7 @@ from toolchain.lsp_services import (
 )
 from toolchain.source import SourceSnapshot
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 CONFIGURATION = "pure-default-v1"
 TARGET = "gallina-pure-v1"
 MAX_QUERY_RESULTS = 256
@@ -115,10 +115,11 @@ class Snapshot:
         if query.get("snapshot") != current["snapshot"]:
             return refuse("stale-snapshot")
         operation = query.get("operation")
-        if not isinstance(operation, str) or operation not in {"symbol-at", "type-at", "references", "symbols"}:
+        if not isinstance(operation, str) or operation not in {
+                "symbol-at", "type-at", "references", "symbols", "tokens", "token-at"}:
             return refuse("unsupported-operation", "unsupported")
         required = {"schema", "snapshot", "operation"}
-        if operation in {"symbol-at", "type-at"}:
+        if operation in {"symbol-at", "type-at", "token-at"}:
             required.add("offset")
         elif operation == "references":
             required.add("symbol")
@@ -134,6 +135,8 @@ class Snapshot:
         items: list[dict[str, object]]
         if operation == "symbols":
             items = symbols
+        elif operation == "tokens":
+            items = cast("list[dict[str, object]]", current["concrete"])
         elif operation == "references":
             handle = query["symbol"]
             if not isinstance(handle, str) or not any(item["id"] == handle for item in symbols):
@@ -145,11 +148,12 @@ class Snapshot:
                 self.document.byte_position(cast("int", offset))
             except (ValueError, TypeError):
                 return refuse("invalid-offset")
-            selected = next((item for item in occurrences
+            candidates = cast("list[dict[str, object]]", current["concrete"]) if operation == "token-at" else occurrences
+            selected = next((item for item in candidates
                              if cast("list[int]", item["span"])[0] <= cast("int", offset)
                              < cast("list[int]", item["span"])[1]), None)
-            items = [] if selected is None else [
-                item for item in symbols if item["id"] == selected["symbol"]]
+            items = ([] if selected is None else [selected]) if operation == "token-at" else (
+                [] if selected is None else [item for item in symbols if item["id"] == selected["symbol"]])
             if operation == "type-at" and selected is not None:
                 items = [{"symbol": item["id"], "span": selected["span"], "type": item["type"]}
                          for item in items]
@@ -173,34 +177,38 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
     publication: dict[str, object] = {
         "schema": SCHEMA_VERSION, "scope": "vela-pure-inspection",
         "snapshot": identity, "binding": binding, "status": "unavailable", "complete": False,
-        "reason": None, "source": document.text, "symbols": [], "occurrences": [],
-        "supported_views": ["source-text", "pure-resolved-identifiers"],
+        "reason": None, "source": document.text, "symbols": [], "occurrences": [], "concrete": [],
+        "supported_views": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers"],
         "unsupported_views": ["syntax-tree", "imports", "generated-origins", "proof", "lowering"]}
     if configuration != CONFIGURATION or target != TARGET:
         publication.update(status="unsupported", reason="unsupported-configuration-or-target")
     else:
         try:
-            raw = inspect_document(source)
+            raw = dict(inspect_document(source, concrete=True))
+            raw_concrete = raw.pop("concrete", None)
             facts = validate_inspection(document, raw)
             if facts is None:
                 publication["reason"] = raw["reason"]
             else:
                 symbols, occurrences = _facts(document, facts, identity)
+                pieces = concrete.validate(source, raw_concrete)
                 publication.update(status="checked", complete=True, symbols=symbols,
-                                   occurrences=occurrences)
+                                   occurrences=occurrences, concrete=pieces)
         except InspectionError as error:
             timed_out = "exceeded 5 seconds" in str(error)
             publication.update(status="timed-out" if timed_out else "unavailable",
                                reason="producer-timeout" if timed_out else "producer-failure")
         except VelaError as error:
             publication["reason"] = error.kind
+        except ValueError:
+            publication["reason"] = "producer-failure"
     if _binding(document, configuration, target) != binding:
         publication.update(status="refused", complete=False, reason="producer-changed",
-                           symbols=[], occurrences=[])
+                           symbols=[], occurrences=[], concrete=[])
     encoded = _encoded(publication)
     if len(encoded) > MAX_EXPORT_BYTES:
         publication.update(status="unavailable", complete=False, reason="export-limit",
-                           symbols=[], occurrences=[])
+                           symbols=[], occurrences=[], concrete=[])
         encoded = _encoded(publication)
         if len(encoded) > MAX_EXPORT_BYTES:
             raise ValueError("inspection source and provenance exceed export limit")
