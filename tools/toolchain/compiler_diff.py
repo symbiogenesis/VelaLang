@@ -446,13 +446,15 @@ def cap_roundtrip(records: list[str]) -> bool:
 
 
 def run_image(simulator: list[str], profile: Path, elf: Path, workdir: Path,
-              timeout: int = RUN_TIMEOUT, inst_limit: int = INST_LIMIT) -> Ran:
+              timeout: int = RUN_TIMEOUT, inst_limit: int = INST_LIMIT, *,
+              observations: list[dict[str, object]] | None = None) -> Ran:
     """Run one image the way `run.py model corpus` runs a member, plus the terminal log.
 
     The commit trace is read off the merged streams by shape, as the corpus runner reads
     it; the terminal log is the HTIF console, which is where a component's emitted bytes
     land, and it is a file rather than the console so that the emulator's own lines and
-    the trace never mix with them.
+    the trace never mix with them. An observation collector additionally retains the
+    exact command and separate stdout/stderr identities with a combined process log.
     """
     term = workdir / f"{elf.stem}.term"
     term.unlink(missing_ok=True)
@@ -467,6 +469,16 @@ def run_image(simulator: list[str], profile: Path, elf: Path, workdir: Path,
     except OSError as err:
         return Ran("no-verdict", None, 0, "", False, b"", f"the emulator could not run: {err}")
     said = done.stdout + done.stderr
+    if observations is not None:
+        log = workdir / f"{elf.stem}.sail.log"
+        log.write_text(said, encoding="utf-8", newline="")
+        stdout, stderr = done.stdout.encode("utf-8"), done.stderr.encode("utf-8")
+        observations.append({
+            "command": argv, "returncode": done.returncode,
+            "log": str(log), "log_sha256": _sha256(log.read_bytes()),
+            "stdout_bytes": len(stdout), "stdout_sha256": _sha256(stdout),
+            "stderr_bytes": len(stderr), "stderr_sha256": _sha256(stderr),
+        })
     records = trace.normalize_commit(said.splitlines())
     emitted = term.read_bytes() if term.is_file() else b""
     verdict, code, detail = htif_verdict(said, done.returncode)
