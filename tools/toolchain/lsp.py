@@ -5,6 +5,7 @@ import hashlib
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import BinaryIO, Never, cast
 
 from toolchain.lsp_format import Formatter, format_document, formatting_edits
@@ -12,11 +13,13 @@ from toolchain.lsp_services import (
     METHODS,
     SEMANTIC_TOKEN_MODIFIERS,
     SEMANTIC_TOKEN_TYPES,
+    Inspection,
     InspectionError,
     Inspector,
     QueryRange,
     inspect_document,
-    project,
+    project_inspection,
+    validate_inspection,
 )
 from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import (
@@ -33,6 +36,14 @@ MAX_DOCUMENTS = 16
 MAX_CHANGES = 64
 WORKER_SECONDS = 5
 type Checker = Callable[[bytes], dict[str, object] | None]
+
+
+@dataclass(frozen=True)
+class _CachedInspection:
+    snapshot: str
+    generation: int
+    producer: Inspector
+    facts: Inspection
 
 
 def _invalid(message: str) -> Never:
@@ -115,11 +126,35 @@ class Server:
         self.documents: dict[str, SourceSnapshot] = {}
         self.desynchronized: set[str] = set()
         self.received_versions: dict[str, int] = {}
+        self._inspections: dict[str, _CachedInspection] = {}
+        self._inspection_generation = 0
         self.generation = 0
         self.initialized = False
         self.ready = False
         self.shutdown = False
         self.exit_code: int | None = None
+
+    def invalidate_inspections(self) -> None:
+        """Advance the producer generation after a toolchain or configuration change."""
+        self._inspections.clear()
+        self._inspection_generation += 1
+
+    def _inspection(self, snapshot: SourceSnapshot) -> Inspection | None:
+        inspector, generation = self.inspector, self._inspection_generation
+        cached = self._inspections.get(snapshot.uri)
+        if (cached is not None and cached.snapshot == snapshot.identity
+                and cached.generation == generation and cached.producer is inspector):
+            return cached.facts
+        self._inspections.pop(snapshot.uri, None)
+        facts = validate_inspection(snapshot, inspector(snapshot.source))
+        if (inspector is not self.inspector or generation != self._inspection_generation
+                or self.documents.get(snapshot.uri) is not snapshot
+                or snapshot.uri in self.desynchronized):
+            raise InspectionError("Inspection producer or source changed during inspection")
+        if facts is not None:
+            self._inspections[snapshot.uri] = _CachedInspection(
+                snapshot.identity, generation, inspector, facts)
+        return facts
 
     def _snapshot(self, uri: str, version: int, text: str) -> SourceSnapshot:
         candidate = SourceSnapshot(uri, version, text, self.generation + 1)
@@ -223,13 +258,11 @@ class Server:
             if _integer(options.get("tabSize")) <= 0 or type(options.get("insertSpaces")) is not bool:
                 _invalid("formatting requires positive tabSize and Boolean insertSpaces")
         try:
-            # No fact cache: every query consumes precisely this current immutable
-            # overlay, so invalidation and refused updates cannot revive old facts.
             if method == "textDocument/formatting":
                 result = formatting_edits(snapshot, self.formatter(snapshot.source))
             else:
-                result = project(snapshot, self.inspector(snapshot.source), method,
-                                 position, include_declaration, requested_range)
+                result = project_inspection(snapshot, self._inspection(snapshot), method,
+                                            position, include_declaration, requested_range)
             reply: dict[str, object] = {"jsonrpc": "2.0", "id": request_id, "result": result}
             encode_message(reply)
         except (InspectionError, FrameError, OSError, subprocess.SubprocessError):
@@ -249,6 +282,7 @@ class Server:
                 or (request and not (isinstance(request_id, str) or type(request_id) is int))):
             return [_error(None, -32600, "Invalid Request")]
         if method == "exit" and not request:
+            self.invalidate_inspections()
             self.exit_code = 0 if self.shutdown else 1
             return []
         if not self.initialized and method != "initialize":
@@ -286,6 +320,7 @@ class Server:
                 self.initialized = True
                 return [reply]
             if method == "shutdown" and request:
+                self.invalidate_inspections()
                 self.shutdown = True
                 self.documents.clear()
                 self.desynchronized.clear()
@@ -303,6 +338,7 @@ class Server:
             if not self.ready:
                 _invalid("initialized notification is required before document work")
             if method in {"workspace/didChangeConfiguration", "workspace/didChangeWatchedFiles"}:
+                self.invalidate_inspections()
                 output: list[dict[str, object]] = []
                 for uri, old in list(self.documents.items()):
                     if uri in self.desynchronized:
@@ -329,12 +365,14 @@ class Server:
                     _invalid("document is not open")
                 old = self.documents[uri]
                 if method == "textDocument/didClose":
+                    self._inspections.pop(uri, None)
                     del self.documents[uri]
                     self.desynchronized.discard(uri)
                     del self.received_versions[uri]
                     self.generation += 1
                     return [self._clear(uri)]
                 if method == "textDocument/didSave":
+                    self._inspections.pop(uri, None)
                     if uri in self.desynchronized:
                         return [self._clear(uri)]
                     return [self._diagnostics(old)]
@@ -345,6 +383,7 @@ class Server:
                 # An older later update cannot resynchronize the document.
                 self.received_versions[uri] = version
                 snapshot = self._changed_snapshot(old, version, params.get("contentChanges"))
+            self._inspections.pop(uri, None)
             self.documents[uri] = snapshot
             self.desynchronized.discard(uri)
             return [self._diagnostics(snapshot)]
@@ -358,6 +397,7 @@ class Server:
                 if isinstance(document_value, dict):
                     uri_value = document_value.get("uri")
                     if isinstance(uri_value, str) and uri_value in self.documents:
+                        self._inspections.pop(uri_value, None)
                         self.desynchronized.add(uri_value)
                         return [self._clear(uri_value)]
             return []

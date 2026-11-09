@@ -71,7 +71,8 @@ class _Occurrence:
 
 
 @dataclass(frozen=True)
-class _Inspection:
+class Inspection:
+    snapshot: str
     symbols: tuple[_Symbol, ...]
     occurrences: tuple[_Occurrence, ...]
 
@@ -106,7 +107,7 @@ def _span(snapshot: SourceSnapshot, lines: list[str], name: str,
     return (first["line"], first["character"]), (last["line"], last["character"])
 
 
-def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> _Inspection | None:
+def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | None:
     encode_message(raw)
     if raw.get("status") == "unavailable":
         record = _object(raw, {"status", "reason"})
@@ -189,7 +190,7 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> _Inspection |
         occurrences.append(_Occurrence(identity, first, last, declaration))
     if len(declarations) != len(symbols):
         raise InspectionError("Pure prototype inspection omits declaration occurrences")
-    return _Inspection(tuple(symbols), tuple(occurrences))
+    return Inspection(snapshot.identity, tuple(symbols), tuple(occurrences))
 
 
 def _range(start: Position, end: Position) -> dict[str, object]:
@@ -205,10 +206,24 @@ def project(snapshot: SourceSnapshot, raw: dict[str, object], method: str,
             position: Position | None, include_declaration: bool = False,
             requested_range: QueryRange | None = None) -> object:
     """Project only complete current facts; malformed producer data is a refusal."""
+    return project_inspection(snapshot, validate_inspection(snapshot, raw), method,
+                              position, include_declaration, requested_range)
+
+
+def validate_inspection(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | None:
+    """Validate an untrusted response once into immutable, source-bound facts."""
     try:
-        inspection = _validate(snapshot, raw)
+        return _validate(snapshot, raw)
     except (ValueError, TypeError, KeyError) as error:
         raise InspectionError("Invalid pure prototype inspection result") from error
+
+
+def project_inspection(snapshot: SourceSnapshot, inspection: Inspection | None, method: str,
+                       position: Position | None, include_declaration: bool = False,
+                       requested_range: QueryRange | None = None) -> object:
+    """Project validated facts; the caller binds their lifetime to the exact snapshot."""
+    if inspection is not None and inspection.snapshot != snapshot.identity:
+        raise InspectionError("Inspection facts differ from the current snapshot")
     empty: object = [] if method in {
         "textDocument/references", "textDocument/documentSymbol", "textDocument/inlayHint"} else None
     if method == "textDocument/semanticTokens/full":

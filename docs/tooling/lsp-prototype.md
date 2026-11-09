@@ -144,10 +144,23 @@ and definition, and empty references and symbols. Malformed query parameters
 return invalid parameters (`-32602`). Worker/resource failure returns RequestFailed
 (`-32803`), without partial facts, truncation or session termination. Requests
 are synchronous and correlated; each result uses the current immutable snapshot.
-Any cache is bound to its full identity and is discarded on changes, refused
-updates, configuration/dependency invalidation, close and shutdown. A result for
-an old snapshot cannot become a result for a newer one. URI strings grant no disk
-access, and query responses cannot publish accepted artifacts.
+The server retains at most one successful, fully validated inspection per open
+document (at most 16). Immutable facts bind the full snapshot identity, inspector
+callable identity and server inspection generation, so hover, navigation, hints
+and semantic tokens reuse one compiler inspection and one validation pass for
+unchanged text. Each projected reply still receives its own byte-bound check.
+Unavailable, malformed, failed and timed-out inspections are never cached;
+the next query retries the producer.
+
+Changes (including same-text and empty updates), refused updates, saves,
+configuration/dependency invalidation, close, shutdown and exit discard affected
+facts. Replacing the inspector callable or explicitly advancing the inspection
+generation also requires fresh facts. Compiler or external toolchain replacement
+requires restarting the server or sending a configuration/watched-file
+invalidation; cache hits do not probe files or launch WSL to discover changes.
+A result for an old snapshot or producer generation cannot become a result for
+a newer one. URI strings grant no disk access, and query responses cannot publish
+accepted artifacts.
 
 Use the same isolated interpreter and five-second worker bound as diagnostics.
 An inspection may contain at most 1,024 declarations and 4,096 identifier
