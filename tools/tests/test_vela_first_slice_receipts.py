@@ -7,6 +7,7 @@ import tempfile
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 from tests.harness import TOOLS, Case, ensure
@@ -46,13 +47,16 @@ def _source_inventory() -> None:
 
 
 def _publication_freshness() -> None:
-    for mutation in ("none", "source", "revision", "execution", "prover", "runtime", "parser", "failure"):
+    for mutation in ("none", "source", "revision", "execution", "prover", "runtime", "parser", "failure",
+                     "source_output", "gallina_output", "lowered_c_output", "object_output",
+                     "deleted_object", "metadata", "new_probe_log"):
         with tempfile.TemporaryDirectory(prefix="vela-slice-publication-") as temporary, ExitStack() as stack:
             root = Path(temporary)
             latest = root / "qualification.json"
             latest.write_text('{"status":"passed","stale":true}', encoding="utf-8")
             parser_receipt: dict[str, object] = {"toolchain": {"menhir": "locked"}}
             compiled = slice_harness.vela_parser.Build(root, root / "parser", parser_receipt)
+            produced: dict[str, Path] = {}
             stack.enter_context(patch.object(slice_harness, "_work_root", return_value=root))
             for name, original in (("_inputs", {"source": "old"}), ("_revision", "a" * 40),
                                    ("_execution_inputs", {"simulator": "old"})):
@@ -61,28 +65,49 @@ def _publication_freshness() -> None:
                 subject = {"_inputs": "source", "_revision": "revision", "_execution_inputs": "execution"}[name]
                 stack.enter_context(patch.object(slice_harness, name,
                                                   side_effect=[original, changed if mutation == subject else original]))
-            for name, subject in (("_toolchain", "prover"), ("_runtime", "runtime")):
-                stack.enter_context(patch.object(slice_harness.replay, name,
-                                                  side_effect=[{}, {"changed": True} if mutation == subject else {}]))
+            def probe(_root: Path, directory: Path, _steps: list[dict[str, object]], *,
+                      case: str = mutation, paths: dict[str, Path] = produced) -> dict[str, object]:
+                if paths:
+                    if case.endswith("_output"):
+                        paths[case.removesuffix("_output")].write_bytes(b"changed after producer")
+                    elif case == "deleted_object":
+                        paths["object"].unlink()
+                    elif case == "new_probe_log":
+                        (directory / "late-probe.log").write_bytes(b"independent final probe")
+                return {"changed": True} if case == "prover" and paths else {}
+
+            stack.enter_context(patch.object(slice_harness.replay, "_toolchain", side_effect=probe))
+            stack.enter_context(patch.object(slice_harness.replay, "_runtime",
+                                              side_effect=[{}, {"changed": True} if mutation == "runtime" else {}]))
             stack.enter_context(patch.object(slice_harness.vela_parser, "build", return_value=compiled))
             stack.enter_context(patch.object(slice_harness.vela_parser, "_toolchain", return_value={"menhir": "locked"}))
             stack.enter_context(patch.object(slice_harness.replay, "_parser_outputs", return_value={"parser": "old"}))
 
             def run(_root: Path, directory: Path, _steps: list[dict[str, object]],
                     _compiler: Path | None, _compiled: object, *, case: str = mutation,
-                    receipt: dict[str, object] = parser_receipt) -> dict[str, object]:
-                (directory / "FirstSlice.vo").write_bytes(b"checked fixture")
+                    receipt: dict[str, object] = parser_receipt,
+                    paths: dict[str, Path] = produced) -> dict[str, object]:
+                paths.update(source=directory / "source.vela", gallina=directory / "FirstSlice.v",
+                             lowered_c=directory / "first_slice.c", object=directory / "FirstSlice.vo")
+                for name, path in paths.items():
+                    path.write_bytes(f"checked {name}".encode())
                 if case == "parser":
                     receipt["toolchain"] = {"menhir": "changed"}
                 if case == "failure":
                     raise ValueError("native producer refused")
-                return {"status": "passed", "kernel_checked": True, "accepted": True}
+                report: dict[str, object] = {"status": "passed", "kernel_checked": True, "accepted": True}
+                for field in ("source", "gallina", "lowered_c"):
+                    report[field] = str(paths[field])
+                    report[f"{field}_sha256"] = slice_harness._sha256(paths[field].read_bytes())
+                if case == "metadata":
+                    report["gallina_sha256"] = "0" * 64
+                return report
 
             stack.enter_context(patch.object(slice_harness, "_qualify_attempt", side_effect=run))
             try:
                 report = slice_harness.qualify(root)
             except ValueError as error:
-                ensure(mutation != "none", f"unchanged producer failed: {error}")
+                ensure(mutation not in {"none", "new_probe_log"}, f"unchanged producer failed: {error}")
                 ensure(not latest.exists(), "failed attempt preserved a stale passing receipt")
                 journals = list(root.glob("slice-*/attempt.json"))
                 ensure(len(journals) == 1, "failed producer lost its attempt journal")
@@ -90,13 +115,17 @@ def _publication_freshness() -> None:
                 ensure(row["status"] == "failed" and not row["kernel_checked"] and not row["accepted"],
                        "failed producer retained source-proof acceptance")
             else:
-                ensure(mutation == "none", f"{mutation} changed without withdrawing acceptance")
+                ensure(mutation in {"none", "new_probe_log"}, f"{mutation} changed without withdrawing acceptance")
                 ensure(report["schema"] == 2 and report["status"] == "passed" and latest.is_file(),
                        "unchanged local producer did not publish")
                 ensure(not report["artifact_accepted"] and not report["source_correspondence"]
                        and not report["production_admission"] and not report["full_machine_refinement_closed"],
                        "local proof producer claimed complete release evidence")
                 ensure(bool(report["artifacts_sha256"]), "passing receipt omitted retained outputs")
+                if mutation == "new_probe_log":
+                    ensure(str(produced["source"].parent / "late-probe.log") in
+                           cast("dict[str, str]", report["artifacts_sha256"]),
+                           "final probe log was omitted from the retained inventory")
 
 
 def _binding_checks() -> None:
