@@ -119,7 +119,7 @@ def _malformed_timeline() -> None:
 def _clock_and_open_spans() -> None:
     for readings in ((1000, 0), (1000, -1), (1000, True), (900, 100), (0, (trace.MAX_TIME + 1) * 1000)):
         ticks = iter(readings)
-        recorder = trace.Recorder(clock=lambda: next(ticks))
+        recorder = trace.Recorder(clock=ticks.__next__)
         with recorder.span("compile"):
             pass
         document = recorder.export(SOURCE, PRODUCER, outcome="success")
@@ -144,7 +144,7 @@ def _clock_and_open_spans() -> None:
 def _quantized_boundaries() -> None:
     for readings in ((0, 0, 0, 0, 0, 0, 0, 0), (0, 1000, 2000, 3000, 4000, 5000, 6000, 6000)):
         ticks = iter(readings)
-        recorder = trace.Recorder(clock=lambda: next(ticks))
+        recorder = trace.Recorder(clock=ticks.__next__)
         with recorder.span("compile"):
             recorder.counter("source_bytes", len(SOURCE))
             with recorder.span("parse"):
@@ -158,7 +158,7 @@ def _quantized_boundaries() -> None:
 def _bounded_decoder() -> None:
     ensure(trace.decode(json.dumps(_fixture()).encode())["displayTimeUnit"] == "ms", "decode failed")
     for raw in (b'{"x":1,"x":2}', b'{"x":NaN}', b'{"x":1.1}',
-                b'[' * 20 + b'0' + b']' * 20, b' ' * (trace.MAX_TRACE_BYTES + 1)):
+                b"[" * 20 + b"0" + b"]" * 20, b" " * (trace.MAX_TRACE_BYTES + 1)):
         try:
             trace.decode(raw)
         except ValueError:

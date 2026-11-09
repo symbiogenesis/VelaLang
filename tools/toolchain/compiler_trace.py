@@ -89,8 +89,9 @@ class Recorder:
         if self.depth >= MAX_DEPTH:
             raise ValueError("trace nesting exceeds limit")
         overhead = time.perf_counter_ns()
+        start = self._now()
         event: Object = {"name": name, "cat": "vela.compiler", "ph": "X", "pid": 1,
-                         "tid": 1, "ts": self._now(), "dur": 0}
+                         "tid": 1, "ts": start, "dur": 0}
         retained = self._retain(event)
         self.depth += 1
         self.overhead += time.perf_counter_ns() - overhead
@@ -100,7 +101,7 @@ class Recorder:
             overhead = time.perf_counter_ns()
             end = self._now()
             if retained:
-                event["dur"] = end - cast("int", event["ts"])
+                event["dur"] = end - start
             self.depth -= 1
             self.overhead += time.perf_counter_ns() - overhead
 
@@ -140,7 +141,7 @@ def _require(condition: bool, message: str) -> None:
 
 
 def _natural(value: object) -> bool:
-    return type(value) is int and 0 <= cast("int", value) <= MAX_TIME
+    return type(value) is int and 0 <= value <= MAX_TIME
 
 
 def validate(document: object, source: bytes, producer: str, *, require_complete: bool = True) -> Object:
