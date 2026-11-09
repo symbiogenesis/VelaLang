@@ -58,6 +58,18 @@ public definition Option<bool> OrOption(bool left, Option<bool> right) => Some(l
 public definition Result<bool,Nat> AndResult(bool left, Result<bool,Nat> right) => Ok(left && right?);
 public definition Result<bool,Nat> OrResult(bool left, Result<bool,Nat> right) => Ok(left || right?);
 public definition Option<bool> Nested(bool left, Option<bool> right) => Some(left && (false || right?));
+public bool Tick(ref Nat count) { count = count + 1; return true; }
+public definition Option<bool> Combine(bool first, bool second) => Some(second);
+public Option<bool> Sequenced() {
+    var count = 0;
+    let first = Tick(ref count);
+    return Combine(first, count == 1 && None::<bool>?);
+}
+public Option<bool> GuardOnce() {
+    var count = 0;
+    let observed = Tick(ref count) && Some(true)?;
+    return Some(count == 1);
+}
 public lemma TruthTable()
     ensures AndOption(false, None::<bool>) == Some(false)
     ensures OrOption(true, None::<bool>) == Some(true)
@@ -69,6 +81,8 @@ public lemma TruthTable()
     ensures OrResult(false, Err<bool,Nat>(7)) == Err<bool,Nat>(7)
     ensures Nested(false, None::<bool>) == Some(false)
     ensures Nested(true, None::<bool>) == None::<bool>
+    ensures Sequenced() == None::<bool>
+    ensures GuardOnce() == Some(true)
     proof {
         assert AndOption(false, None::<bool>) == Some(false);
         assert OrOption(true, None::<bool>) == Some(true);
@@ -80,6 +94,8 @@ public lemma TruthTable()
         assert OrResult(false, Err<bool,Nat>(7)) == Err<bool,Nat>(7);
         assert Nested(false, None::<bool>) == Some(false);
         assert Nested(true, None::<bool>) == None::<bool>;
+        assert Sequenced() == None::<bool>;
+        assert GuardOnce() == Some(true);
     }
 """),
         ("fresh-polymorphic-calls", """module GenericReplay;
@@ -1005,6 +1021,12 @@ public Nat RoundTripOwned()
          "public Unit Wrong(ref u32 x) effects none { x = 1u32; return; }", "type"),
         ("effects-missing-call",
          "public u32 Helper(u32 x) { return x; } public u32 Wrong(u32 x) effects none { return Helper(x); }", "type"),
+        ("propagation-earlier-sibling-effect-order",
+         "public union Option<T> { None(); Some(T Value); } "
+         "public bool Tick(ref Nat count) { count = count + 1; return true; } "
+         "public definition Option<bool> Combine(bool first, bool second) => Some(second); "
+         "public Option<bool> Wrong() { var count = 0; "
+         "return Combine(Tick(ref count), count == 1 && None::<bool>?); }", "unsupported"),
     )
     pure = Fixture("pure-expression-operators", b"""module PureExpressions;
 public Nat Difference(Nat left, Nat right) => left - right;
