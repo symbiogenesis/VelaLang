@@ -67,6 +67,30 @@ expected trees independently of actions. Retain the Python prototype/tests. Q25g
 qualifies executable development syntax only; checked parsing, lexer correctness,
 source correspondence and the full frontend need separate evidence.
 
+### Ordinary build cache
+
+`vela-parser parse`, `vela-parser elaborate`, and `vela-playground` reuse a
+development parser in the native worktree lane's `vela-parser/ordinary-cache`
+directory. Each lookup checks the exact authored-input hashes, selected
+toolchain versions and executable hashes, generation/compilation arguments,
+receipt scope and directory, and all generated-output hashes. A missing,
+outdated, or damaged entry is rebuilt. The receipt records only `built` syntax
+tooling; a cache hit supplies no qualification or kernel verdict.
+
+Builders serialize under a cache lock, waiting at most 120 seconds for another
+builder. Construction completes before an atomic current-generation pointer
+publishes it; a failed build or publication preserves the previous pointer.
+Readers lease immutable generation directories through independent OS file
+locks, so concurrent CLI users share a generation and a running playground
+keeps its parser even when edited grammar requires a newer generation.
+
+The cache retains its current generation and any older generation still in use.
+Obsolete unused entries and interrupted candidates are removed at the next
+lookup or lease release. A crashed reader releases its OS lock, allowing its
+stale lease to be collected. Cleanup is confined to cache entries; explicit
+`vela-parser build` and all qualification paths continue making fresh builds
+outside the cache and retain their existing evidence artifacts.
+
 ## Generated syntax campaigns
 
 [Q25y](../../PLAN.md#q-assessment-actions) qualifies reuse of the

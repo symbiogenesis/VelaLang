@@ -355,8 +355,8 @@ def _native_cli_startup() -> None:
     commands = [command for command in COMMANDS if command.name.startswith("vela-playground")]
     ensure(len(commands) == 1 and commands[0].guest_only([]),
            "unified playground did not select exactly one native-backed launch")
-    with patch("toolchain.parser.build") as build, patch.object(playground_cli, "PlaygroundServer") as factory:
-        prepared = build.return_value
+    with patch("toolchain.parser.cached_build") as build, patch.object(playground_cli, "PlaygroundServer") as factory:
+        prepared = build.return_value.__enter__.return_value
         prepared.executable = Path("/native/lane/build/vela-parser")
         server = factory.return_value.__enter__.return_value
         server.launch_url = "http://127.0.0.1:12345/#token=fixture"
@@ -367,7 +367,7 @@ def _native_cli_startup() -> None:
                "native parser was rebuilt per request or not supplied to the local server")
         ensure(server.serve_forever.call_count == 1,
                "prepared mathematical playground did not enter its HTTP service")
-    with patch("toolchain.parser.build", side_effect=RuntimeError("native tools unavailable")), \
+    with patch("toolchain.parser.cached_build", side_effect=RuntimeError("native tools unavailable")), \
             patch.object(playground_cli, "PlaygroundServer") as factory:
         ensure(playground_cli.main(["--port", "0"]) == 1 and not factory.called,
                "unavailable native toolchain started a mathematical service without its parser")

@@ -3,7 +3,7 @@
 
 import json
 import tempfile
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import nullcontext, redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -29,7 +29,7 @@ def _publication() -> None:
         source, output = root / "input.vela", root / "output.v"
         source.write_bytes(SOURCE)
         tree: dict[str, object] = {"schema": 2}
-        with (patch.object(cli.vela_parser, "build", return_value=object()) as build,
+        with (patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(object())) as build,
               patch.object(cli.vela_parser, "parse_source", return_value=tree) as parse,
               patch.object(cli.vela_mathematical, "inspect_source",
                            return_value=Compilation("Demo", GALLINA, ())) as elaborate):

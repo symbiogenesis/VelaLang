@@ -5,7 +5,7 @@ import hashlib
 import json
 import subprocess
 import tempfile
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import nullcontext, redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -56,14 +56,14 @@ def _entry_cli() -> None:
         source.write_bytes(b"module M;")
         compiled = _build(directory)
         with redirect_stdout(output := StringIO()), redirect_stderr(errors := StringIO()), \
-                patch.object(cli.vela_parser, "build", return_value=compiled), \
+                patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(compiled)), \
                 patch.object(cli.vela_parser, "parse_source", return_value={"schema": 2}) as parse:
             code = cli.main(["parse", "--surface", str(source)])
         ensure(code == 0 and json.loads(output.getvalue()) == {"schema": 2} and not errors.getvalue(),
                "surface CLI failed or mixed diagnostics with syntax")
         parse.assert_called_once_with(compiled, source.read_bytes(), surface=True)
         with redirect_stdout(output := StringIO()), redirect_stderr(errors := StringIO()), \
-                patch.object(cli.vela_parser, "build", return_value=compiled), \
+                patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(compiled)), \
                 patch.object(cli.vela_parser, "parse_source", side_effect=ValueError("invalid surface schema")) as parse:
             code = cli.main(["parse", "--surface", str(source)])
         ensure(code == 1 and not output.getvalue() and "invalid surface schema" in errors.getvalue(),

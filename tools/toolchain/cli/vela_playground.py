@@ -20,8 +20,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("port must be between 0 and 65535")
     try:
         print("Preparing the locked Vela parser in this native lane...", flush=True)
-        native_parser = vela_parser.build(Path(__file__).resolve().parents[3]).executable
-        with PlaygroundServer(args.port, mathematical_parser=native_parser) as server:
+        with (vela_parser.cached_build(Path(__file__).resolve().parents[3]) as compiled,
+              PlaygroundServer(args.port, mathematical_parser=compiled.executable) as server):
             print(f"Vela playground: {server.launch_url}", flush=True)
             print("Vela functions, dependent types and proofs. Ctrl+C stops the local service.", flush=True)
             server.serve_forever()

@@ -117,8 +117,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "elaborate":
             source = vela_parser.read_source(args.source)
-            compiled = vela_parser.build(root)
-            parsed = vela_parser.parse_source(compiled, source, surface=True)
+            with vela_parser.cached_build(root) as compiled:
+                parsed = vela_parser.parse_source(compiled, source, surface=True)
             translation = vela_mathematical.inspect_source(source, parsed)
             if not _naming(args.source, translation.findings, allowed, denied):
                 return 1
@@ -148,7 +148,8 @@ def main(argv: list[str] | None = None) -> int:
             output = vela_parser.build(root).receipt
         else:
             source = vela_parser.read_source(args.source)
-            output = vela_parser.parse_source(vela_parser.build(root), source, surface=args.surface)
+            with vela_parser.cached_build(root) as compiled:
+                output = vela_parser.parse_source(compiled, source, surface=args.surface)
     except VelaError as error:
         site = str(args.source) if args.command in {"parse", "elaborate"} else "qualification"
         print(f"{site}:{error.line}:{error.column}: {error.kind}: {error.message}", file=sys.stderr)

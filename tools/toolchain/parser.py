@@ -12,6 +12,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import uuid
+from collections.abc import Generator
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -38,6 +40,8 @@ MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 # A syntax edge can add a node object and a child-list container. The response
 # envelope, located names and span arrays require the remaining four levels.
 MAX_RESPONSE_DEPTH = 2 * MAX_SYNTAX_DEPTH + 4
+CACHE_RECEIPT_BYTES = 65_536
+_CACHE_ENTRY = re.compile(r"entry-[0-9a-f]{64}-[0-9a-f]{32}")
 
 
 @dataclass(frozen=True)
@@ -106,18 +110,22 @@ def _inputs(root: Path) -> dict[str, str]:
     return {name: _digest(root / name) for name in paths}
 
 
+def _commands() -> tuple[list[str], ...]:
+    return (["ocamlc", "-c", "ast.ml"],
+            ["menhir", *GENERATION_FLAGS, "parser.mly"],
+            ["ocamllex", "lexer.mll"],
+            ["ocamlc", "-c", "parser.mli"],
+            ["ocamlc", "-c", "parser.ml"],
+            ["ocamlc", "-c", "lexer.ml"],
+            ["ocamlc", "-c", "main.ml"],
+            ["ocamlc", "-o", "vela-parser", "ast.cmo", "parser.cmo", "lexer.cmo", "main.cmo"])
+
+
 def _compile(root: Path, directory: Path, tools: dict[str, object]) -> Build:
     inputs = _inputs(root)
     for name in SOURCES:
         shutil.copyfile(root / "tools/toolchain/parser" / name, directory / name)
-    commands = (["ocamlc", "-c", "ast.ml"],
-                ["menhir", *GENERATION_FLAGS, "parser.mly"],
-                ["ocamllex", "lexer.mll"],
-                ["ocamlc", "-c", "parser.mli"],
-                ["ocamlc", "-c", "parser.ml"],
-                ["ocamlc", "-c", "lexer.ml"],
-                ["ocamlc", "-c", "main.ml"],
-                ["ocamlc", "-o", "vela-parser", "ast.cmo", "parser.cmo", "lexer.cmo", "main.cmo"])
+    commands = _commands()
     for arguments in commands:
         _run(_opam(arguments), directory)
     if _inputs(root) != inputs:
@@ -158,6 +166,131 @@ def build(root: Path) -> Build:
         tools = _toolchain(root)
         output = Path(tempfile.mkdtemp(prefix="build-", dir=directory))
         return _compile(root, output, tools)
+
+
+def _current_cache_entry(cache: Path) -> Path | None:
+    try:
+        with (cache / "current").open(encoding="utf-8") as stream:
+            raw = stream.read(129)
+        if len(raw) > 128:
+            return None
+        name = raw.strip()
+        return cache / name if _CACHE_ENTRY.fullmatch(name) else None
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _cache_hit(directory: Path, inputs: dict[str, str], tools: dict[str, object]) -> Build | None:
+    try:
+        if (directory.is_symlink() or not directory.is_dir()
+                or directory.resolve().parent != directory.parent.resolve()
+                or (directory / "receipt.json").is_symlink()):
+            return None
+        with (directory / "receipt.json").open("rb") as stream:
+            raw = stream.read(CACHE_RECEIPT_BYTES + 1)
+        if len(raw) > CACHE_RECEIPT_BYTES:
+            return None
+        value: object = json.loads(raw, object_pairs_hook=unique_object)
+        if not isinstance(value, dict):
+            return None
+        receipt = cast("dict[str, object]", value)
+        if (type(receipt.get("schema")) is not int or receipt["schema"] != 1
+                or receipt.get("scope") != "vela-syntax-only-development-parser"
+                or receipt.get("status") != "built" or receipt.get("inputs") != inputs
+                or receipt.get("toolchain") != tools or receipt.get("directory") != str(directory)
+                or receipt.get("commands") != list(_commands())):
+            return None
+        outputs = receipt.get("generated_sha256")
+        if not isinstance(outputs, dict) or set(outputs) != {*GENERATED, "vela-parser"}:
+            return None
+        for name in (*GENERATED, "vela-parser"):
+            path = directory / name
+            if path.is_symlink() or _digest(path) != outputs[name]:
+                return None
+    except (OSError, ValueError, TypeError, RecursionError):
+        return None
+    return Build(directory, directory / "vela-parser", receipt)
+
+
+def _cache_leased(cache: Path, entry: Path) -> bool:
+    leased = False
+    for marker in cache.glob(f"lease-{entry.name}-*.lock"):
+        try:
+            with _file_lock(marker, timeout=0):
+                pass
+        except TimeoutError:
+            leased = True
+        else:
+            marker.unlink(missing_ok=True)
+    return leased
+
+
+def _prune_cache(cache: Path, current: Path | None) -> None:
+    for entry in cache.glob("entry-*"):
+        if _CACHE_ENTRY.fullmatch(entry.name):
+            leased = _cache_leased(cache, entry)
+            if entry == current or leased:
+                continue
+            if entry.is_symlink() or not entry.is_dir():
+                entry.unlink(missing_ok=True)
+                continue
+            if entry.resolve().parent != cache.resolve():
+                raise ValueError(f"parser cache entry escapes its cache directory: {entry}")
+            shutil.rmtree(entry)
+
+
+def _compile_cache_entry(root: Path, entry: Path, inputs: dict[str, str], tools: dict[str, object]) -> Build:
+    compiled = _compile(root, entry, tools)
+    if compiled.receipt["inputs"] != inputs:
+        raise ValueError("parser inputs changed before cache construction")
+    return compiled
+
+
+@contextlib.contextmanager
+def cached_build(root: Path) -> Generator[Build]:
+    """Lease an immutable ordinary-use build; qualification keeps using fresh builds.
+
+    Retain only the current generation and generations with live users. A unique
+    OS-backed lease for each user allows concurrent readers and recovers after a
+    crashed user. The cache lock serializes construction, publication and pruning.
+    """
+    native = _work_root(root)
+    cache = native / "ordinary-cache"
+    cache.mkdir(exist_ok=True)
+    if cache.is_symlink() or cache.resolve().parent != native.resolve():
+        raise ValueError(f"parser cache directory escapes its native build root: {cache}")
+    with contextlib.ExitStack() as lease:
+        with _file_lock(cache / "cache.lock", timeout=BUILD_TIMEOUT):
+            inputs, tools = _inputs(root), _toolchain(root)
+            identity = json.dumps({"root": str(root.resolve()), "inputs": inputs,
+                                   "toolchain": tools, "commands": _commands()}, sort_keys=True)
+            key = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+            entry = _current_cache_entry(cache)
+            compiled = (_cache_hit(entry, inputs, tools)
+                        if entry is not None and entry.name.startswith(f"entry-{key}-") else None)
+            if compiled is None:
+                entry = cache / f"entry-{key}-{uuid.uuid4().hex}"
+                entry.mkdir()
+                try:
+                    compiled = _compile_cache_entry(root, entry, inputs, tools)
+                    with atomic_path(cache / "current") as pending:
+                        pending.write_text(entry.name + "\n", encoding="utf-8", newline="")
+                except BaseException:
+                    with contextlib.suppress(OSError, TimeoutError, ValueError):
+                        _prune_cache(cache, _current_cache_entry(cache))
+                    raise
+            entry = compiled.directory
+            marker = cache / f"lease-{entry.name}-{uuid.uuid4().hex}.lock"
+            lease.enter_context(_file_lock(marker, timeout=0))
+            _prune_cache(cache, entry)
+        try:
+            yield compiled
+        finally:
+            lease.close()
+            with (contextlib.suppress(OSError, TimeoutError, ValueError),
+                  _file_lock(cache / "cache.lock", timeout=0)):
+                marker.unlink(missing_ok=True)
+                _prune_cache(cache, _current_cache_entry(cache))
 
 
 def read_source(path: Path) -> bytes:

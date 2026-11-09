@@ -247,7 +247,7 @@ def _cli() -> None:
         source = Path(temporary) / "source.vela"
         source.write_bytes(b"module M;")
         with redirect_stdout(out := StringIO()), redirect_stderr(err := StringIO()), \
-                patch.object(cli.vela_parser, "build", side_effect=RuntimeError("no locked toolchain")):
+                patch.object(cli.vela_parser, "cached_build", side_effect=RuntimeError("no locked toolchain")):
             code = cli.main(["parse", str(source)])
         ensure(code == 1 and not out.getvalue() and "no locked toolchain" in err.getvalue(),
                "failed build emitted an AST or lost its cause")

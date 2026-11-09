@@ -2,7 +2,7 @@
 """Independent naming-warning, strict-check and publication controls for Vela."""
 
 import tempfile
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import nullcontext, redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -39,7 +39,7 @@ def _warnings_and_allow() -> None:
         source = Path(temporary) / "input.vela"
         source.write_bytes(SOURCE)
         compilation = Compilation("Named", GALLINA, (FINDING,))
-        with (patch.object(cli.vela_parser, "build", return_value=object()) as build,
+        with (patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(object())) as build,
               patch.object(cli.vela_parser, "parse_source", return_value=TREE) as parse,
               patch.object(cli.vela_mathematical, "inspect_source", return_value=compilation) as inspect):
             code, out, err = _invoke(["elaborate", str(source)])
@@ -62,7 +62,7 @@ def _strict_publication() -> None:
         source.write_bytes(SOURCE)
         output.write_bytes(b"retain existing artifact\n")
         compilation = Compilation("Named", GALLINA, (FINDING,))
-        with (patch.object(cli.vela_parser, "build", return_value=object()),
+        with (patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(object())),
               patch.object(cli.vela_parser, "parse_source", return_value=TREE),
               patch.object(cli.vela_mathematical, "inspect_source", return_value=compilation),
               patch.object(cli, "_publish") as publish):
@@ -79,7 +79,7 @@ def _strict_publication() -> None:
 
 def _options_before_compilation() -> None:
     with (patch.object(cli.vela_parser, "read_source") as read,
-          patch.object(cli.vela_parser, "build") as build,
+          patch.object(cli.vela_parser, "cached_build") as build,
           patch.object(cli.vela_mathematical, "inspect_source") as inspect):
         for options in (["--allow", "VELA105", "--deny", "VELA105"],
                         ["--deny", "VELA105", "--allow", "VELA105"]):
@@ -108,7 +108,7 @@ def _semantic_failure_and_recovery() -> None:
         source, output = root / "input.vela", root / "output.v"
         source.write_bytes(SOURCE)
         output.write_bytes(b"original artifact\n")
-        with (patch.object(cli.vela_parser, "build", return_value=object()),
+        with (patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(object())),
               patch.object(cli.vela_parser, "parse_source", return_value=TREE),
               patch.object(cli.vela_mathematical, "inspect_source",
                            side_effect=VelaError("type", 3, 9, "invalid equality proof"))):
@@ -117,7 +117,7 @@ def _semantic_failure_and_recovery() -> None:
                    "invalid source produced style findings or obscured its semantic error")
         ensure(output.read_bytes() == b"original artifact\n", "semantic failure changed existing output")
         accepted = Compilation("Named", GALLINA, ())
-        with (patch.object(cli.vela_parser, "build", return_value=object()),
+        with (patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(object())),
               patch.object(cli.vela_parser, "parse_source", return_value=TREE),
               patch.object(cli.vela_mathematical, "inspect_source", return_value=accepted)):
             code, out, err = _invoke(["elaborate", str(source), "--output", str(output), "--deny", "VELA105"])
@@ -131,7 +131,7 @@ def _warning_file_output() -> None:
         source, output = root / "input.vela", root / "output.v"
         source.write_bytes(SOURCE)
         result = Compilation("Named", GALLINA, (FINDING,))
-        with (patch.object(cli.vela_parser, "build", return_value=object()),
+        with (patch.object(cli.vela_parser, "cached_build", return_value=nullcontext(object())),
               patch.object(cli.vela_parser, "parse_source", return_value=TREE),
               patch.object(cli.vela_mathematical, "inspect_source", return_value=result)):
             code, out, err = _invoke(["elaborate", str(source), "--output", str(output)])
