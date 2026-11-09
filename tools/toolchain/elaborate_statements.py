@@ -326,12 +326,20 @@ class _StatementsMixin:
                 raise self.fail("name", f"unknown identifier '{tname}'", target)
             if tname in self.frozen_collections:
                 raise self.fail("type", f"cannot mutate collection '{tname}' while iterating over it", statement)
+            if tname in self.local_borrows and self.local_borrows[tname][0] != "ref":
+                raise self.fail(
+                    "type",
+                    f"cannot assign through shared 'in' borrow '{tname}' (write-through-shared)",
+                    target,
+                )
             if tname not in self.mutable_locals:
                 raise self.fail(
                     "type",
                     f"cannot assign to immutable binding '{tname}'; declare it with 'var' or 'ref'",
                     target,
                 )
+            if tname in self.local_borrows:
+                self._refresh_local_borrows(updated, target)
             cur_b = updated[tname]
             if self._is_readonly_span(cur_b.term):
                 raise self.fail("type", f"cannot mutate a read-only 'in' parameter '{tname}'", target)
@@ -361,6 +369,9 @@ class _StatementsMixin:
                 }
                 rhs_term = self.check(bin_node, cur_b.type, updated)
                 self._consume_call_updates(updated, statement)
+            if tname in self.local_borrows:
+                self._apply_borrow_write(tname, _Binding(rhs_term, cur_b.type), updated, statement)
+                return updated
             rec_head, rec_targs = self.spine(self.whnf(cur_b.type))
             if (
                 rec_head.kind == "const"
@@ -373,6 +384,7 @@ class _StatementsMixin:
                     rinfo, rec_targs, rhs_term, updated, statement, exclude_clauses=lifted
                 )
             updated[tname] = _Binding(rhs_term, cur_b.type)
+            self._refresh_local_borrows(updated, statement)
             return updated
         if target["kind"] == "member":
             recv_node = self._unwrap_group(self.node(target["value"]))
@@ -390,12 +402,20 @@ class _StatementsMixin:
                     f"cannot mutate field '{fname}' of uninitialized 'out' parameter '{rname}'; initialize the whole value first",
                     target,
                 )
+            if rname in self.local_borrows and self.local_borrows[rname][0] != "ref":
+                raise self.fail(
+                    "type",
+                    f"cannot mutate field '{fname}' through shared 'in' borrow '{rname}' (write-through-shared)",
+                    target,
+                )
             if rname not in self.mutable_locals:
                 raise self.fail(
                     "type",
                     f"cannot mutate field '{fname}' of immutable record '{rname}'; declare it with 'var' or 'ref'",
                     target,
                 )
+            if rname in self.local_borrows:
+                self._refresh_local_borrows(updated, target)
             cur_b = updated[rname]
             if self._is_readonly_span(cur_b.term):
                 raise self.fail("type", f"cannot mutate a read-only 'in' parameter '{rname}'", target)
@@ -436,11 +456,15 @@ class _StatementsMixin:
                     final_fields.append(_apps(_constant(rf.proj_const), *type_args, cur_b.term))
             self._consume_call_updates(updated, statement)
             new_rec_term = _apps(_constant(record_info.ctor_const), *type_args, *final_fields)
+            if rname in self.local_borrows:
+                self._apply_borrow_write(rname, _Binding(new_rec_term, cur_b.type), updated, statement)
+                return updated
             lifted = self.lifted_invariants.get(rname, set())
             self._check_record_invariants(
                 record_info, type_args, new_rec_term, updated, statement, exclude_clauses=lifted
             )
             updated[rname] = _Binding(new_rec_term, cur_b.type)
+            self._refresh_local_borrows(updated, statement)
             return updated
         if target["kind"] == "index":
             recv_node = self._unwrap_group(self.node(target["value"]))
@@ -620,6 +644,74 @@ class _StatementsMixin:
             return cast("str", cast("Node", val["name"]).get("text")), False
         return None, False
 
+    def _apply_borrow_write(
+        self: _Elaborator,
+        bname: str,
+        new_binding: _Binding,
+        updated: dict[str, _Binding],
+        site_node: Node,
+    ) -> None:
+        bmode, owner_name, field_path = self.local_borrows[bname]
+        if bmode != "ref":
+            raise self.fail(
+                "type",
+                f"cannot mutate through shared 'in' borrow '{bname}' (write-through-shared)",
+                site_node,
+            )
+        if owner_name not in updated:
+            raise self.fail("name", f"unknown identifier '{owner_name}'", site_node)
+        if not field_path:
+            rec_head, rec_targs = self.spine(self.whnf(new_binding.type))
+            if (
+                rec_head.kind == "const"
+                and isinstance(rec_head.value, str)
+                and rec_head.value in self.records_by_type
+            ):
+                rinfo = self.records_by_type[rec_head.value]
+                lifted = self.lifted_invariants.get(owner_name, set()) | self.lifted_invariants.get(bname, set())
+                self._check_record_invariants(
+                    rinfo, rec_targs, new_binding.term, updated, site_node, exclude_clauses=lifted
+                )
+            updated[owner_name] = new_binding
+            if owner_name in self.slice_views:
+                parent_name = self.slice_views[owner_name]
+                if parent_name in updated:
+                    p_b = updated[parent_name]
+                    updated[parent_name] = _Binding(
+                        _apps(_constant("Span_Restore"), _U8, p_b.term, new_binding.term), p_b.type
+                    )
+        elif len(field_path) == 1:
+            fname = field_path[0]
+            owner_b = updated[owner_name]
+            rec_type = self.whnf(owner_b.type)
+            head, type_args = self.spine(rec_type)
+            if (
+                head.kind != "const"
+                or not isinstance(head.value, str)
+                or head.value not in self.records_by_type
+            ):
+                raise self.fail("type", f"borrowed owner '{owner_name}' is not a record", site_node)
+            record_info = self.records_by_type[head.value]
+            field_index = next(
+                (idx for idx, rf in enumerate(record_info.fields) if rf.name == fname),
+                None,
+            )
+            if field_index is None:
+                raise self.fail("name", f"record '{record_info.name}' has no field '{fname}'", site_node)
+            final_fields: list[_Term] = []
+            for idx, rf in enumerate(record_info.fields):
+                if idx == field_index:
+                    final_fields.append(new_binding.term)
+                else:
+                    final_fields.append(_apps(_constant(rf.proj_const), *type_args, owner_b.term))
+            new_rec_term = _apps(_constant(record_info.ctor_const), *type_args, *final_fields)
+            lifted = self.lifted_invariants.get(owner_name, set()) | self.lifted_invariants.get(bname, set())
+            self._check_record_invariants(
+                record_info, type_args, new_rec_term, updated, site_node, exclude_clauses=lifted
+            )
+            updated[owner_name] = _Binding(new_rec_term, owner_b.type)
+        self._refresh_local_borrows(updated, site_node)
+
     def _consume_call_updates(
         self: _Elaborator, updated: dict[str, _Binding], site: Node
     ) -> None:
@@ -652,6 +744,9 @@ class _StatementsMixin:
             if vname in updated:
                 if vname in self.frozen_collections:
                     raise self.fail("type", f"cannot mutate frozen collection '{vname}'", site)
+                if vname in self.local_borrows:
+                    self._apply_borrow_write(vname, new_binding, updated, site)
+                    return True
                 self.uninitialized_out_params.discard(vname)
                 updated[vname] = new_binding
                 if vname in self.slice_views:
@@ -661,6 +756,7 @@ class _StatementsMixin:
                         updated[parent_name] = _Binding(
                             _apps(_constant("Span_Restore"), _U8, p_b.term, new_binding.term), p_b.type
                         )
+                self._refresh_local_borrows(updated, site)
                 return True
             return False
         if val.get("kind") == "member" and isinstance(val.get("name"), dict) and isinstance(val.get("value"), dict):
@@ -703,11 +799,15 @@ class _StatementsMixin:
                                 else:
                                     final_fields.append(_apps(_constant(rf.proj_const), *type_args, cur_b.term))
                             new_rec_term = _apps(_constant(record_info.ctor_const), *type_args, *final_fields)
+                            if rname in self.local_borrows:
+                                self._apply_borrow_write(rname, _Binding(new_rec_term, cur_b.type), updated, site)
+                                return True
                             lifted = self.lifted_invariants.get(rname, set())
                             self._check_record_invariants(
                                 record_info, type_args, new_rec_term, updated, site, exclude_clauses=lifted
                             )
                             updated[rname] = _Binding(new_rec_term, cur_b.type)
+                            self._refresh_local_borrows(updated, site)
                             return True
         return False
 

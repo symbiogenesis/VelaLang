@@ -1493,6 +1493,7 @@ class _FunctionLowerer:
         # Map loan handle name -> Place.
         self.handle_places: dict[str, Place] = {}
         self.handle_modes: dict[str, Mode] = {}
+        self.used_binders: set[str] = set()
         self.nodes: list[Node] = []
         self.edges: dict[str, list[str]] = {}
         self.events: dict[str, Event] = {}
@@ -1515,6 +1516,14 @@ class _FunctionLowerer:
     def _fresh_loan(self, prefix: str = "loan") -> str:
         self.loan_counter += 1
         return f"_{prefix}_{self.loan_counter}"
+
+    def _fresh_binder(self, bname: str) -> str:
+        if bname not in self.owners and bname not in self.used_binders:
+            self.used_binders.add(bname)
+            return bname
+        fresh = self._fresh_loan(bname)
+        self.used_binders.add(fresh)
+        return fresh
 
     def _connect(self, src: str | None, dst: str) -> None:
         if src is not None and isinstance(self.events.get(src), Return):
@@ -1543,7 +1552,7 @@ class _FunctionLowerer:
         borrowed: bool,
         type_name: str | None = None,
     ) -> None:
-        if not _NAME.fullmatch(name):
+        if not _NAME.fullmatch(name) or (name in self.used_binders and name not in self.owners):
             return
         if name not in self.owner_fields:
             self.owner_fields[name] = set()
@@ -1729,8 +1738,10 @@ class _FunctionLowerer:
                 self._add_owner_field(rname, tuple(fields))
             return current, rname, Place(rname, tuple(fields))
 
-        fallback_owner = next(iter(self.owners))
-        return current, fallback_owner, Place(fallback_owner)
+        current, _ = self._lower_expr(current, expr)
+        tmp_owner = self._fresh_loan("tmp")
+        self._register_owner(tmp_owner, borrowed=False)
+        return current, tmp_owner, Place(tmp_owner)
 
     def _eval_index_subexpressions(
         self, current: str | None, expr: dict[str, object]
@@ -1803,7 +1814,7 @@ class _FunctionLowerer:
                     parent_handle = captures[0]
                     place = self.handle_places[parent_handle]
                     mode = self.handle_modes.get(parent_handle, "shared")
-                    loan_name = bname if bname not in self.owners else self._fresh_loan(bname)
+                    loan_name = self._fresh_binder(bname)
                     current = self._emit(
                         current,
                         Borrow(Loan(loan_name, parent_handle, place, mode=mode)),
@@ -1813,7 +1824,7 @@ class _FunctionLowerer:
                     self.handle_places[bname] = place
                     self.handle_modes[bname] = mode
                 else:
-                    bind_name = bname if bname not in self.owners else self._fresh_loan(bname)
+                    bind_name = self._fresh_binder(bname)
                     current = self._emit(current, Bind(bind_name, captures), f"pat_{bname}")
                     self.handles[bname] = bind_name
             elif source_place is not None and self.return_lifetime_place is not None:
@@ -1821,7 +1832,7 @@ class _FunctionLowerer:
                 if place.owner in self.owners:
                     if place.fields:
                         self._add_owner_field(place.owner, place.fields)
-                    loan_name = bname if bname not in self.owners else self._fresh_loan(bname)
+                    loan_name = self._fresh_binder(bname)
                     current = self._emit(
                         current,
                         Borrow(Loan(loan_name, place.owner, place, mode="shared")),
@@ -1831,6 +1842,7 @@ class _FunctionLowerer:
                     self.handle_places[bname] = place
                     self.handle_modes[bname] = "shared"
             else:
+                self.handles.pop(bname, None)
                 self._register_owner(bname, borrowed=False)
         return current
 
@@ -2198,9 +2210,7 @@ class _FunctionLowerer:
                     sname = _id_text(inner["name"])
                     if sname in self.handles:
                         old_handle = self.handles.pop(sname)
-                        target_handle = (
-                            binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
-                        )
+                        target_handle = self._fresh_binder(binder_name)
                         current = self._emit(current, Move(old_handle, target_handle), f"move_{binder_name}")
                         self.handles[binder_name] = target_handle
                         if sname in self.handle_places:
@@ -2212,12 +2222,13 @@ class _FunctionLowerer:
                         return current
                 current, _, place = self._resolve_borrow_target(current, inner)
                 current = self._emit(current, Access(place, "move"), f"move_{binder_name}")
+                self.handles.pop(binder_name, None)
                 self._register_owner(binder_name, borrowed=False, type_name=_type_base_name(local_type))
                 return current
 
             loan_mode: Mode = "shared" if mode == "in" else "exclusive"
             current, parent, place = self._resolve_borrow_target(current, inner)
-            loan_name = binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
+            loan_name = self._fresh_binder(binder_name)
             current = self._emit(
                 current,
                 Borrow(Loan(loan_name, parent, place, mode=loan_mode, scoped=scoped)),
@@ -2235,7 +2246,7 @@ class _FunctionLowerer:
             if len(caps) == 1 and explicit_loan_mode is not None and caps[0] in self.handle_places:
                 parent_handle = caps[0]
                 place = self.handle_places[parent_handle]
-                loan_name = binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
+                loan_name = self._fresh_binder(binder_name)
                 current = self._emit(
                     current,
                     Borrow(Loan(loan_name, parent_handle, place, mode=explicit_loan_mode, scoped=scoped)),
@@ -2250,9 +2261,10 @@ class _FunctionLowerer:
                 _is_scalar_value_type(local_type)
                 or (_is_ident(value_expr) and len(caps) == 1 and caps[0] in self.handle_places)
             ):
+                self.handles.pop(binder_name, None)
                 self._register_owner(binder_name, borrowed=False, type_name=_type_base_name(local_type))
             else:
-                bind_name = binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
+                bind_name = self._fresh_binder(binder_name)
                 current = self._emit(current, Bind(bind_name, caps), f"bind_{binder_name}")
                 self.handles[binder_name] = bind_name
             return current
@@ -2264,6 +2276,7 @@ class _FunctionLowerer:
                 cname = _id_text(callee["name"])
                 if cname in self.structs:
                     inferred_type = cname
+        self.handles.pop(binder_name, None)
         self._register_owner(binder_name, borrowed=False, type_name=inferred_type)
         return current
 
@@ -2527,7 +2540,7 @@ class _FunctionLowerer:
                         body_curr, parent, cplace = self._resolve_borrow_target(body_curr, coll)
                         elem_place = Place(cplace.owner, (*cplace.fields, "*"))
                         loan_mode = "shared" if imode == "in" else "exclusive"
-                        iter_loan = iname if iname not in self.owners else self._fresh_loan(iname)
+                        iter_loan = self._fresh_binder(iname)
                         body_curr = self._emit(
                             body_curr,
                             Borrow(Loan(iter_loan, parent, elem_place, mode=loan_mode, scoped=True)),
@@ -2539,6 +2552,7 @@ class _FunctionLowerer:
                         self.handle_modes[iname] = loan_mode
                         self.handle_modes[iter_loan] = loan_mode
                     else:
+                        self.handles.pop(iname, None)
                         self._register_owner(iname, borrowed=False)
                 body_exit = self._lower_statements(
                     body_curr,

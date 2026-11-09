@@ -427,6 +427,168 @@ class _PatternsMixin:
         for child in pat.args:
             self._collect_pat_names(child, out)
 
+    def _project_borrow_binding(
+        self: _Elaborator,
+        owner_name: str,
+        field_path: tuple[str, ...],
+        environment: dict[str, _Binding],
+        site_node: Node,
+    ) -> _Binding:
+        if owner_name not in environment:
+            raise self.fail("name", f"unknown identifier '{owner_name}'", site_node)
+        cur = environment[owner_name]
+        for fname in field_path:
+            cur_ty = self.whnf(cur.type)
+            head, type_args = self.spine(cur_ty)
+            if (
+                head.kind != "const"
+                or not isinstance(head.value, str)
+                or head.value not in self.records_by_type
+            ):
+                raise self.fail("type", f"cannot borrow field '{fname}' from non-record '{owner_name}'", site_node)
+            record_info = self.records_by_type[head.value]
+            field_index = next(
+                (idx for idx, rf in enumerate(record_info.fields) if rf.name == fname),
+                None,
+            )
+            if field_index is None:
+                raise self.fail("name", f"record '{record_info.name}' has no field '{fname}'", site_node)
+            rf = record_info.fields[field_index]
+            f_type = self._instantiate_record_field_type(record_info, type_args, field_index, cur.term)
+            f_term = _apps(_constant(rf.proj_const), *type_args, cur.term)
+            cur = _Binding(f_term, f_type)
+        return cur
+
+    def _refresh_local_borrows(
+        self: _Elaborator, environment: dict[str, _Binding], site_node: Node
+    ) -> None:
+        for bname, (_mode, owner_name, field_path) in list(self.local_borrows.items()):
+            if bname in environment and owner_name in environment:
+                environment[bname] = self._project_borrow_binding(
+                    owner_name, field_path, environment, site_node
+                )
+
+    def _resolve_local_borrow_target(
+        self: _Elaborator,
+        borrow_mode: str,
+        target_node: Node,
+        environment: dict[str, _Binding],
+        site_node: Node,
+    ) -> tuple[str, tuple[str, ...], _Binding]:
+        target_node = self._unwrap_group(target_node)
+        t_kind = target_node["kind"]
+        if t_kind == "name":
+            tname = self.name(target_node["name"])
+            if tname not in environment:
+                raise self.fail("name", f"unknown identifier '{tname}'", target_node)
+            if tname in self.uninitialized_out_params:
+                raise self.fail("type", f"cannot borrow uninitialized 'out' parameter '{tname}'", target_node)
+            if tname in self.local_borrows:
+                parent_mode, owner_name, field_path = self.local_borrows[tname]
+                if borrow_mode == "ref" and parent_mode != "ref":
+                    raise self.fail(
+                        "type",
+                        f"cannot take exclusive 'ref' borrow from shared 'in' borrow '{tname}' (exclusive-from-shared)",
+                        site_node,
+                    )
+            else:
+                owner_name = tname
+                field_path = ()
+                if borrow_mode == "ref":
+                    if tname in self.readonly_in_params or self._is_readonly_span(environment[tname].term):
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of read-only 'in' parameter '{tname}'",
+                            site_node,
+                        )
+                    if tname in self.frozen_collections:
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of frozen collection '{tname}'",
+                            site_node,
+                        )
+                    if tname not in self.mutable_locals:
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of immutable binding '{tname}'; declare it with 'var' or 'ref'",
+                            site_node,
+                        )
+        elif t_kind == "member":
+            recv_node = self._unwrap_group(self.node(target_node["value"]))
+            fname = self.name(target_node["name"])
+            if recv_node["kind"] != "name":
+                raise self.fail("unsupported", "field borrow target must be a named local or borrow", target_node)
+            rname = self.name(recv_node["name"])
+            if rname not in environment:
+                raise self.fail("name", f"unknown identifier '{rname}'", recv_node)
+            if rname in self.uninitialized_out_params:
+                raise self.fail("type", f"cannot borrow field of uninitialized 'out' parameter '{rname}'", recv_node)
+            if rname in self.local_borrows:
+                parent_mode, owner_name, parent_path = self.local_borrows[rname]
+                if parent_path:
+                    raise self.fail(
+                        "unsupported",
+                        "nested field reborrows beyond one record field level are not supported",
+                        target_node,
+                    )
+                if borrow_mode == "ref" and parent_mode != "ref":
+                    raise self.fail(
+                        "type",
+                        f"cannot take exclusive 'ref' borrow of field '{fname}' from shared 'in' borrow '{rname}' (exclusive-from-shared)",
+                        site_node,
+                    )
+                field_path = (fname,)
+            else:
+                owner_name = rname
+                field_path = (fname,)
+                if borrow_mode == "ref":
+                    if rname in self.readonly_in_params:
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of field '{fname}' on read-only 'in' parameter '{rname}'",
+                            site_node,
+                        )
+                    if rname in self.frozen_collections:
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of field '{fname}' on frozen collection '{rname}'",
+                            site_node,
+                        )
+                    if rname not in self.mutable_locals:
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of field '{fname}' on immutable record '{rname}'; declare it with 'var' or 'ref'",
+                            site_node,
+                        )
+            rec_ty = self.whnf(environment[owner_name].type)
+            head, _ = self.spine(rec_ty)
+            if head.kind != "const" or not isinstance(head.value, str) or head.value not in self.records_by_type:
+                raise self.fail("type", f"cannot borrow field '{fname}' from non-record '{owner_name}'", target_node)
+            record_info = self.records_by_type[head.value]
+            field_index = next(
+                (idx for idx, rf in enumerate(record_info.fields) if rf.name == fname),
+                None,
+            )
+            if field_index is None:
+                raise self.fail("name", f"record '{record_info.name}' has no field '{fname}'", target_node)
+            rf = record_info.fields[field_index]
+            if borrow_mode == "ref":
+                if cast("int", rf.var.value) in self.constant_parameters or rf.readonly_span:
+                    raise self.fail("type", f"cannot take exclusive 'ref' borrow of constant or read-only field '{fname}'", target_node)
+                for later_rf in record_info.fields[field_index + 1:]:
+                    if cast("int", rf.var.value) in self.free(later_rf.type):
+                        raise self.fail(
+                            "type",
+                            f"cannot take exclusive 'ref' borrow of field '{fname}' because later field '{later_rf.name}' depends on it",
+                            target_node,
+                        )
+        else:
+            raise self.fail("type", f"'{borrow_mode}' borrow requires a variable or record field place", target_node)
+        projected = self._project_borrow_binding(owner_name, field_path, environment, target_node)
+        if not self._is_supported_loan_type(projected.type):
+            raise self.fail("unsupported", f"loan modifier '{borrow_mode}' is not supported on this type", site_node)
+        return owner_name, field_path, projected
+
     def local(self: _Elaborator, node: Node, environment: dict[str, _Binding]) -> dict[str, _Binding]:
         self.site = node
         if node["kind"] in {"let_pattern", "var_pattern"}:
@@ -442,6 +604,7 @@ class _PatternsMixin:
             for bname in bound_names:
                 if bname in self.frozen_collections:
                     raise self.fail("type", f"cannot rebind collection '{bname}' while iterating over it", node)
+                self.local_borrows.pop(bname, None)
                 if node["kind"] == "var_pattern":
                     self.mutable_locals.add(bname)
                 else:
@@ -453,6 +616,50 @@ class _PatternsMixin:
             raise self.fail("unsupported", "only local let/var name bindings are supported")
         else:
             self.no_roles(node, "grade")
+            value_node = self._unwrap_group(self.node(node["value"]))
+            type_mod: str | None = None
+            if node["type"] is not None:
+                tnode = self.node(node["type"])
+                if tnode["kind"] == "modified_type" and tnode.get("modifier") in {"in", "ref"}:
+                    type_mod = cast("str", tnode["modifier"])
+            expr_mod: str | None = None
+            borrow_target_node = value_node
+            if (
+                value_node["kind"] == "unary"
+                and isinstance(value_node.get("operator"), dict)
+                and cast("Node", value_node["operator"]).get("text") in {"in", "ref"}
+            ):
+                expr_mod = cast("str", cast("Node", value_node["operator"])["text"])
+                borrow_target_node = self._unwrap_group(self.node(value_node["value"]))
+            if type_mod is not None and expr_mod is not None and type_mod != expr_mod:
+                raise self.fail(
+                    "type",
+                    f"local borrow modifier '{type_mod}' does not match initializer '{expr_mod}'",
+                    node,
+                )
+            borrow_mode = expr_mod or type_mod
+            if borrow_mode is not None:
+                owner_name, field_path, binding = self._resolve_local_borrow_target(
+                    borrow_mode, borrow_target_node, environment, node
+                )
+                if node["type"] is not None:
+                    value_type = self.type(self.node(node["type"]), environment)
+                    self.site = node
+                    self.unify(binding.type, value_type)
+                    binding = _Binding(binding.term, value_type)
+                extended = dict(environment)
+                self._consume_call_updates(extended, node)
+                bname = self.name(node["name"])
+                if bname in self.frozen_collections:
+                    raise self.fail("type", f"cannot rebind collection '{bname}' while iterating over it", node)
+                self.local_borrows[bname] = (borrow_mode, owner_name, field_path)
+                if borrow_mode == "ref":
+                    self.mutable_locals.add(bname)
+                else:
+                    self.mutable_locals.discard(bname)
+                self.slice_views.pop(bname, None)
+                self.bind_local(extended, bname, binding)
+                return extended
             if node["type"] is None:
                 binding = self.expression(self.node(node["value"]), environment)
             else:
@@ -463,6 +670,7 @@ class _PatternsMixin:
         bname = self.name(node["name"])
         if bname in self.frozen_collections:
             raise self.fail("type", f"cannot rebind collection '{bname}' while iterating over it", node)
+        self.local_borrows.pop(bname, None)
         if node["kind"] == "var":
             self.mutable_locals.add(bname)
         else:

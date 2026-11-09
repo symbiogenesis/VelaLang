@@ -959,8 +959,17 @@ class _IntrinsicsMixin:
     def _elaborate_unary(
         self: _Elaborator, node: Node, environment: dict[str, _Binding], *, expected_int: _Term | None = None
     ) -> _Binding:
+        if isinstance(node["operator"], dict) and node["operator"].get("text") == "in":
+            _, _, projected = self._resolve_local_borrow_target(
+                "in", self.node(node["value"]), environment, node
+            )
+            return projected
         if isinstance(node["operator"], dict) and node["operator"].get("text") == "ref":
-            raise self.fail("type", "ref argument is only supported as the target of Format.Write", node)
+            raise self.fail(
+                "type",
+                "exclusive 'ref' borrow cannot escape as a value expression; ref argument is only supported as the target of Format.Write or a mutable call target (exclusive-loan-escape)",
+                node,
+            )
         operator = self.operator(node["operator"])
         operand_node = self.node(node["value"])
         if operator == "!":
@@ -1818,7 +1827,12 @@ class _IntrinsicsMixin:
                 return self.instantiate(self.records[name].ctor_binding, environment)
             if kind == "name" and name not in environment and name in self.union_ctors and not self.union_ctors[name][1].fields:
                 return self.apply(self.lookup(name, environment), [], environment)
-            return self.lookup(name, environment)
+            found = self.lookup(name, environment)
+            if kind == "name" and name in environment and name in self.local_borrows:
+                _mode, owner_name, field_path = self.local_borrows[name]
+                if owner_name in environment:
+                    return self._project_borrow_binding(owner_name, field_path, environment, node)
+            return found
         if kind == "group":
             return self.expression(self.node(node["value"]), environment)
         if kind == "type_expression":

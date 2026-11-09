@@ -179,6 +179,8 @@ class _Elaborator(
         self.in_executable_function: bool = False
         self.slice_views: dict[str, str] = {}
         self.restored_view_terms: set[_Term] = set()
+        self.local_borrows: dict[str, tuple[str, str, tuple[str, ...]]] = {}
+        self.readonly_in_params: set[str] = set()
         self.output: list[str] = []
         self.site: Node | None = None
         self._builtins()
@@ -1481,6 +1483,8 @@ class _Elaborator(
             if node["name"] is not None:
                 name = self.name(node["name"])
                 self.parameter_names[cast("int", variable.value)] = name
+                if is_readonly_span:
+                    self.readonly_in_params.add(name)
                 if is_ref_param or is_out_param:
                     self.mutable_locals.add(name)
                 if is_out_param:
@@ -1494,6 +1498,24 @@ class _Elaborator(
             self.nullary_parameters.add(cast("int", variable.value))
             variables.append(variable)
         return variables, extended
+
+    def _is_supported_loan_type(self, ty: _Term) -> bool:
+        inner_w = self.whnf(ty)
+        inner_head, inner_args = self.spine(inner_w)
+        return (
+            inner_w == _BOOL
+            or self._int_spec(inner_w) is not None
+            or (inner_head == _constant("Span") and len(inner_args) == 1 and self.whnf(inner_args[0]) == _U8)
+            or (inner_head == _constant("Slots") and len(inner_args) == 2)
+            or (inner_head == _constant("Vec") and len(inner_args) == 2)
+            or (inner_head == _constant("Seq") and len(inner_args) == 1)
+            or (inner_head == _constant("TextBuilder") and len(inner_args) == 1)
+            or (
+                inner_head.kind == "const"
+                and isinstance(inner_head.value, str)
+                and inner_head.value in self.records_by_type
+            )
+        )
 
     def wrap(self, kind: str, variables: list[_Term], result: _Term) -> _Term:
         for variable in reversed(variables):
@@ -1608,24 +1630,10 @@ class _Elaborator(
                 result = inner_type
             elif modifier in {"in", "ref"}:
                 inner_type = self.type(self.node(node["type"]), environment, require_sort=require_sort)
-                inner_w = self.whnf(inner_type)
-                inner_head, inner_args = self.spine(inner_w)
-                supported_loan = (
-                    (inner_head == _constant("Span") and len(inner_args) == 1 and self.whnf(inner_args[0]) == _U8)
-                    or (inner_head == _constant("Slots") and len(inner_args) == 2)
-                    or (inner_head == _constant("Vec") and len(inner_args) == 2)
-                    or (inner_head == _constant("Seq") and len(inner_args) == 1)
-                    or (inner_head == _constant("TextBuilder") and len(inner_args) == 1)
-                    or (
-                        inner_head.kind == "const"
-                        and isinstance(inner_head.value, str)
-                        and inner_head.value in self.records_by_type
-                    )
-                )
-                if not supported_loan:
+                if not self._is_supported_loan_type(inner_type):
                     raise self.fail(
                         "unsupported",
-                        f"modifier '{modifier}' is only supported on Span<byte>, Slots<T, capacity>, Vec<T, n>, Seq<T>, TextBuilder<capacity> or record types in the first-slice carrier",
+                        f"modifier '{modifier}' is only supported on fixed-width integers, bool, Span<byte>, Slots<T, capacity>, Vec<T, n>, Seq<T>, TextBuilder<capacity> or record types in the first-slice carrier",
                         node,
                     )
                 result = inner_type

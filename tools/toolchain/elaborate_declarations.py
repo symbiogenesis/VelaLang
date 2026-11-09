@@ -3,6 +3,7 @@
 
 from typing import TYPE_CHECKING, cast
 
+from toolchain import loans
 from toolchain.ast import VelaError
 from toolchain.elaborate_types import (
     _BOOL,
@@ -574,6 +575,8 @@ class _DeclarationsMixin:
                 rp_type = self.substitute(rp.type, cast("int", rp.self_var.value), self_var)
                 base_env[pname] = _Binding(_apps(_constant(rp.prop_const), *generic_vars, self_var), rp_type)
         self.mutable_locals = set()
+        self.local_borrows.clear()
+        self.readonly_in_params.clear()
         self.final_return_facts = []
         m_vars, method_env = self.telescope(m_generics, m_params, base_env, unit=True)
         m_gen_vars = m_vars[:len(m_generics)]
@@ -627,6 +630,7 @@ class _DeclarationsMixin:
         self.active_facts.extend(entry_body_facts)
         try:
             body_term = self.check(body_node, result_ty, method_env)
+            self._check_callable_loans(member_node, enclosing_type=name)
         finally:
             self.active_facts = saved_body_facts
             self.current_return_type = prev_ret
@@ -1205,6 +1209,8 @@ class _DeclarationsMixin:
             for mnode in member_nodes:
                 self.site = mnode
                 self.mutable_locals.clear()
+                self.local_borrows.clear()
+                self.readonly_in_params.clear()
                 self.out_param_names.clear()
                 self.uninitialized_out_params.clear()
                 mkind = mnode["kind"]
@@ -1406,6 +1412,8 @@ class _DeclarationsMixin:
             self.active_interface_witnesses.pop(active_key, None)
             self.active_interface_ensures.pop(active_key, None)
             self.mutable_locals.clear()
+            self.local_borrows.clear()
+            self.readonly_in_params.clear()
             self.out_param_names.clear()
             self.uninitialized_out_params.clear()
         for index in range(first_meta, len(self.metas)):
@@ -1596,6 +1604,8 @@ class _DeclarationsMixin:
                 self.reset_budget()
                 m_first_meta = len(self.metas)
                 self.mutable_locals.clear()
+                self.local_borrows.clear()
+                self.readonly_in_params.clear()
                 self.out_param_names.clear()
                 self.uninitialized_out_params.clear()
                 self.entry_env = {}
@@ -1741,6 +1751,7 @@ class _DeclarationsMixin:
                                 self._check_record_invariants(
                                     rinfo, fin_targs, fin_b.term, self.final_ref_bindings, body_node
                                 )
+                    self._check_callable_loans(mnode)
                 finally:
                     self.active_facts = saved_body_f
                     self.current_return_type = prev_ret
@@ -1855,6 +1866,8 @@ class _DeclarationsMixin:
                 self.reset_budget()
                 l_first_meta = len(self.metas)
                 self.mutable_locals.clear()
+                self.local_borrows.clear()
+                self.readonly_in_params.clear()
                 self.out_param_names.clear()
                 self.uninitialized_out_params.clear()
                 if lnode["body"] is None:
@@ -1984,6 +1997,8 @@ class _DeclarationsMixin:
                 self.active_interface_witnesses.pop(wk, None)
                 self.active_interface_ensures.pop(wk, None)
             self.mutable_locals.clear()
+            self.local_borrows.clear()
+            self.readonly_in_params.clear()
             self.out_param_names.clear()
             self.uninitialized_out_params.clear()
 
@@ -2106,6 +2121,113 @@ class _DeclarationsMixin:
             else:
                 witness_terms.append(_term("unit"))
         return witness_terms
+
+    def _check_callable_loans(
+        self: _Elaborator, fn_node: Node, enclosing_type: str | None = None
+    ) -> None:
+        structs: dict[str, loans._StructInfo] = {}
+        for rname, rinfo in self.records.items():
+            fpaths = tuple((rf.name,) for rf in rinfo.fields)
+            invs = tuple(
+                inv.name for inv in rinfo.invariants if not inv.name.startswith("__anon_")
+            )
+            sinfo = loans._StructInfo(fpaths, {}, invs)
+            structs[rname] = sinfo
+            short_name = rname.split("_")[-1]
+            if short_name not in structs:
+                structs[short_name] = sinfo
+        fn_name = self.name(fn_node["name"])
+        lowered = loans._FunctionLowerer(fn_name, fn_node, enclosing_type, structs).build()
+        report = loans.analyze(lowered.owners, lowered.graph)
+        for path in report.paths:
+            for issue in path.issues:
+                site = lowered.node_sites.get(issue.node, fn_node)
+                res = issue.resources
+                if issue.kind == "suspended-parent":
+                    loan_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot access or mutate owner while loan '{loan_id}' is still live (suspended-parent)",
+                        site,
+                    )
+                if issue.kind == "conflicting-access":
+                    loan_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"access conflicts with active loan '{loan_id}' (conflicting-access)",
+                        site,
+                    )
+                if issue.kind == "competing-loans":
+                    new_l = res[0] if res else ""
+                    old_l = res[1] if len(res) > 1 else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot borrow '{new_l}' because it conflicts with active loan '{old_l}' (competing-loans)",
+                        site,
+                    )
+                if issue.kind == "exclusive-from-shared":
+                    new_l = res[0] if res else ""
+                    parent_l = res[1] if len(res) > 1 else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot take exclusive 'ref' borrow '{new_l}' from shared 'in' borrow '{parent_l}' (exclusive-from-shared)",
+                        site,
+                    )
+                if issue.kind == "write-through-shared":
+                    loan_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot mutate through shared 'in' borrow '{loan_id}' (write-through-shared)",
+                        site,
+                    )
+                if issue.kind == "local-loan-escape":
+                    loan_id = res[0] if res else ""
+                    owner_id = res[1] if len(res) > 1 else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot return loan '{loan_id}' borrowed from local variable '{owner_id}' (local-loan-escape)",
+                        site,
+                    )
+                if issue.kind == "exclusive-loan-escape":
+                    loan_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot return exclusive 'ref' loan '{loan_id}' (exclusive-loan-escape)",
+                        site,
+                    )
+                if issue.kind == "scoped-loan-escape":
+                    loan_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot allow scoped loan '{loan_id}' to escape its scope (scoped-loan-escape)",
+                        site,
+                    )
+                if issue.kind == "use-after-owner-move":
+                    owner_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot use or borrow '{owner_id}' after it was moved (use-after-owner-move)",
+                        site,
+                    )
+                if issue.kind == "open-invariant-whole-receiver":
+                    owner_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot access whole record '{owner_id}' while an invariant clause is lifted (open-invariant-whole-receiver)",
+                        site,
+                    )
+                if issue.kind == "unclosed-invariant":
+                    owner_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"lifted invariant on '{owner_id}' is not closed on all exit paths (unclosed-invariant)",
+                        site,
+                    )
+                raise self.fail(
+                    "type",
+                    f"loan analysis rejected callable '{fn_name}': {issue.kind} ({', '.join(res)})",
+                    site,
+                )
 
     def declaration(self: _Elaborator, node: Node) -> None:
         self.site = node
@@ -2552,6 +2674,7 @@ class _DeclarationsMixin:
                                     self._check_record_invariants(
                                         rinfo, fin_targs, fin_b.term, self.final_ref_bindings, body_node
                                     )
+                        self._check_callable_loans(node)
                 finally:
                     self.in_executable_function = False
                     self.active_facts = saved_body_facts
