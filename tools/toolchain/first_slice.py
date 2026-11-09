@@ -406,6 +406,19 @@ def _artifacts(directory: Path) -> dict[str, str]:
     return dict(sorted(files.items()))
 
 
+def _reported_outputs(report: dict[str, object]) -> dict[str, str]:
+    """Recheck the producer's explicit source and generated-output identities."""
+    outputs: dict[str, str] = {}
+    for field in ("source", "gallina", "lowered_c"):
+        name, digest = report.get(field), report.get(f"{field}_sha256")
+        if not isinstance(name, str) or not isinstance(digest, str):
+            raise TypeError(f"first-slice {field} identity is missing or malformed")
+        _require(_sha256(Path(name).read_bytes()) == digest,
+                 f"first-slice {field} changed after its producer observation")
+        outputs[name] = digest
+    return outputs
+
+
 def _write(path: Path, payload: object) -> None:
     with atomic_path(path) as pending:
         pending.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -1774,6 +1787,8 @@ def qualify(root: Path, *, ccomp_path: Path | None = None) -> dict[str, object]:
                             "parser_outputs": outputs})
             _write(directory / "attempt.json", attempt)
             attempt.update(_qualify_attempt(root, directory, steps, ccomp_path, compiled))
+            reported_outputs = _reported_outputs(attempt)
+            produced_outputs = _artifacts(directory)
             _require(_inputs(root) == inputs and _revision(root) == revision
                      and replay._toolchain(root, directory, steps) == tools
                      and replay._runtime(directory, steps) == runtime
@@ -1783,7 +1798,11 @@ def qualify(root: Path, *, ccomp_path: Path | None = None) -> dict[str, object]:
                      and vela_parser._toolchain(root) == parser_receipt["toolchain"],
                      "first-slice parser identity changed during qualification")
             replay._observations([], steps)
-            attempt["artifacts_sha256"] = _artifacts(directory)
+            final_outputs = _artifacts(directory)
+            _require(_reported_outputs(attempt) == reported_outputs
+                     and all(final_outputs.get(name) == digest for name, digest in produced_outputs.items()),
+                     "first-slice outputs changed during final identity checks")
+            attempt["artifacts_sha256"] = final_outputs
         except Exception as error:
             attempt.update({
                 "status": "failed",
