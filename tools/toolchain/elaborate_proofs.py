@@ -72,7 +72,7 @@ class _ProofsMixin:
         except VelaError as error:
             if error.kind != "type":
                 raise
-            self.metas = saved
+            self.restore_metas(saved)
             return False
         else:
             return True
@@ -98,7 +98,7 @@ class _ProofsMixin:
             saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
             if all(self._match_meta_pattern(pa, ta) for pa, ta in zip(p.args, t.args, strict=True)):
                 return True
-            self.metas = saved
+            self.restore_metas(saved)
         return self._try_unify(p, t)
 
     def _is_prop_type(self: _Elaborator, value_type: _Term) -> bool:
@@ -168,7 +168,7 @@ class _ProofsMixin:
         saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
         if not (self._try_unify(self.infer(goal_type), _SORT)
                 and self._try_unify(self.infer(eq_type), _SORT)):
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         z = self.fresh(eq_type)
         z_id = cast("int", z.value)
@@ -228,10 +228,10 @@ class _ProofsMixin:
         if replaced and ctx is not None and ctx != z:
             fn = _term("lam", eq_type, ctx, value=z.value)
             return _apps(_constant("Congr"), eq_type, goal_type, u, v, fn, proof_term)
-        self.metas = [_Meta(m.type, m.scope, m.solution) for m in saved]
+        self.restore_metas([_Meta(m.type, m.scope, m.solution) for m in saved])
         if not (self._try_unify(self.infer(goal_type), _SORT)
                 and self._try_unify(self.infer(eq_type), _SORT)):
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         ctx_l, rep_l = (
             self._replace_subterm(lhs, eq_type, u, z) if u.kind != "bool" else (lhs, False)
@@ -239,10 +239,10 @@ class _ProofsMixin:
         if rep_l and ctx_l != z and self._try_unify(self.substitute(ctx_l, z_id, v), rhs):
             fn = _term("lam", eq_type, ctx_l, value=z.value)
             return _apps(_constant("Congr"), eq_type, goal_type, u, v, fn, proof_term)
-        self.metas = [_Meta(m.type, m.scope, m.solution) for m in saved]
+        self.restore_metas([_Meta(m.type, m.scope, m.solution) for m in saved])
         if not (self._try_unify(self.infer(goal_type), _SORT)
                 and self._try_unify(self.infer(eq_type), _SORT)):
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         ctx_r, rep_r = (
             self._replace_subterm(rhs, eq_type, v, z) if v.kind != "bool" else (rhs, False)
@@ -250,7 +250,7 @@ class _ProofsMixin:
         if rep_r and ctx_r != z and self._try_unify(self.substitute(ctx_r, z_id, u), lhs):
             fn = _term("lam", eq_type, ctx_r, value=z.value)
             return _apps(_constant("Congr"), eq_type, goal_type, u, v, fn, proof_term)
-        self.metas = saved
+        self.restore_metas(saved)
         return None
 
     def _try_congruence_trans(
@@ -269,7 +269,7 @@ class _ProofsMixin:
         saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
         if not (self._try_unify(self.infer(goal_type), _SORT)
                 and self._try_unify(self.infer(eq_type), _SORT)):
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         z = self.fresh(eq_type)
         z_id = cast("int", z.value)
@@ -282,14 +282,14 @@ class _ProofsMixin:
                 step_saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                 if self._try_unify(eu, mid) and self._try_unify(ev, rhs):
                     return _apps(_constant("Trans"), goal_type, lhs, mid, rhs, congr_p, ep)
-                self.metas = step_saved
+                self.restore_metas(step_saved)
                 congr2 = self._try_congruence(goal_type, mid, rhs, goal_type, eu, ev, ep)
                 if congr2 is not None:
                     return _apps(_constant("Trans"), goal_type, lhs, mid, rhs, congr_p, congr2)
-        self.metas = [_Meta(m.type, m.scope, m.solution) for m in saved]
+        self.restore_metas([_Meta(m.type, m.scope, m.solution) for m in saved])
         if not (self._try_unify(self.infer(goal_type), _SORT)
                 and self._try_unify(self.infer(eq_type), _SORT)):
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         ctx_r, rep_r = self._replace_subterm(rhs, eq_type, v, z)
         if rep_r and ctx_r != z:
@@ -300,11 +300,11 @@ class _ProofsMixin:
                 step_saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                 if self._try_unify(eu, lhs) and self._try_unify(ev, mid):
                     return _apps(_constant("Trans"), goal_type, lhs, mid, rhs, ep, congr_p)
-                self.metas = step_saved
+                self.restore_metas(step_saved)
                 congr1 = self._try_congruence(goal_type, lhs, mid, goal_type, eu, ev, ep)
                 if congr1 is not None:
                     return _apps(_constant("Trans"), goal_type, lhs, mid, rhs, congr1, congr_p)
-        self.metas = saved
+        self.restore_metas(saved)
         return None
 
     def _equality_edges(
@@ -334,11 +334,11 @@ class _ProofsMixin:
         for fact in sequence:
             extracted = self._extract_equality(fact.type)
             if extracted is None:
-                self.metas = saved
+                self.restore_metas(saved)
                 return None
             eq_type, u, v = extracted
             if not self._try_unify(eq_type, goal_type):
-                self.metas = saved
+                self.restore_metas(saved)
                 return None
             if u == current:
                 steps.append((u, v, fact.term))
@@ -381,10 +381,10 @@ class _ProofsMixin:
                     steps.append(congr)
                     current = congr[1]
                 else:
-                    self.metas = saved
+                    self.restore_metas(saved)
                     return None
         if current != rhs and not self._try_unify(current, rhs):
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         acc_u, acc_v, acc_term = steps[0]
         for _, next_v, next_term in steps[1:]:
@@ -896,7 +896,7 @@ class _ProofsMixin:
                         )
                         return _apps(_constant("vela_and_intro"), lhs_args[0], lhs_args[1], pa, pb)
                     except VelaError:
-                        self.metas = saved_and
+                        self.restore_metas(saved_and)
                         if allow_refl:
                             raise
                 cmp_head, cmp_args = self.spine(lhs_r)
@@ -931,7 +931,7 @@ class _ProofsMixin:
                             )
                             return _apps(_constant("vela_int_eq_of_eq"), tag, cmp_args[0], cmp_args[1], p_eq)
                         except VelaError:
-                            self.metas = saved_ieq
+                            self.restore_metas(saved_ieq)
                 if cmp_head in {_constant("eq_bool"), _constant("<==>")} and len(cmp_args) == 2:
                     if allow_refl and self._try_unify(cmp_args[0], cmp_args[1]):
                         return _app(_constant("vela_eq_bool_refl"), cmp_args[0])
@@ -948,7 +948,7 @@ class _ProofsMixin:
                         )
                         return _apps(_constant("vela_eq_bool_of_eq"), cmp_args[0], cmp_args[1], p_beq)
                     except VelaError:
-                        self.metas = saved_beq
+                        self.restore_metas(saved_beq)
                 if allow_refl and cmp_head == _constant(">") and len(cmp_args) == 2:
                     gt_l_w = self.whnf(cmp_args[0])
                     gt_r_w = self.whnf(cmp_args[1])
@@ -1062,11 +1062,11 @@ class _ProofsMixin:
                 saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                 if self._try_unify(u, lhs) and self._try_unify(v, rhs):
                     return p
-                self.metas = saved
+                self.restore_metas(saved)
             for i1, u1, v1, p1 in edges:
                 saved1 = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                 if not self._try_unify(u1, lhs):
-                    self.metas = saved1
+                    self.restore_metas(saved1)
                     continue
                 for i2, u2, v2, p2 in edges:
                     if i1 == i2:
@@ -1074,8 +1074,8 @@ class _ProofsMixin:
                     saved2 = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                     if self._try_unify(v1, u2) and self._try_unify(v2, rhs):
                         return _apps(_constant("Trans"), goal_type, lhs, v1, rhs, p1, p2)
-                    self.metas = saved2
-                self.metas = saved1
+                    self.restore_metas(saved2)
+                self.restore_metas(saved1)
             if allow_refl and self._try_unify(lhs, rhs):
                 return _apps(_constant("Refl"), goal_type, lhs)
             if allow_refl:
@@ -1119,10 +1119,10 @@ class _ProofsMixin:
         try:
             self.unify(a, b)
         except VelaError:
-            self.metas = saved
+            self.restore_metas(saved)
             return False
         else:
-            self.metas = saved
+            self.restore_metas(saved)
             return True
 
     def _find_if_condition(self: _Elaborator, term: _Term, depth: int = 0) -> _Term | None:
@@ -1318,7 +1318,7 @@ class _ProofsMixin:
                 split_depth=split_depth + 1,
             )
         except VelaError:
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         finally:
             for _ in true_bool_facts:
@@ -1336,7 +1336,7 @@ class _ProofsMixin:
                 split_depth=split_depth + 1,
             )
         except VelaError:
-            self.metas = saved
+            self.restore_metas(saved)
             return None
         finally:
             for _ in false_bool_facts:
@@ -1361,7 +1361,7 @@ class _ProofsMixin:
         saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
         if self._try_unify(lhs, rhs):
             return _apps(_constant("Refl"), goal_type, self.whnf(rhs))
-        self.metas = saved
+        self.restore_metas(saved)
         lhs_is_branch = self.whnf(lhs).kind in {"if", "sum_match", "pair_match"}
         rhs_is_branch = self.whnf(rhs).kind in {"if", "sum_match", "pair_match"}
         if rhs_is_branch and not lhs_is_branch:
@@ -1526,7 +1526,7 @@ class _ProofsMixin:
                     and self._try_unify(v, lhs)
                     and self._try_unify(u, rhs)):
                 return _apps(_constant("Symm"), goal_type, u, v, justification.term)
-            self.metas = saved
+            self.restore_metas(saved)
             edges = self._equality_edges(goal_type, facts)
             ct = self._try_congruence_trans(goal_type, lhs, rhs, eq_type, u, v, justification.term, edges)
             if ct is not None:
@@ -1674,7 +1674,7 @@ class _ProofsMixin:
             try:
                 term = self._prove_proposition(goal, environment, facts, node)
             except VelaError:
-                self.metas = saved_prove_m
+                self.restore_metas(saved_prove_m)
                 has_span_env = self.in_post_env_theorem or any(
                     self.spine(self.whnf(b.type))[0] == _constant("Span") for b in environment.values()
                 )
@@ -1816,7 +1816,7 @@ class _ProofsMixin:
                     lam_k = self.substitute(lam_k, prev_var_id, prev_val)
                 acc_proof = _term("ex_intro", dom_k, lam_k, self.resolve(wm_k), acc_proof)
             return acc_proof
-        self.metas = saved_ex
+        self.restore_metas(saved_ex)
         return None
 
     def _normalize_if_cond(self: _Elaborator, raw_cond: _Term) -> _Term:

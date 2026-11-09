@@ -462,11 +462,11 @@ class _DeclarationsMixin:
                 if inv_w == _BOOL or self._is_prop_type(inv_w):
                     inv_term, inv_type = inv_b.term, inv_w
                 else:
-                    self.metas = saved_inv_metas
+                    self.restore_metas(saved_inv_metas)
                     inv_term = self.proposition(val_node, inv_env)
                     inv_type = _PROP
             except VelaError:
-                self.metas = saved_inv_metas
+                self.restore_metas(saved_inv_metas)
                 inv_term = self.proposition(val_node, inv_env)
                 inv_type = _PROP
             self.site = c_node
@@ -604,7 +604,7 @@ class _DeclarationsMixin:
                 try:
                     req_val = self.expression(req_val_node, method_env)
                 except VelaError:
-                    self.metas = saved_req_metas
+                    self.restore_metas(saved_req_metas)
                     req_val = None
             if req_val is not None and self.whnf(req_val.type) == _BOOL:
                 req_bool_terms.append(req_val.term)
@@ -613,7 +613,7 @@ class _DeclarationsMixin:
                 req_vars.append(req_var)
                 method_env[f"__vela_req_{req_idx}"] = _Binding(req_var, eq_prop)
             else:
-                self.metas = saved_req_metas
+                self.restore_metas(saved_req_metas)
                 req_prop = self.proposition(req_val_node, method_env)
                 req_var = self.fresh(req_prop)
                 req_vars.append(req_var)
@@ -1482,7 +1482,7 @@ class _DeclarationsMixin:
                 self._try_unify(t1, t2) for t1, t2 in zip(inst_first, inst_second, strict=True)
             )
         finally:
-            self.metas = saved_metas
+            self.restore_metas(saved_metas)
 
     def _impl_declaration(self: _Elaborator, node: Node, _first_meta: int) -> None:
         modifiers = node["modifiers"]
@@ -2030,7 +2030,7 @@ class _DeclarationsMixin:
                 saved_metas = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                 if all(self._try_unify(a, b) for a, b in zip(act_t_args, inst_t_args, strict=True)):
                     return w_dict, self.active_interface_ensures.get((act_iface, act_t_args), {})
-                self.metas = saved_metas
+                self.restore_metas(saved_metas)
 
         iface = self.interfaces[iface_name]
         for impl_inst in self.impls.get(iface_name, []):
@@ -2095,7 +2095,7 @@ class _DeclarationsMixin:
                         )
                         res_ensures[mname] = (rem_m_ids, tuple(inst_ens))
                 return res_methods, res_ensures
-            self.metas = saved_metas
+            self.restore_metas(saved_metas)
 
         raise self.fail(
             "type",
@@ -2717,7 +2717,7 @@ class _DeclarationsMixin:
                             try:
                                 req_val = self.expression(req_val_node, environment)
                             except VelaError:
-                                self.metas = saved_req_metas
+                                self.restore_metas(saved_req_metas)
                                 req_val = None
                         if req_val is not None and self.whnf(req_val.type) == _BOOL:
                             req_bool_terms.append(req_val.term)
@@ -2726,7 +2726,7 @@ class _DeclarationsMixin:
                             req_vars.append(req_var)
                             environment[f"__vela_req_{req_idx}"] = _Binding(req_var, eq_prop)
                         else:
-                            self.metas = saved_req_metas
+                            self.restore_metas(saved_req_metas)
                             req_prop = self.proposition(req_val_node, environment)
                             req_var = self.fresh(req_prop)
                             req_vars.append(req_var)
@@ -2755,7 +2755,7 @@ class _DeclarationsMixin:
                         try:
                             result = self.proposition(self.node(ensures_clauses[0]["value"]), environment)
                         except VelaError as err:
-                            self.metas = saved_ens_m
+                            self.restore_metas(saved_ens_m)
                             if err.kind == "name":
                                 is_post_env_theorem = True
                                 result = _apps(_constant("Eq"), _BOOL, _term("bool", value=1), _term("bool", value=1))
@@ -2876,7 +2876,7 @@ class _DeclarationsMixin:
                                         include_env=False,
                                     )
                                 except VelaError:
-                                    self.metas = saved_ens_p
+                                    self.restore_metas(saved_ens_p)
                                 self.reset_budget()
                                 post_env_obligations.append((ens_prop, ens_proof, ens_contract))
                         finally:
@@ -3336,7 +3336,7 @@ class _DeclarationsMixin:
                                     )
                                 )
                         except VelaError:
-                            self.metas = saved_sym_m
+                            self.restore_metas(saved_sym_m)
                 finally:
                     self.post_env = {}
                     self.active_facts = saved_post_facts
@@ -3654,7 +3654,7 @@ class _DeclarationsMixin:
             saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
             if self._try_unify(fact.type, ens_prop):
                 return True
-            self.metas = saved
+            self.restore_metas(saved)
             f_ext = self._extract_equality(fact.type)
             if f_ext is not None:
                 f_ty, f_u, f_v = f_ext
@@ -3689,7 +3689,7 @@ class _DeclarationsMixin:
                             self._try_unify(a1, b2) and self._try_unify(a2, b1)
                         ):
                             return True
-                        self.metas = saved
+                        self.restore_metas(saved)
             return False
 
         def match_bool_conjunct(conj: _Term) -> bool:
@@ -3697,7 +3697,7 @@ class _DeclarationsMixin:
                 saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                 if self._try_unify(conj, bc):
                     return True
-                self.metas = saved
+                self.restore_metas(saved)
             c_w = self.whnf(conj)
             c_h, c_args = self.spine(c_w)
             return (
@@ -3755,5 +3755,5 @@ class _DeclarationsMixin:
             if self.whnf(expr_b.type) == _BOOL and self._prove_bool_precondition(expr_b.term, env):
                 return True
         except VelaError:
-            self.metas = saved_metas
+            self.restore_metas(saved_metas)
         return False

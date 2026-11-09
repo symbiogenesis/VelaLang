@@ -208,6 +208,14 @@ class _Elaborator(
         self.types[index] = value_type
         return _term("var", value=index)
 
+    def restore_metas(self, saved: list[_Meta]) -> None:
+        """Restore inference state without retaining reductions from abandoned solutions."""
+        self.metas = saved
+        self.whnf_cache.clear()
+        self.decl_first_meta = next(
+            (index for index, meta in enumerate(saved) if meta.solution is None), len(saved)
+        )
+
     def pi(self, domain: _Term, codomain: _Term, *, nullary: bool = False) -> _Term:
         variable = self.fresh(domain)
         if nullary:

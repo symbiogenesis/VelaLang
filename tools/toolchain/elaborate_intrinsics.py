@@ -1368,7 +1368,7 @@ class _IntrinsicsMixin:
                 if idx_head == _constant("Fin"):
                     self.unify(idx_b.type, _app(_constant("Fin"), len_t))
                     return _Binding(_apps(_constant("At"), elem_t, len_t, recv_b.term, idx_b.term), elem_t)
-                self.metas = saved_idx_m
+                self.restore_metas(saved_idx_m)
             idx_t = self._seq_nat_arg(idx_node, environment)
             in_bounds = _apps(_constant("<"), idx_t, len_t)
             if not self._prove_bool_precondition(in_bounds, environment):
@@ -2150,7 +2150,7 @@ class _IntrinsicsMixin:
                 try:
                     recv_for_method = self.expression(receiver, environment)
                 except Exception:
-                    self.metas = saved_recv_m
+                    self.restore_metas(saved_recv_m)
                 if recv_for_method is not None:
                     rm_head, rm_targs = self.spine(self.whnf(recv_for_method.type))
                     if (
@@ -2205,9 +2205,9 @@ class _IntrinsicsMixin:
                                     environment,
                                 )
                             except Exception:
-                                self.metas = saved_try_m
+                                self.restore_metas(saved_try_m)
                                 self.active_facts = saved_try_f
-                    self.metas = saved_recv_m
+                    self.restore_metas(saved_recv_m)
             if base_callee["kind"] == "name":
                 cname = self.name(base_callee["name"])
                 if (
@@ -2302,7 +2302,7 @@ class _IntrinsicsMixin:
                                     environment,
                                 )
                             except Exception:
-                                self.metas = saved_try_m
+                                self.restore_metas(saved_try_m)
                                 self.active_facts = saved_try_f
                 if (
                     cname in {"LivePrefix", "VacantRange", "VacantSuffix", "PrefixModel", "CopyRepresentation", "TransferType"}

@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from tests.harness import Case, ensure
 from toolchain import elaborate as language
+from toolchain import elaborate_types as terms
 from toolchain.ast import VelaError
 from toolchain.elaborate import elaborate, elaborate_package
 
@@ -6004,6 +6005,24 @@ def _consuming_ownership_general_loans_and_closed_effects() -> None:
     _refuses(missing_call_effect, "type", "not declared in effects calls(...)")
 
 
+def _speculative_normalization_rollback() -> None:
+    elaborator = language._Elaborator(language._Protocol(b""))
+    unknown = elaborator.meta(terms._NAT, {})
+    zero, one, two = (terms._term("nat", value=value) for value in range(3))
+    addition = terms._apps(terms._constant("+"), unknown, zero)
+    left = terms._term("pair", terms._NAT, terms._NAT, unknown, addition)
+    right = terms._term("pair", terms._NAT, terms._NAT, one, two)
+
+    ensure(not elaborator._try_unify(left, right), "accepted the inconsistent pair (x, x + 0) = (1, 2)")
+    ensure(elaborator.resolve(unknown) == unknown, "failed unification retained a speculative solution")
+    ensure(elaborator.whnf(addition) == addition, "rollback retained a reduction from an abandoned solution")
+
+    elaborator.unify(unknown, two)
+    ensure(elaborator.whnf(addition) == two, "the new solution did not replace speculative normalization")
+    ensure(not elaborator._try_unify(addition, one), "stale normalization established the false equality 2 + 0 = 1")
+    ensure(elaborator._try_unify(addition, two), "rollback prevented the true equality 2 + 0 = 2")
+
+
 def cases() -> list[Case]:
     return [Case("fresh-polymorphism-and-higher-order-inference", _polymorphism_and_higher_order),
             Case("familiar-generic-markers-and-mathematical-body-source-binding", _familiar_generic_spellings),
@@ -6022,6 +6041,7 @@ def cases() -> list[Case]:
             Case("predicative-universes-and-rigid-scope", _universes_and_scope),
             Case("occurs-and-unresolved-inference", _occurs_and_unresolved_inference),
             Case("definitional-reduction-without-arithmetic-assumptions", _definitional_conversion),
+            Case("speculative-normalization-rollback", _speculative_normalization_rollback),
             Case("products-and-concrete-dependent-lookup", _products_and_lookup_computation),
             Case("strict-surface-schema-and-source-binding", _strict_protocol),
             Case("malformed-role-containers", _malformed_role_containers),
