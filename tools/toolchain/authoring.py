@@ -212,13 +212,13 @@ def _render(parts: list[_Part]) -> bytes:
 
 def format_source(source: bytes) -> bytes:
     """Return checked canonical bytes without mutating source or filesystem state."""
-    vela.translate(source)
     original = vela.parse_module(source)
+    vela._translate(source, original)
     parts = _parts(source)
     result = _render(parts)
     # Checking the candidate also enforces its expanded byte and syntax bounds.
-    vela.translate(result)
     candidate = vela.parse_module(result)
+    vela._translate(result, candidate)
     rendered = _parts(result)
     if _fingerprint(parts) != _fingerprint(rendered) or _shape(original) != _shape(candidate):
         raise syntax.VelaError("format", 1, 1, "formatting changed tokens, comments or syntax")

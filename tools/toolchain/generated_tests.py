@@ -79,13 +79,9 @@ class ObservationMismatchError(AssertionError):
 class OracleLine:
     """Independently computed scalar, UTF-8 byte, and UTF-16 line boundaries."""
 
-    start_cp: int
-    end_cp: int
-    start_byte: int
     end_byte: int
     content: str
     utf16_to_byte: dict[int, int]
-    byte_to_utf16: dict[int, int]
     utf16_width: int
 
 
@@ -158,26 +154,19 @@ class OracleTextModel:
     ) -> OracleLine:
         content = text[start_cp:end_cp]
         utf16_to_byte: dict[int, int] = {}
-        byte_to_utf16: dict[int, int] = {}
         utf16_pos = 0
         b_pos = start_byte
         for ch in content:
             utf16_to_byte[utf16_pos] = b_pos
-            byte_to_utf16[b_pos] = utf16_pos
             byte_to_pos[b_pos] = {"line": line_idx, "character": utf16_pos}
             utf16_pos += 1 if ord(ch) <= 0xFFFF else 2
             b_pos += len(ch.encode("utf-8"))
         utf16_to_byte[utf16_pos] = end_byte
-        byte_to_utf16[end_byte] = utf16_pos
         byte_to_pos[end_byte] = {"line": line_idx, "character": utf16_pos}
         return OracleLine(
-            start_cp=start_cp,
-            end_cp=end_cp,
-            start_byte=start_byte,
             end_byte=end_byte,
             content=content,
             utf16_to_byte=utf16_to_byte,
-            byte_to_utf16=byte_to_utf16,
             utf16_width=utf16_pos,
         )
 

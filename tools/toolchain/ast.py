@@ -202,8 +202,7 @@ def source_text(source: bytes) -> str:
 
 
 class _Decoder:
-    def __init__(self, source: bytes) -> None:
-        text = source_text(source)
+    def __init__(self, source: bytes, text: str) -> None:
         self.source = source
         self.remaining = MAX_SOURCE_BYTES
         self.sites: dict[int, Site] = {}
@@ -279,15 +278,18 @@ class _Decoder:
             raise ValueError("native parser returned an invalid syntax list")
         return cast("list[object]", raw)
 
-    def _ordered(self, raw: list[object], parent: tuple[int, int]) -> None:
+    def _ordered(self, raw: list[object], parent: tuple[int, int]) -> list[tuple[int, int]]:
         previous = parent[0]
+        spans: list[tuple[int, int]] = []
         for item in raw:
             if not isinstance(item, dict):
                 raise TypeError("native parser returned a non-node list member")
             start, previous_end = self._span(item.get("span"), parent)
             if start < previous:
                 raise ValueError("native syntax list is overlapping or out of order")
+            spans.append((start, previous_end))
             previous = previous_end
+        return spans
 
     def _type(self, raw: object, parent: tuple[int, int], depth: int) -> ValueType:
         node, span, _ = self._node(raw, "type", {"name"}, parent, depth)
@@ -332,21 +334,14 @@ class _Decoder:
         if kind == "call":
             name = self._text(node["callee"], span)
             arguments = self._list(node["arguments"])
-            self._ordered([node["callee"], *arguments], span)
-            raw_callee = node["callee"]
-            if not isinstance(raw_callee, dict):
-                raise TypeError("native call has no callee")
-            callee_span = self._span(raw_callee.get("span"), span)
+            callee_span, *argument_spans = self._ordered([node["callee"], *arguments], span)
             if callee_span[0] != span[0]:
                 raise ValueError("native call leaves source callee tokens uncovered")
             cursor = trivia_end(self.source, callee_span[1])
             if self.source[cursor:cursor + 1] != b"(":
                 raise ValueError("native call differs from its source opening")
             cursor = trivia_end(self.source, cursor + 1)
-            for index, raw_argument in enumerate(arguments):
-                if not isinstance(raw_argument, dict):
-                    raise TypeError("native call has an invalid argument")
-                argument_span = self._span(raw_argument.get("span"), span)
+            for index, argument_span in enumerate(argument_spans):
                 if cursor != argument_span[0]:
                     raise ValueError("native call leaves source argument tokens uncovered")
                 cursor = trivia_end(self.source, argument_span[1])
@@ -398,23 +393,14 @@ class _Decoder:
         if kind == "unary":
             if operator.text != "!":
                 raise ValueError("native parser returned an unknown unary operator")
-            self._ordered([node["operator"], node["value"]], span)
-            if not isinstance(node["operator"], dict) or not isinstance(node["value"], dict):
-                raise TypeError("native unary operator has no located operand")
-            operator_span = self._span(node["operator"].get("span"), span)
-            value_span = self._span(node["value"].get("span"), span)
+            operator_span, value_span = self._ordered([node["operator"], node["value"]], span)
             if (operator_span[0] != span[0] or value_span[1] != span[1]
                     or trivia_end(self.source, operator_span[1]) != value_span[0]):
                 raise ValueError("native unary expression leaves source tokens uncovered")
             return expression(kind, operator.text, operator.site, (child(node["value"]),))
         if operator.text not in {"+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||"}:
             raise ValueError("native parser returned an unknown binary operator")
-        self._ordered([node["left"], node["operator"], node["right"]], span)
-        if not all(isinstance(node[field], dict) for field in ("left", "operator", "right")):
-            raise TypeError("native operator has no located operands")
-        left_span = self._span(cast("dict[str, object]", node["left"]).get("span"), span)
-        op_span = self._span(cast("dict[str, object]", node["operator"]).get("span"), span)
-        right_span = self._span(cast("dict[str, object]", node["right"]).get("span"), span)
+        left_span, op_span, right_span = self._ordered([node["left"], node["operator"], node["right"]], span)
         if (left_span[0] != span[0] or right_span[1] != span[1]
                 or trivia_end(self.source, left_span[1]) != op_span[0]
                 or trivia_end(self.source, op_span[1]) != right_span[0]):
@@ -423,24 +409,13 @@ class _Decoder:
 
     def _constant(self, raw: object, kind: str, parent: tuple[int, int], depth: int) -> Constant:
         node, span, site = self._node(raw, kind, {"name", "type", "value"}, parent, depth)
-        self._ordered([node["type"], node["name"], node["value"]], span)
+        type_span, name_span, value_span = self._ordered([node["type"], node["name"], node["value"]], span)
         value_type = self._type(node["type"], span, depth + 1)
         name = self._text(node["name"], span)
         value = self._expression(node["value"], span, depth + 1)
         cursor = span[0]
         for keyword in ((b"public", b"const") if kind == "constant" else (b"const",)):
-            if self.source[cursor:cursor + len(keyword)] != keyword:
-                raise ValueError("native constant differs from its source declaration")
-            end = cursor + len(keyword)
-            if self.source[end:end + 1] and (self.source[end:end + 1].isalnum() or self.source[end:end + 1] == b"_"):
-                raise ValueError("native constant keyword ends inside an identifier")
-            cursor = trivia_end(self.source, end)
-        raw_type, raw_name, raw_value = node["type"], node["name"], node["value"]
-        if not all(isinstance(item, dict) for item in (raw_type, raw_name, raw_value)):
-            raise TypeError("native constant is missing located fields")
-        type_span = self._span(cast("dict[str, object]", raw_type).get("span"), span)
-        name_span = self._span(cast("dict[str, object]", raw_name).get("span"), span)
-        value_span = self._span(cast("dict[str, object]", raw_value).get("span"), span)
+            cursor = self._keyword(cursor, keyword)
         equal = trivia_end(self.source, name_span[1])
         if (cursor != type_span[0] or trivia_end(self.source, type_span[1]) != name_span[0]
                 or self.source[equal:equal + 1] != b"="
@@ -453,14 +428,11 @@ class _Decoder:
     def _block(self, raw: object, parent: tuple[int, int], depth: int) -> Block:
         node, span, _ = self._node(raw, "block", {"bindings", "exit"}, parent, depth)
         bindings = self._list(node["bindings"])
-        self._ordered([*bindings, node["exit"]], span)
+        statement_spans = self._ordered([*bindings, node["exit"]], span)
         if self.source[span[0]:span[0] + 1] != b"{" or self.source[span[1] - 1:span[1]] != b"}":
             raise ValueError("native block differs from its source braces")
         cursor = trivia_end(self.source, span[0] + 1)
-        for raw_statement in [*bindings, node["exit"]]:
-            if not isinstance(raw_statement, dict):
-                raise TypeError("native block has no located statement")
-            statement_span = self._span(raw_statement.get("span"), span)
+        for statement_span in statement_spans:
             if cursor != statement_span[0]:
                 raise ValueError("native block leaves source statements uncovered")
             cursor = trivia_end(self.source, statement_span[1])
@@ -484,18 +456,14 @@ class _Decoder:
                 fields.add("type")
             binding, binding_span, site = self._node(raw_binding, kind, fields, span, depth + 1)
             raw_annotation = binding.get("type")
-            self._ordered(([raw_annotation] if annotated else []) + [binding["name"], binding["value"]], binding_span)
-            raw_name, raw_value = binding["name"], binding["value"]
-            if not isinstance(raw_name, dict) or not isinstance(raw_value, dict):
-                raise TypeError("native binding has no located name/value")
-            name_span = self._span(raw_name.get("span"), binding_span)
-            value_span = self._span(raw_value.get("span"), binding_span)
+            ordered_spans = self._ordered(
+                ([raw_annotation] if annotated else []) + [binding["name"], binding["value"]], binding_span
+            )
+            name_span, value_span = ordered_spans[-2], ordered_spans[-1]
             cursor = self._keyword(binding_span[0], b"let") if kind == "let" else binding_span[0]
             annotation = None
             if annotated:
-                if not isinstance(raw_annotation, dict):
-                    raise TypeError("native typed binding has no located annotation")
-                annotation_span = self._span(raw_annotation.get("span"), binding_span)
+                annotation_span = ordered_spans[0]
                 if cursor != annotation_span[0]:
                     raise ValueError("native typed binding leaves its annotation uncovered")
                 annotation = self._type(raw_annotation, binding_span, depth + 2)
@@ -509,7 +477,7 @@ class _Decoder:
             binding_name = self._text(binding["name"], binding_span)
             binding_value = self._expression(binding["value"], binding_span, depth + 2)
             converted.append(Reassignment(binding_name, binding_value, site) if kind == "reassignment"
-                             else Binding(binding_name, binding_value, site, annotation, kind == "let"))
+                             else Binding(binding_name, binding_value, site, annotation))
         raw_exit = node["exit"]
         if isinstance(raw_exit, dict) and raw_exit.get("kind") == "return":
             terminal, terminal_span, site = self._node(raw_exit, "return", {"value"}, span, depth + 1)
@@ -524,13 +492,9 @@ class _Decoder:
             exit_value: Return | Conditional = Return(self._expression(terminal["value"], terminal_span, depth + 2), site)
         else:
             terminal, terminal_span, site = self._node(raw_exit, "if", {"condition", "then", "else"}, span, depth + 1)
-            self._ordered([terminal["condition"], terminal["then"], terminal["else"]], terminal_span)
-            raw_condition, raw_yes, raw_no = terminal["condition"], terminal["then"], terminal["else"]
-            if not all(isinstance(item, dict) for item in (raw_condition, raw_yes, raw_no)):
-                raise TypeError("native conditional has no located branches")
-            condition_span = self._span(cast("dict[str, object]", raw_condition).get("span"), terminal_span)
-            yes_span = self._span(cast("dict[str, object]", raw_yes).get("span"), terminal_span)
-            no_span = self._span(cast("dict[str, object]", raw_no).get("span"), terminal_span)
+            condition_span, yes_span, no_span = self._ordered(
+                [terminal["condition"], terminal["then"], terminal["else"]], terminal_span
+            )
             opening = self._keyword(terminal_span[0], b"if")
             closing = trivia_end(self.source, condition_span[1])
             if (self.source[opening:opening + 1] != b"("
@@ -567,20 +531,13 @@ class _Decoder:
         declarations = self._list(node["declarations"])
         if not declarations:
             raise ValueError("native syntax module has no declarations")
-        self._ordered([node["name"], *declarations], span)
-        raw_name = node["name"]
-        if not isinstance(raw_name, dict):
-            raise TypeError("native module has no located name")
-        name_span = self._span(raw_name.get("span"), span)
+        name_span, *declaration_spans = self._ordered([node["name"], *declarations], span)
         semicolon = trivia_end(self.source, name_span[1])
         if (span[0] != trivia_end(self.source, 0) or self._keyword(span[0], b"module") != name_span[0]
                 or self.source[semicolon:semicolon + 1] != b";"):
             raise ValueError("native module differs from its source header")
         cursor = trivia_end(self.source, semicolon + 1)
-        for raw_declaration in declarations:
-            if not isinstance(raw_declaration, dict):
-                raise TypeError("native module has no located declaration")
-            declaration_span = self._span(raw_declaration.get("span"), span)
+        for declaration_span in declaration_spans:
             if declaration_span[0] != cursor:
                 raise ValueError("native module leaves source declarations uncovered")
             cursor = trivia_end(self.source, declaration_span[1])
@@ -599,9 +556,12 @@ class _Decoder:
             if type(is_const) is not bool:
                 raise ValueError("native function has an invalid const qualifier")
             parameters = self._list(function["parameters"])
-            self._ordered([function["result"], function["name"], *parameters, function["body"]], function_span)
+            result_span, name_span, *parameter_spans, body_span = self._ordered(
+                [function["result"], function["name"], *parameters, function["body"]], function_span
+            )
             converted_parameters: list[tuple[Name, ValueType]] = []
             const_parameters: set[str] = set()
+            parameter_part_spans: list[tuple[tuple[int, int], tuple[int, int], bool]] = []
             for raw_parameter in parameters:
                 parameter_fields = {"name", "type"}
                 if isinstance(raw_parameter, dict) and "const" in raw_parameter:
@@ -610,17 +570,12 @@ class _Decoder:
                 parameter_const = parameter.get("const", False)
                 if type(parameter_const) is not bool:
                     raise ValueError("native parameter has an invalid const qualifier")
-                self._ordered([parameter["type"], parameter["name"]], parameter_span)
+                type_span, binder_span = self._ordered([parameter["type"], parameter["name"]], parameter_span)
                 parameter_name = self._text(parameter["name"], parameter_span)
                 converted_parameters.append((parameter_name, self._type(parameter["type"], parameter_span, 4)))
                 if parameter_const:
                     const_parameters.add(parameter_name.text)
-            raw_result, raw_name, raw_body = function["result"], function["name"], function["body"]
-            if not all(isinstance(item, dict) for item in (raw_result, raw_name, raw_body)):
-                raise TypeError("native function has no located signature/body")
-            result_span = self._span(cast("dict[str, object]", raw_result).get("span"), function_span)
-            name_span = self._span(cast("dict[str, object]", raw_name).get("span"), function_span)
-            body_span = self._span(cast("dict[str, object]", raw_body).get("span"), function_span)
+                parameter_part_spans.append((type_span, binder_span, parameter_const))
             opening = trivia_end(self.source, name_span[1])
             result_start = self._keyword(function_span[0], b"public")
             if is_const:
@@ -630,18 +585,10 @@ class _Decoder:
                     or self.source[opening:opening + 1] != b"("):
                 raise ValueError("native function differs from its source signature")
             cursor = trivia_end(self.source, opening + 1)
-            for index, raw_parameter in enumerate(parameters):
-                if not isinstance(raw_parameter, dict):
-                    raise TypeError("native function has no located parameter")
-                parameter_span = self._span(raw_parameter.get("span"), function_span)
-                raw_type, raw_parameter_name = raw_parameter["type"], raw_parameter["name"]
-                if not isinstance(raw_type, dict) or not isinstance(raw_parameter_name, dict):
-                    raise TypeError("native parameter has no located name/type")
-                type_span = self._span(raw_type.get("span"), parameter_span)
-                binder_span = self._span(raw_parameter_name.get("span"), parameter_span)
-                type_start = parameter_span[0]
-                if raw_parameter.get("const", False):
-                    type_start = self._keyword(type_start, b"const")
+            for index, (parameter_span, (type_span, binder_span, parameter_const)) in enumerate(
+                zip(parameter_spans, parameter_part_spans, strict=True)
+            ):
+                type_start = self._keyword(parameter_span[0], b"const") if parameter_const else parameter_span[0]
                 if (cursor != parameter_span[0] or type_span[0] != type_start
                         or trivia_end(self.source, type_span[1]) != binder_span[0]
                         or binder_span[1] != parameter_span[1]):
@@ -666,9 +613,9 @@ class _Decoder:
 
 def decode(source: bytes, response: object) -> Module:
     """Accept only the complete, exact-source schema emitted by parse_source."""
-    source_text(source)
+    text = source_text(source)
     if (not isinstance(response, dict) or set(response) != {"schema", "source_sha256", "ast"}
             or type(response["schema"]) is not int or response["schema"] != 1
             or response["source_sha256"] != hashlib.sha256(source).hexdigest()):
         raise ValueError("native parser response has an invalid schema or source binding")
-    return _Decoder(source).module(response["ast"])
+    return _Decoder(source, text).module(response["ast"])
