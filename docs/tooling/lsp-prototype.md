@@ -126,7 +126,7 @@ Support `textDocument/hover`, `textDocument/definition`,
 `textDocument/references` and `textDocument/documentSymbol`; advertise only those
 four navigation providers; [authoring hints](#authoring-hints) add the separate
 inlay-hint provider; the [pure editor operations](#pure-editor-operations) add
-formatting and full semantic tokens. Hover uses plain text with the resolved function
+formatting and full/delta semantic tokens. Hover uses plain text with the resolved function
 signature or local/parameter type and an explicit unqualified-prototype label.
 Definition returns the exact declaration identifier location. References use
 resolved identity within the requested document and honor `includeDeclaration`.
@@ -168,8 +168,14 @@ occurrences, including declarations; exceeding either refuses inspection without
 changing ordinary translation. Its internal JSON result is either
 `{"status":"unavailable","reason":KIND}` or an object with `status: "ok"`,
 `symbols` and `occurrences`. Each symbol has `name`, `kind` (`function`,
-`parameter` or `variable`), `detail` and one-based normalized code-point `line`
-and `column`. Its index is a snapshot-local identity. Each occurrence has
+`parameter`, `variable` or `constant`), `detail`, structured `type` and one-based
+normalized code-point `line` and `column`. Scalar types record `kind: "scalar"`
+and `name` (`Nat` or `bool`). Callable types record `kind: "function"`, `result`,
+Boolean `const` and an ordered `parameters` list whose entries contain scalar
+`type` and Boolean `required_static`. Validation checks these compiler-produced
+types against symbol kinds, declaration facts and presentation signatures; the
+adapter supplies no type inference. Each symbol's index is a snapshot-local
+identity. Each occurrence has
 `symbol` (that index), `line`, `column` and boolean `declaration`. Validate the
 worker shape, bounds, identity links and exact source spelling before converting
 positions through the shared source API. Worker output and each complete reply
@@ -284,7 +290,7 @@ formatter failure returns RequestFailed, including expansion beyond the source
 bound; never return a partial edit. Run formatting in the existing isolated
 five-second worker and validate its complete, bounded transport result.
 
-`textDocument/semanticTokens/full` advertises a fixed legend with token types
+`textDocument/semanticTokens/full` advertises full tokens with delta support and a fixed legend with token types
 `function`, `parameter`, `variable`, in that order, and modifiers `declaration`,
 `readonly`, in that order. Project every resolved identifier occurrence in source
 order. Constants use `variable`; parameters, constants and immutable locals have
@@ -292,11 +298,42 @@ order. Constants use `variable`; parameters, constants and immutable locals have
 no `readonly` modifier. Encode the standard five-integer relative token records,
 with UTF-16 lengths and same-line relative starts. Keywords, literals, comments
 and unsupported syntax receive no invented semantic facts. Invalid or unsupported
-source returns `{"data": []}`. Do not advertise range or delta tokens or return a
-result ID. Retain existing inspection validation, complete-output limits and
+source returns an empty token stream. Do not advertise range tokens.
+Retain existing inspection validation, complete-output limits and
 worker failures; never truncate a token stream.
 
-Both requests require `initialized` and a synchronized open document. Retain the
+Clients that offer `textDocument.semanticTokens.requests.full.delta: true` receive
+a 64-character opaque `resultId` alongside each complete token stream. Full-only
+clients retain the data-only response. `textDocument/semanticTokens/full/delta`
+requires a string `previousResultId`; it returns the current result ID and either
+standard integer-array edits or a complete current stream when the base is unknown.
+Edits replace one differing integer interval after removing the shared prefix and
+suffix; unchanged streams return no edits. The consumer applies edits to its prior
+encoded stream before decoding token records. Delta offsets count integers,
+including changes inside a five-integer token record.
+
+The server retains at most one immutable delta base per open document, bounded by
+the existing 4,096-occurrence inspection limit. A base records only the previously
+published token array, producer identity and inspection generation. Valid text
+updates retain that array for comparison against freshly checked current facts;
+it supplies no facts about the new source. A successful full/delta response
+replaces the base only after the complete correlated reply passes its byte bound.
+Failed publication leaves the prior base usable. Saves, refused updates,
+configuration/dependency invalidation, explicit generation advances, close,
+shutdown and exit discard affected bases. Producer replacement, cross-document
+IDs, evicted IDs and IDs from earlier document lifetimes receive complete current
+tokens. Unavailable source removes the old stream through a complete empty result
+or deletion delta; worker failure returns RequestFailed without publishing a base.
+
+Independent delta controls cover exact integer edits and reconstruction,
+negotiation, unknown and foreign IDs, bounded history, source refusal/recovery,
+producer and lifecycle invalidation, malformed capabilities/parameters, and
+publication failure. A real stdio session reconstructs tokens after an unsaved
+edit inserting supplementary text and CRLF. Existing pinned-client observation
+checks accept well-formed optional result IDs and compare the complete token data;
+live delta interoperability remains part of Q25ci's two-client qualification.
+
+These requests require `initialized` and a synchronized open document. Retain the
 navigation errors for malformed parameters, unopened/closed documents, refused
 updates and resource failures. Compute each response from the current immutable
 snapshot; changes and configuration invalidation cannot reuse old results. An

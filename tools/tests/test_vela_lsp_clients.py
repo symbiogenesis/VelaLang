@@ -480,6 +480,13 @@ def _synthetic_session(
 def _scenario_oracle_and_observation_controls() -> None:
     oracle, observation, _ = _synthetic_session(incremental=True)
     lsp_clients.verify_client_observation(observation, oracle)
+    identified = copy.deepcopy(observation)
+    tokens = cast("dict[str, object]", cast("dict[str, object]", identified["stage1"])["semantic_tokens_initial"])
+    tokens["resultId"] = "0" * 64
+    lsp_clients.verify_client_observation(identified, oracle)
+    for invalid_identity in (True, "", "z" * 64, "0" * 65):
+        tokens["resultId"] = invalid_identity
+        _refuses(lambda: lsp_clients.verify_client_observation(identified, oracle), "malformed semantic result ID")
 
     for mutator, label in (
         (lambda obs: obs.update(offset_encoding="utf-8"), "wrong offset_encoding"),
