@@ -21,7 +21,7 @@ from toolchain.ast import (
     VelaError,
 )
 from toolchain.compiler_trace import Recorder
-from toolchain.facts import Facts, SymbolKind
+from toolchain.facts import Facts, PureType, SymbolKind
 
 __all__ = ["MAX_BLOCK_DEPTH", "MAX_EXPRESSION_DEPTH", "MAX_LITERAL_DIGITS", "MAX_SOURCE_BYTES",
            "StaticEvaluation", "Translation", "ValueType", "VelaError", "evaluate",
@@ -162,9 +162,9 @@ class _Elaborator:
         cloned.fresh_argument = self.fresh_argument
         return cloned
 
-    def _declare(self, name: syntax.Name, kind: SymbolKind, detail: str, *,
+    def _declare(self, name: syntax.Name, kind: SymbolKind, detail: str, value_type: PureType, *,
                  inferred: bool | None = None) -> int | None:
-        return None if self.facts is None else self.facts.declare(name, kind, detail, inferred=inferred)
+        return None if self.facts is None else self.facts.declare(name, kind, detail, value_type, inferred=inferred)
 
     def _reference(self, identity: int | None, site: syntax.Site) -> None:
         if self.facts is not None:
@@ -188,7 +188,10 @@ class _Elaborator:
         parameters = ", ".join(f"{'const ' if parameter.text in function.const_parameters else ''}{value_type} {parameter.text}"
                                for parameter, value_type in function.parameters)
         identity = self._declare(name, "function",
-                                 f"public {'const ' if function.is_const else ''}{function.result} {name.text}({parameters})")
+                                 f"public {'const ' if function.is_const else ''}{function.result} {name.text}({parameters})",
+                                 PureType(function.result, tuple(
+                                     (value_type, parameter.text in function.const_parameters)
+                                     for parameter, value_type in function.parameters), function.is_const))
         environment: dict[str, _Local] = {}
         parameter_facts: list[tuple[syntax.Name, ValueType, int | None]] = []
         for parameter, value_type in function.parameters:
@@ -196,7 +199,8 @@ class _Elaborator:
                 raise _error("name", f"duplicate parameter '{parameter.text}'", parameter.site)
             required_static = parameter.text in function.const_parameters
             symbol = self._declare(parameter, "parameter",
-                                   f"{'const ' if required_static else ''}{parameter.text}: {value_type}")
+                                   f"{'const ' if required_static else ''}{parameter.text}: {value_type}",
+                                   PureType(value_type))
             environment[parameter.text] = _Local(value_type, symbol, required_static=required_static)
             parameter_facts.append((parameter, value_type, symbol))
         body = self._block(function.body, environment, 1)
@@ -258,7 +262,7 @@ class _Elaborator:
         if value is not None:
             spelling = ("true" if value.value else "false") if value.value_type == "bool" else str(value.value)
             detail += f" = {spelling}"
-        symbol = self._declare(declaration.name, "constant", detail)
+        symbol = self._declare(declaration.name, "constant", detail, PureType(declaration.value_type))
         return _Local(declaration.value_type, symbol, value, True,
                       initializer=checked if value is None else _Expression(value.value_type, self._literal(value)))
 
@@ -370,6 +374,7 @@ class _Elaborator:
                 raise _error("type", f"local '{binding.name.text}' requires {binding.annotation}, "
                              f"but its initializer has type {value.value_type}", binding.site)
             symbol = self._declare(binding.name, "variable", f"{binding.name.text}: {value.value_type}",
+                                   PureType(value.value_type),
                                    inferred=False if binding.annotation is not None else None)
             extended[binding.name.text] = _Local(value.value_type, symbol)
             values.append((binding, value))

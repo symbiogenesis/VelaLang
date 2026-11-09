@@ -187,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     inspection = commands.add_parser("inspect", help="export versioned pure compiler facts (Q25ch subset)")
     inspection.add_argument("source", type=Path)
     inspection.add_argument("--query", type=Path,
-                            help="read a version-1 bounded query JSON object instead of exporting all facts")
+                            help="read a version-2 bounded query JSON object instead of exporting all facts")
     args = parser.parse_args(argv)
     if args.command in {"trace", "trace-validate"}:
         return _trace(args)

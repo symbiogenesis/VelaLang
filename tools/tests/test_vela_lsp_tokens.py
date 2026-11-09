@@ -113,7 +113,9 @@ def _unicode_comments_and_newline_units() -> None:
     # giving the comment a fact in the real compiler fixture above.
     text = "// 😀 Echo"
     raw: dict[str, object] = {"status": "ok", "symbols": [
-        {"name": "Echo", "kind": "function", "detail": "public Nat Echo()", "line": 1, "column": 6}],
+        {"name": "Echo", "kind": "function", "detail": "public Nat Echo()",
+         "type": {"kind": "function", "result": "Nat", "const": False, "parameters": []},
+         "line": 1, "column": 6}],
         "occurrences": [{"symbol": 0, "line": 1, "column": 6, "declaration": True}]}
     ensure(project(SourceSnapshot(_URI, 1, text, 1), raw, _METHOD, None)
            == {"data": [0, 6, 4, 0, 1]}, "semantic-token start used Unicode code points instead of UTF-16")

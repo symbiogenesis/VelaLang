@@ -24,8 +24,11 @@ _TEXT = "module Demo;\r\n// 😀\rpublic Nat Id(Nat value) { return value; }\n"
 
 def _facts() -> dict[str, object]:
     return {"status": "ok", "symbols": [
-        {"name": "Id", "kind": "function", "detail": "public Nat Id(Nat value)", "line": 3, "column": 12},
-        {"name": "value", "kind": "parameter", "detail": "value: Nat", "line": 3, "column": 19}],
+        {"name": "Id", "kind": "function", "detail": "public Nat Id(Nat value)",
+         "type": {"kind": "function", "result": "Nat", "const": False,
+                  "parameters": [{"type": "Nat", "required_static": False}]}, "line": 3, "column": 12},
+        {"name": "value", "kind": "parameter", "detail": "value: Nat",
+         "type": {"kind": "scalar", "name": "Nat"}, "line": 3, "column": 19}],
         "occurrences": [
             {"symbol": 0, "line": 3, "column": 12, "declaration": True},
             {"symbol": 1, "line": 3, "column": 19, "declaration": True},
@@ -226,6 +229,7 @@ def _oversized_reply_recovery() -> None:
     text = "module Demo;\n" + "".join(f"public Nat F{index}() {{ return 0; }}\n" for index in range(300))
     raw: dict[str, object] = {"status": "ok", "symbols": [
         {"name": f"F{index}", "kind": "function", "detail": f"public Nat F{index}()",
+         "type": {"kind": "function", "result": "Nat", "const": False, "parameters": []},
          "line": index + 2, "column": 12} for index in range(300)],
         "occurrences": [{"symbol": index, "line": index + 2, "column": 12, "declaration": True}
                         for index in range(300)]}

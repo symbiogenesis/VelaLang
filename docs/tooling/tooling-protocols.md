@@ -228,7 +228,7 @@ checked-generation requests retain their separate metaprogramming obligations.
 
 ### Pure development snapshot increment
 
-`python tools/run.py vela inspect SOURCE` exports version 1 of the bounded
+`python tools/run.py vela inspect SOURCE` exports version 2 of the bounded
 pure inspection view. Its [JSON Schema](../../tools/toolchain/inspection.schema.json)
 covers bulk snapshots and query replies; the
 [implementation](../../tools/toolchain/inspection.py) consumes the existing
@@ -239,9 +239,16 @@ syntax-tree, generated, proof and lowering views retain their producer prerequis
 Each snapshot preserves the exact UTF-8 source text, including comments, line
 endings and supplementary characters. Declaration and occurrence spans are
 half-open UTF-8 byte offsets. The view supplies source-ordered declaration kinds,
-compiler type/signature labels, authored identifier origins, documentation and
-resolved reference links. It does not supply a syntax tree, structural scope
-tree, inferred argument terms or generated definitions. Same-spelled declarations
+compiler type/signature labels, structured scalar and callable types, authored
+identifier origins, documentation and resolved reference links. The compiler
+records each type alongside its resolution decision; adapters do not infer types
+or parse display labels. A scalar type is `{"kind":"scalar","name":"Nat"}` or
+the corresponding `bool` object. Callable types carry `kind: "function"`, a
+`Nat`/`bool` result, ordered parameters with `type` and Boolean `required_static`
+fields, and a Boolean `const` field identifying constant-callable functions.
+The worker boundary checks type shapes, declaration kinds, parameter order and
+display-label agreement before publishing facts. It does not supply a syntax
+tree, structural scope tree, inferred argument terms or generated definitions. Same-spelled declarations
 retain distinct identities; a symbol handle contains its complete snapshot digest.
 
 Snapshot identity binds the source URI and digest, the fixed `pure-default-v1`
@@ -252,14 +259,22 @@ identities describe development inspection inputs; they supply no checked source
 correspondence, kernel or runtime-artifact acceptance. The isolated producer uses
 the existing checked-parser runtime qualification and integrity checks.
 
-`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 1`,
-the exported `snapshot` digest and one `operation`: `symbols`, `symbol-at` with a
-byte `offset`, or `references` with a snapshot-scoped `symbol` handle. Optional
+`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 2`,
+the exported `snapshot` digest and one `operation`: `symbols`, `symbol-at` or
+`type-at` with a byte `offset`, or `references` with a snapshot-scoped `symbol` handle.
+`type-at` returns the resolved identifier's structured type, symbol handle and
+occurrence span, including at function calls and declarations. Same-spelled
+function and parameter references retain their separately resolved types. This
+query covers identifier sites; punctuation, literals and whole expressions have
+no type result in this increment. Optional
 `limit` is an integer from 1 through 256. Reference results include declaration
 occurrences. An identifier's end, punctuation and comments select no symbol.
 Offsets inside UTF-8 characters or CRLF are refused. The Python `Snapshot.query`
 interface also requires the current source and rechecks URI, configuration, target
 and producer closure; a changed binding or cross-snapshot handle is refused.
+Version 2 makes structured types mandatory. Version-1 queries and obsolete
+worker facts without types are refused; no label-parsing compatibility path
+supplies missing semantic facts. Clients must select the published schema version.
 
 Bulk inspection retains the existing 65,536-byte source, 1,024-declaration and
 4,096-occurrence bounds, with a 1,048,576-byte compact export bound. Queries report
