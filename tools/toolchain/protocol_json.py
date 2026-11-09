@@ -89,9 +89,14 @@ def decode_message(raw: bytes) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
-def encode_message(message: dict[str, object]) -> bytes:
+def encode_body(message: dict[str, object]) -> bytes:
     raw = json.dumps(message, ensure_ascii=False, allow_nan=False,
                      separators=(",", ":")).encode("utf-8")
     if len(raw) > MAX_BODY_BYTES:
         raise FrameError("reply exceeds limit")
+    return raw
+
+
+def encode_message(message: dict[str, object]) -> bytes:
+    raw = encode_body(message)
     return f"Content-Length: {len(raw)}\r\n\r\n".encode("ascii") + raw

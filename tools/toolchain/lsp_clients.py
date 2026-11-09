@@ -875,6 +875,14 @@ def extract_verified_archive(
     def _permitted(rel: str) -> bool:
         return rel in allowed_exact or any(rel.startswith(prefix) for prefix in allow_predicate)
 
+    def _write_member(rel: str, payload: bytes) -> None:
+        extracted_digests[rel] = _sha256(payload)
+        target = destination / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        if rel == pin.executable and sys.platform != "win32":
+            target.chmod(target.stat().st_mode | stat.S_IXUSR)
+
     if pin.filename.endswith(".zip"):
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as bundle:
             infos = bundle.infolist()
@@ -887,13 +895,7 @@ def extract_verified_archive(
                     continue
                 _require(rel not in extracted_digests, f"duplicate zip member {rel!r}")
                 _require(0 <= info.file_size <= MAX_DOWNLOAD_BYTES, f"oversized zip member {rel!r}")
-                payload = bundle.read(info)
-                extracted_digests[rel] = _sha256(payload)
-                target = destination / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(payload)
-                if rel == pin.executable and sys.platform != "win32":
-                    target.chmod(target.stat().st_mode | stat.S_IXUSR)
+                _write_member(rel, bundle.read(info))
     elif pin.filename.endswith(".tar.gz"):
         with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as bundle:
             members = bundle.getmembers()
@@ -912,12 +914,7 @@ def extract_verified_archive(
                     raise ValueError(f"unreadable tar member {rel!r}")
                 with stream:
                     payload = stream.read(MAX_DOWNLOAD_BYTES + 1)
-                extracted_digests[rel] = _sha256(payload)
-                target = destination / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(payload)
-                if rel == pin.executable and sys.platform != "win32":
-                    target.chmod(target.stat().st_mode | stat.S_IXUSR)
+                _write_member(rel, payload)
     else:
         raise ValueError(f"unsupported archive format: {pin.filename}")
 
@@ -1420,6 +1417,26 @@ def verify_wire_transcript(
     }
 
 
+def _verify_editor_session_artifacts(
+    target_file: Path,
+    client_out_file: Path,
+    transcript_file: Path,
+    *,
+    label: str,
+    sentinel_error: str,
+    require_ranged_change: bool,
+) -> tuple[str, str, dict[str, object]]:
+    _require(target_file.read_text(encoding="utf-8") == DISK_SENTINEL, sentinel_error)
+    observation_raw = client_out_file.read_bytes()
+    transcript_raw = transcript_file.read_bytes()
+    observation = _object(json.loads(observation_raw), f"{label} observation")
+    transcript = _object(json.loads(transcript_raw), f"{label} transcript")
+    oracle = expected_scenario_oracle(str(observation.get("uri", "")))
+    verify_client_observation(observation, oracle)
+    summary = verify_wire_transcript(transcript, require_ranged_change=require_ranged_change)
+    return _sha256(observation_raw), _sha256(transcript_raw), summary
+
+
 def _run_neovim_session(
     nvim_exe: Path,
     run_py: Path,
@@ -1459,23 +1476,20 @@ def _run_neovim_session(
         done.returncode == 0,
         f"Neovim headless session exited {done.returncode}: {done.stderr.strip() or done.stdout.strip()}",
     )
-    _require(
-        target_file.read_text(encoding="utf-8") == DISK_SENTINEL,
-        "Neovim session modified or replaced the on-disk sentinel file",
+    obs_sha, tx_sha, summary = _verify_editor_session_artifacts(
+        target_file,
+        client_out_file,
+        transcript_file,
+        label="neovim",
+        sentinel_error="Neovim session modified or replaced the on-disk sentinel file",
+        require_ranged_change=True,
     )
-    observation_raw = client_out_file.read_bytes()
-    transcript_raw = transcript_file.read_bytes()
-    observation = _object(json.loads(observation_raw), "neovim observation")
-    transcript = _object(json.loads(transcript_raw), "neovim transcript")
-    oracle = expected_scenario_oracle(str(observation.get("uri", "")))
-    verify_client_observation(observation, oracle)
-    summary = verify_wire_transcript(transcript, require_ranged_change=True)
     return {
         "client": "neovim",
         "version": NEOVIM_VERSION,
         "seconds": elapsed,
-        "observation_sha256": _sha256(observation_raw),
-        "transcript_sha256": _sha256(transcript_raw),
+        "observation_sha256": obs_sha,
+        "transcript_sha256": tx_sha,
         "summary": summary,
     }
 
@@ -1544,25 +1558,22 @@ def _run_vim_session(
         done.returncode == 0 and client_out_file.is_file(),
         f"Vim ({mode_tag}) session exited {done.returncode}: {err_detail or done.stderr.strip() or done.stdout.strip()}",
     )
-    _require(
-        target_file.read_text(encoding="utf-8") == DISK_SENTINEL,
-        f"Vim ({mode_tag}) session modified or replaced the on-disk sentinel file",
+    obs_sha, tx_sha, summary = _verify_editor_session_artifacts(
+        target_file,
+        client_out_file,
+        transcript_file,
+        label=f"vim ({mode_tag})",
+        sentinel_error=f"Vim ({mode_tag}) session modified or replaced the on-disk sentinel file",
+        require_ranged_change=incremental,
     )
-    observation_raw = client_out_file.read_bytes()
-    transcript_raw = transcript_file.read_bytes()
-    observation = _object(json.loads(observation_raw), f"vim ({mode_tag}) observation")
-    transcript = _object(json.loads(transcript_raw), f"vim ({mode_tag}) transcript")
-    oracle = expected_scenario_oracle(str(observation.get("uri", "")))
-    verify_client_observation(observation, oracle)
-    summary = verify_wire_transcript(transcript, require_ranged_change=incremental)
     return {
         "client": "vim-yegappan-lsp",
         "version": VIM_VERSION,
         "plugin_commit": YEGAPPAN_LSP_COMMIT,
         "sync_mode": mode_tag,
         "seconds": elapsed,
-        "observation_sha256": _sha256(observation_raw),
-        "transcript_sha256": _sha256(transcript_raw),
+        "observation_sha256": obs_sha,
+        "transcript_sha256": tx_sha,
         "summary": summary,
     }
 

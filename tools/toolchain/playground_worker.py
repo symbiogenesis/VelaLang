@@ -16,7 +16,7 @@ from toolchain import (
     mathematical as vela_mathematical,
 )
 from toolchain.authoring import lint_source, preview_bindings
-from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_message
+from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_body
 
 
 def _mathematical_request(request: dict[str, object], source: bytes, digest: str,
@@ -88,7 +88,7 @@ def main(*, mathematical_parser: Path | None = None, parser_sha256: str | None =
         _verify_parser(mathematical_parser, parser_sha256)
         request = decode_message(sys.stdin.buffer.read(MAX_BODY_BYTES + 1))
         response = compile_request(request, mathematical_parser=mathematical_parser)
-        raw = encode_message(response).split(b"\r\n\r\n", 1)[1]
+        raw = encode_body(response)
     except (KeyError, TypeError, ValueError, UnicodeError, OSError, RuntimeError):
         return 1
     sys.stdout.buffer.write(raw)

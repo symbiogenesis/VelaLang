@@ -4,10 +4,19 @@
 import hashlib
 import json
 import sys
+from pathlib import Path
 
 from toolchain import MAX_SOURCE_BYTES, VelaError, inspect_source, translate
 from toolchain.authoring import format_source
 from toolchain.protocol_json import MAX_BODY_BYTES
+
+
+def worker_command(*args: str) -> list[str]:
+    """Build an isolated `-I` command line for the checkout's fixed worker."""
+    tools = str(Path(__file__).resolve().parents[1])
+    script = (f"import sys; sys.path.insert(0, {tools!r}); "
+              "from toolchain.lsp_worker import main; raise SystemExit(main())")
+    return [sys.executable, "-I", "-c", script, *args]
 
 
 def main() -> int:

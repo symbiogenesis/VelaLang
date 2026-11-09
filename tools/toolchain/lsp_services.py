@@ -2,10 +2,8 @@
 """Bounded projection of the pure compiler's resolved facts into LSP results."""
 
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import cast
 
 from toolchain.ast import (
@@ -19,6 +17,7 @@ from toolchain.ast import (
 )
 from toolchain.documentation import DocumentationSource
 from toolchain.facts import MAX_OCCURRENCES, MAX_SYMBOLS
+from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_message
 from toolchain.source import SourceSnapshot
 
@@ -39,11 +38,8 @@ class InspectionError(ValueError):
 
 def inspect_document(source: bytes) -> dict[str, object]:
     """Run only the checkout's fixed fact producer, never a client-selected tool."""
-    tools = str(Path(__file__).resolve().parents[1])
-    script = (f"import sys; sys.path.insert(0, {tools!r}); "
-              "from toolchain.lsp_worker import main; raise SystemExit(main())")
     try:
-        done = subprocess.run([sys.executable, "-I", "-c", script, "--inspect"],
+        done = subprocess.run(worker_command("--inspect"),
                               input=source, capture_output=True,
                               timeout=INSPECTION_SECONDS, check=False)
         if done.returncode != 0 or len(done.stdout) > MAX_BODY_BYTES:

@@ -18,7 +18,7 @@ from typing import cast, override
 from toolchain.ast import IDENTIFIER, MAX_SOURCE_BYTES
 from toolchain.authoring import LINT_CODES, is_pascal_case
 from toolchain.lsp import Server
-from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_message
+from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_body
 from toolchain.source import SourceSnapshot
 
 MAX_SESSIONS = 8
@@ -30,10 +30,6 @@ ASSETS = {"/": ("index.html", "text/html; charset=utf-8"),
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
           "/style.css": ("style.css", "text/css; charset=utf-8")}
-
-
-def _raw(message: dict[str, object]) -> bytes:
-    return encode_message(message).split(b"\r\n\r\n", 1)[1]
 
 
 def _validate_result(response: dict[str, object], request: dict[str, object], digest: str) -> None:
@@ -125,13 +121,13 @@ def _compiler_response(request: dict[str, object], digest: str, *,
               "from toolchain.playground_worker import main; "
               f"raise SystemExit(main(mathematical_parser={parser_argument}, "
               f"parser_sha256={parser_sha256!r}))")
-    done = subprocess.run([sys.executable, "-I", "-c", script], input=_raw(request),
+    done = subprocess.run([sys.executable, "-I", "-c", script], input=encode_body(request),
                           capture_output=True, timeout=WORKER_SECONDS, check=False)
     if done.returncode != 0:
         raise ValueError("compiler worker unavailable or output exceeds its budget")
     response = decode_message(done.stdout)
     _validate_result(response, request, digest)
-    _raw(response)
+    encode_body(response)
     return response
 
 
@@ -274,7 +270,7 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
                 self.rfile.read(int(lengths[0]))
             except OSError:
                 self.close_connection = True
-        self._send(status, _raw({"error": message}))
+        self._send(status, encode_body({"error": message}))
 
     def _authority(self) -> bool:
         hosts = self.headers.get_all("Host", [])
@@ -333,7 +329,7 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
         try:
             request = self._read_json(size)
             response = self._dispatch(request)
-            encoded = _raw(response)
+            encoded = encode_body(response)
         except TimeoutError:
             self._error(408, "Request read timed out")
             return

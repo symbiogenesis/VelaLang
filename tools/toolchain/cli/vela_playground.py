@@ -12,10 +12,6 @@ from toolchain.playground import PlaygroundServer
 
 
 def main(argv: list[str] | None = None) -> int:
-    return serve(argv)
-
-
-def serve(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(suggest_on_error=True, description=__doc__)
     parser.add_argument("--port", type=int, default=8765,
                         help="IPv4 loopback port (default: 8765; zero selects an available port)")

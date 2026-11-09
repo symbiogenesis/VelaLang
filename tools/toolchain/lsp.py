@@ -5,7 +5,6 @@ import hashlib
 import subprocess
 import sys
 from collections.abc import Callable
-from pathlib import Path
 from typing import BinaryIO, Never, cast
 
 from toolchain.lsp_format import Formatter, format_document, formatting_edits
@@ -19,6 +18,7 @@ from toolchain.lsp_services import (
     inspect_document,
     project,
 )
+from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import (
     MAX_BODY_BYTES,
     FrameError,
@@ -42,12 +42,7 @@ def _invalid(message: str) -> Never:
 def diagnose(source: bytes) -> dict[str, object] | None:
     """Use the same interpreter and compiler checkout, without client-selected paths."""
     try:
-        # -I excludes caller PYTHONPATH and user site packages. The only added path
-        # is this adapter's own tools directory; no client text is executable code.
-        tools = str(Path(__file__).resolve().parents[1])
-        script = (f"import sys; sys.path.insert(0, {tools!r}); "
-                  "from toolchain.lsp_worker import main; raise SystemExit(main())")
-        done = subprocess.run([sys.executable, "-I", "-c", script], input=source,
+        done = subprocess.run(worker_command(), input=source,
                               capture_output=True, timeout=WORKER_SECONDS, check=False)
         if done.returncode != 0 or len(done.stdout) > MAX_BODY_BYTES:
             _invalid("pure diagnostic worker failed")

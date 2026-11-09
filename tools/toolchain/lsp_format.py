@@ -3,12 +3,11 @@
 
 import hashlib
 import subprocess
-import sys
 from collections.abc import Callable
-from pathlib import Path
 
 from toolchain.ast import MAX_SOURCE_BYTES
 from toolchain.lsp_services import INSPECTION_SECONDS, InspectionError
+from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_message
 from toolchain.source import SourceSnapshot
 
@@ -17,11 +16,8 @@ type Formatter = Callable[[bytes], dict[str, object]]
 
 def format_document(source: bytes) -> dict[str, object]:
     """Run the fixed compiler library without invoking its file-writing command."""
-    tools = str(Path(__file__).resolve().parents[1])
-    script = (f"import sys; sys.path.insert(0, {tools!r}); "
-              "from toolchain.lsp_worker import main; raise SystemExit(main())")
     try:
-        done = subprocess.run([sys.executable, "-I", "-c", script, "--format"],
+        done = subprocess.run(worker_command("--format"),
                               input=source, capture_output=True,
                               timeout=INSPECTION_SECONDS, check=False)
         if done.returncode != 0 or len(done.stdout) > MAX_BODY_BYTES:
