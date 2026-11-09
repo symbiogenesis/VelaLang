@@ -19,6 +19,7 @@ from toolchain import (
 from toolchain.ast import Name, position
 from toolchain.authoring import Finding, generic_type_findings
 from toolchain.elaborate import Elaboration
+from toolchain.surface import nodes
 
 _BUILD_CACHE: tuple[tuple[Path, int, int, int], vela_parser.Build] | None = None
 
@@ -47,20 +48,14 @@ def inspect_source(source: bytes, parsed: object) -> Compilation:
     keeps this advisory inspection separate from mathematical acceptance.
     """
     translation = vela_elaborate.elaborate(source, parsed)
-    ast = cast("dict[str, object]", parsed)["ast"]
-    pending: list[object] = [ast]
+    ast = cast("vela_parser.Json", cast("dict[str, object]", parsed)["ast"])
     names: list[tuple[int, Name]] = []
-    while pending:
-        item = pending.pop()
-        if isinstance(item, dict):
-            if item.get("kind") == "generic_parameter" and item.get("mode") == "type":
-                identifier = cast("dict[str, object]", item["name"])
-                offset = cast("list[int]", identifier["span"])[0]
-                names.append((offset, Name(cast("str", identifier["text"]),
-                                           position(source[:offset].decode("utf-8")))))
-            pending.extend(item.values())
-        elif isinstance(item, list):
-            pending.extend(item)
+    for item in nodes(ast):
+        if item.get("kind") == "generic_parameter" and item.get("mode") == "type":
+            identifier = cast("dict[str, vela_parser.Json]", item["name"])
+            offset = cast("int", cast("list[vela_parser.Json]", identifier["span"])[0])
+            names.append((offset, Name(cast("str", identifier["text"]),
+                                       position(source[:offset].decode("utf-8")))))
     names.sort(key=lambda item: item[0])
     findings = sorted(
         generic_type_findings(tuple(name for _, name in names)),

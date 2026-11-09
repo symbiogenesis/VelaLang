@@ -2568,14 +2568,7 @@ def _receiver_roles(result: dict[str, Json]) -> None:
 
 
 def _constructor(container: dict[str, Json], name: str) -> dict[str, Json]:
-    matches: list[dict[str, Json]] = []
-    for node in nodes(container):
-        spelling = node.get("name")
-        if isinstance(spelling, dict) and spelling.get("text") == name:
-            matches.append(node)
-    if len(matches) != 1:
-        raise ValueError(f"surface expected one constructor named {name}")
-    return matches[0]
+    return _named(container, "constructor", name)
 
 
 def _effect_generic_roles(result: dict[str, Json]) -> None:
@@ -4308,17 +4301,6 @@ def _literal_and_comment_boundaries(parse: Callable[[bytes], dict[str, Json]]) -
         raise ValueError("surface UTF-8 original-byte literal span differs")
 
 
-def _expression_shape(value: dict[str, Json]) -> Json:
-    if value.get("kind") == "nat":
-        return ["nat", value.get("value"), value.get("suffix")]
-    if value.get("kind") == "binary":
-        operator = _object(value.get("operator"), "binary operator")
-        return [operator.get("text"),
-                _expression_shape(_object(value.get("left"), "left operand")),
-                _expression_shape(_object(value.get("right"), "right operand"))]
-    raise ValueError(f"unexpected surface oracle expression: {value.get('kind')}")
-
-
 def _precedence_and_spans(parse: Callable[[bytes], dict[str, Json]]) -> None:
     source = b"module M; public Nat F() { return 1 + 2 * 3; }"
     result = parse(source)
@@ -4350,7 +4332,7 @@ def _precedence_and_spans(parse: Callable[[bytes], dict[str, Json]]) -> None:
     expression = _object(terminal.get("value"), "return value")
     expected: Json = ["+", ["nat", "1", ""],
                       ["*", ["nat", "2", ""], ["nat", "3", ""]]]
-    if _expression_shape(expression) != expected or expression.get("span") != [34, 43]:
+    if _operator_expression_shape(expression) != expected or expression.get("span") != [34, 43]:
         raise ValueError("surface precedence/operand oracle differs")
     operator = _object(expression.get("operator"), "addition")
     if operator != {"text": "+", "span": [36, 37]}:
@@ -4694,6 +4676,73 @@ def _ergonomic_expression_and_property_roles(source: bytes, result: dict[str, Js
         _exact_span(source, node, spelling)
 
 
+_SOURCE_FIXTURE_CHECKS: dict[str, str] = {
+    "expressions-patterns-updates-guards-and-properties": "_ergonomic_expression_and_property_roles",
+    "familiar-generic-calls-and-expression-arms": "_familiar_call_roles",
+    "bounded-collection-iteration": "_collection_iteration_roles",
+    "raw-strings-and-checked-formatting": "_raw_string_and_format_roles",
+    "numeric-separator-values-patterns-and-indices": "_numeric_separator_roles",
+    "callable-list-boundaries": "_callable_list_roles",
+    "required-static-constants": "_required_static_roles",
+    "compositional-constant-callables": "_compositional_constant_roles",
+    "concise-authoring-syntax": "_concise_authoring_roles",
+    "generic-binders-and-typed-initializers": "_binder_initializer_roles",
+    "explicit-values-loans-and-options": "_explicit_value_roles",
+    "explicit-pointer-operators": "_pointer_roles",
+    "expression-local-bindings": "_expression_binding_roles",
+    "shared-syntax-primitives": "_shared_primitive_roles",
+    "shared-operator-values": "_shared_operator_roles",
+    "recursive-local-patterns": "_recursive_local_roles",
+    "computed-types-and-family-application": "_computed_type_roles",
+    "alias-and-effect-family-contracts": "_family_contract_roles",
+    "literal-patterns-and-dependent-branches": "_literal_pattern_roles",
+    "empty-dependent-elimination": "_empty_elimination_roles",
+    "local-grades-and-evaluation": "_local_grade_roles",
+    "domain-dictionaries-and-product-laws": "_domain_dictionary_roles",
+    "disposal-clause-lifecycles": "_disposal_clause_roles",
+    "generic-callable-annotation-composition": "_generic_callable_annotation_roles",
+    "kinded-telescopes-and-associated-families": "_kinded_family_roles",
+    "type-valued-dependent-matches": "_type_expression_roles",
+    "callable-kinds-and-contract-effect-ownership": "_callable_kind_effect_roles",
+    "typed-callable-values-and-scoped-loans": "_typed_callable_roles",
+    "typed-callable-expression-composition": "_typed_callable_composition_roles",
+    "typed-resource-errors-remain-syntax": "_typed_resource_error_roles",
+    "indexed-family-and-constructor-contracts": "_indexed_family_contract_roles",
+    "stable-literal-generic-arguments": "_stable_generic_literal_roles",
+    "effect-operation-resource-contracts": "_effect_resource_roles",
+    "container-resource-contracts": "_container_resource_roles",
+    "named-handler-capabilities": "_named_handler_roles",
+    "dependent-match-expressions-and-motives": "_dependent_match_roles",
+    "graded-struct-fields": "_field_grade_roles",
+    "locally-quantified-callable-contracts": "_scoped_callable_roles",
+    "mathematical-definitions-and-proofs": "_indexed_constructor_roles",
+    "represented-numeric-patterns": "_numeric_pattern_roles",
+    "dependent-callable-telescopes": "_callable_telescope_roles",
+    "product-types-values-and-patterns": "_product_roles",
+    "explicit-structural-type-arguments": "_explicit_type_argument_roles",
+    "structural-local-and-lambda-annotations": "_structural_annotation_roles",
+}
+
+_AST_FIXTURE_CHECKS: dict[str, str] = {
+    "canonical-readable-calls": "_readable_call_roles",
+    "binder-initializer-errors-remain-syntax": "_binder_initializer_error_roles",
+    "explicit-values-errors-remain-syntax": "_explicit_error_roles",
+    "expressions-and-closures": "_propagation_member_role",
+    "shared-operator-precedence": "_shared_precedence_roles",
+    "local-grade-errors-remain-syntax": "_local_grade_error_roles",
+    "disposal-errors-remain-syntax": "_disposal_error_roles",
+    "function-types-grades-and-contracts": "_type_roles",
+    "generic-library-implementations": "_generic_impl_roles",
+    "dependent-data-and-lifetimes": "_receiver_roles",
+    "typed-locals-and-scoped-callbacks": "_typed_local_roles",
+    "effects-handlers-and-disposal": "_handler_roles",
+    "generic-effect-families": "_effect_generic_roles",
+    "structured-tasks-and-cleanup": "_cancellation_roles",
+    "unbraced-conditionals-and-annotation-lookahead": "_unbraced_if_roles",
+    "callback-expressions-in-grades": "_callback_grade_roles",
+}
+
+
 def qualify(parse: Callable[[bytes], dict[str, Json]]) -> list[str]:
     """Exercise independent syntax cases; a failed oracle never passes a case."""
     _precedence_and_spans(parse)
@@ -4702,135 +4751,20 @@ def qualify(parse: Callable[[bytes], dict[str, Json]]) -> list[str]:
     passed = ["surface:independent-precedence-and-spans", "surface:literal-and-comment-boundaries",
               "surface:numeric-separator-suffixes-and-digit-limits"]
     for fixture in POSITIVE:
+        source = fixture.source.encode("utf-8")
         try:
-            result = parse(fixture.source.encode("utf-8"))
+            result = parse(source)
         except VelaError as error:
             raise ValueError(f"surface fixture {fixture.name} failed at {error.line}:{error.column}: {error}") from error
-        _argument_roles(fixture.source.encode("utf-8"), result)
+        _argument_roles(source, result)
         found = {node.get("kind") for node in nodes(result.get("ast"))}
         missing = set(fixture.kinds) - found
         if missing:
             raise ValueError(f"surface fixture {fixture.name} lacks AST roles: {sorted(missing)}")
-        if fixture.name == "expressions-patterns-updates-guards-and-properties":
-            _ergonomic_expression_and_property_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "familiar-generic-calls-and-expression-arms":
-            _familiar_call_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "bounded-collection-iteration":
-            _collection_iteration_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "raw-strings-and-checked-formatting":
-            _raw_string_and_format_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "numeric-separator-values-patterns-and-indices":
-            _numeric_separator_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "callable-list-boundaries":
-            _callable_list_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "required-static-constants":
-            _required_static_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "compositional-constant-callables":
-            _compositional_constant_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "canonical-readable-calls":
-            _readable_call_roles(result)
-        elif fixture.name == "concise-authoring-syntax":
-            _concise_authoring_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "generic-binders-and-typed-initializers":
-            _binder_initializer_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "binder-initializer-errors-remain-syntax":
-            _binder_initializer_error_roles(result)
-        elif fixture.name == "explicit-values-loans-and-options":
-            _explicit_value_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "explicit-pointer-operators":
-            _pointer_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "explicit-values-errors-remain-syntax":
-            _explicit_error_roles(result)
-        elif fixture.name == "expressions-and-closures":
-            _propagation_member_role(result)
-        elif fixture.name == "expression-local-bindings":
-            _expression_binding_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "shared-syntax-primitives":
-            _shared_primitive_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "shared-operator-values":
-            _shared_operator_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "shared-operator-precedence":
-            _shared_precedence_roles(result)
-        elif fixture.name == "recursive-local-patterns":
-            _recursive_local_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "computed-types-and-family-application":
-            _computed_type_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "alias-and-effect-family-contracts":
-            _family_contract_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "literal-patterns-and-dependent-branches":
-            _literal_pattern_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "empty-dependent-elimination":
-            _empty_elimination_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "local-grades-and-evaluation":
-            _local_grade_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "local-grade-errors-remain-syntax":
-            _local_grade_error_roles(result)
-        elif fixture.name == "domain-dictionaries-and-product-laws":
-            _domain_dictionary_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "disposal-clause-lifecycles":
-            _disposal_clause_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "disposal-errors-remain-syntax":
-            _disposal_error_roles(result)
-        elif fixture.name == "generic-callable-annotation-composition":
-            _generic_callable_annotation_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "function-types-grades-and-contracts":
-            _type_roles(result)
-        elif fixture.name == "kinded-telescopes-and-associated-families":
-            _kinded_family_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "type-valued-dependent-matches":
-            _type_expression_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "callable-kinds-and-contract-effect-ownership":
-            _callable_kind_effect_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "typed-callable-values-and-scoped-loans":
-            _typed_callable_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "typed-callable-expression-composition":
-            _typed_callable_composition_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "typed-resource-errors-remain-syntax":
-            _typed_resource_error_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "indexed-family-and-constructor-contracts":
-            _indexed_family_contract_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "stable-literal-generic-arguments":
-            _stable_generic_literal_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "effect-operation-resource-contracts":
-            _effect_resource_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "container-resource-contracts":
-            _container_resource_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "named-handler-capabilities":
-            _named_handler_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "dependent-match-expressions-and-motives":
-            _dependent_match_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "graded-struct-fields":
-            _field_grade_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "generic-library-implementations":
-            _generic_impl_roles(result)
-        elif fixture.name == "locally-quantified-callable-contracts":
-            _scoped_callable_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "dependent-data-and-lifetimes":
-            _receiver_roles(result)
-        elif fixture.name == "typed-locals-and-scoped-callbacks":
-            _typed_local_roles(result)
-        elif fixture.name == "effects-handlers-and-disposal":
-            _handler_roles(result)
-        elif fixture.name == "generic-effect-families":
-            _effect_generic_roles(result)
-        elif fixture.name == "structured-tasks-and-cleanup":
-            _cancellation_roles(result)
-        elif fixture.name == "mathematical-definitions-and-proofs":
-            _indexed_constructor_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "represented-numeric-patterns":
-            _numeric_pattern_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "dependent-callable-telescopes":
-            _callable_telescope_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "product-types-values-and-patterns":
-            _product_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "explicit-structural-type-arguments":
-            _explicit_type_argument_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "structural-local-and-lambda-annotations":
-            _structural_annotation_roles(fixture.source.encode("utf-8"), result)
-        elif fixture.name == "unbraced-conditionals-and-annotation-lookahead":
-            _unbraced_if_roles(result)
-        elif fixture.name == "callback-expressions-in-grades":
-            _callback_grade_roles(result)
+        if (source_check := _SOURCE_FIXTURE_CHECKS.get(fixture.name)) is not None:
+            globals()[source_check](source, result)
+        elif (ast_check := _AST_FIXTURE_CHECKS.get(fixture.name)) is not None:
+            globals()[ast_check](result)
         passed.append(f"surface:{fixture.name}")
     _generic_probe_limits(parse)
     passed.append("surface:generic-probe-inspection-boundaries")

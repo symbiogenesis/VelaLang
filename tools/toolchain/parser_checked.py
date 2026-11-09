@@ -24,7 +24,6 @@ import tempfile
 import threading
 import time
 import urllib.request
-from importlib import import_module
 from pathlib import Path, PurePosixPath
 from typing import cast
 
@@ -1053,32 +1052,18 @@ def _strip_comments_and_actions(body: str) -> str:
     cleaned = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
     out: list[str] = []
     depth = 0
-    in_str = False
-    in_chr = False
+    quote: str | None = None
     escape = False
     for ch in cleaned:
-        if in_str:
+        if quote is not None:
             if escape:
                 escape = False
             elif ch == "\\":
                 escape = True
-            elif ch == '"':
-                in_str = False
-            if depth == 0:
-                out.append(ch)
-        elif in_chr:
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == "'":
-                in_chr = False
-            if depth == 0:
-                out.append(ch)
-        elif ch == '"' and depth > 0:
-            in_str = True
-        elif ch == "'" and depth > 0:
-            in_chr = True
+            elif ch == quote:
+                quote = None
+        elif ch in {'"', "'"} and depth > 0:
+            quote = ch
         elif ch == "{":
             depth += 1
         elif ch == "}":
@@ -1413,12 +1398,19 @@ def _compile(directory: Path, steps: list[dict[str, object]]) -> None:
          directory, directory / "compile.stdout", steps)
 
 
-def _file_lock(path: Path, timeout: int) -> contextlib.AbstractContextManager[object]:
-    try:
-        lock_cls = import_module("filelock").FileLock
-    except ModuleNotFoundError:
-        return contextlib.nullcontext()
-    return cast("contextlib.AbstractContextManager[object]", lock_cls(path, timeout=timeout))
+def _compile_grammar_and_extract(tree: Path, pure_mly: str, steps: list[dict[str, object]]) -> None:
+    (tree / "VelaPureAst.v").write_text(VELA_PURE_AST_V, encoding="utf-8", newline="")
+    (tree / "VelaPureGrammar.mly").write_text(pure_mly, encoding="utf-8", newline="")
+    _run(_opam(["menhir", "--coq", "--strict", "VelaPureGrammar.mly"], switch=env.SAIL_SWITCH),
+         tree, tree / "menhir-coq.stdout", steps)
+    for module_name in GRAMMAR_MODULES:
+        if module_name == "VelaPureProofs":
+            (tree / "VelaPureProofs.v").write_text(VELA_PURE_PROOFS_V, encoding="utf-8", newline="")
+        _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", f"{module_name}.v"]),
+             tree, tree / f"{module_name.lower()}.stdout", steps)
+    (tree / "VelaPureExtraction.v").write_text(VELA_PURE_EXTRACTION_V, encoding="utf-8", newline="")
+    _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VelaPureExtraction.v"]),
+         tree, tree / "extraction.stdout", steps)
 
 
 def _work_root(root: Path) -> Path:
@@ -1495,41 +1487,45 @@ def _compile_checked_executable(root: Path, tree: Path, token_stub: str,
     return tree / "vela-checked-parser"
 
 
+def _publish_runtime_build(runtime_dir: Path, source_tree: Path, wanted: dict[str, str]) -> vela_parser.Build:
+    exe_path = runtime_dir / "vela-checked-parser"
+    receipt_path = runtime_dir / "receipt.json"
+    exe_bytes = _read_file_bytes(source_tree / "vela-checked-parser")
+    with atomic_path(exe_path) as pending_exe:
+        pending_exe.write_bytes(exe_bytes)
+        pending_exe.chmod(0o755)
+    receipt: dict[str, object] = {
+        "schema": 1,
+        "scope": "vela-checked-pure-parser-runtime",
+        "status": "built",
+        "directory": str(runtime_dir),
+        "inputs": wanted,
+        "generated_sha256": {
+            "vela-parser": _sha256(exe_bytes),
+            "vela_checked_parser.ml": _sha256(_read_file_bytes(source_tree / "vela_checked_parser.ml")),
+            "vela_checked_parser.mli": _sha256(_read_file_bytes(source_tree / "vela_checked_parser.mli")),
+            "VelaPureGrammar.v": _sha256(_read_file_bytes(source_tree / "VelaPureGrammar.v")),
+        },
+    }
+    _write_json(receipt_path, receipt)
+    return vela_parser.Build(runtime_dir, exe_path, receipt)
+
+
 def _install_runtime_build(root: Path, source_tree: Path, contents: bytes | None = None) -> vela_parser.Build:
     runtime_dir = _runtime_root()
-    with _file_lock(runtime_dir / "runtime.lock", timeout=TIMEOUT):
+    with vela_parser._file_lock(runtime_dir / "runtime.lock", timeout=TIMEOUT):
         wanted = _runtime_inputs(root)
-        exe_path = runtime_dir / "vela-checked-parser"
-        receipt_path = runtime_dir / "receipt.json"
         if contents is not None:
             with atomic_path(runtime_dir / "menhir.tar.gz") as pending_tar:
                 pending_tar.write_bytes(contents)
-        exe_bytes = _read_file_bytes(source_tree / "vela-checked-parser")
-        with atomic_path(exe_path) as pending_exe:
-            pending_exe.write_bytes(exe_bytes)
-            pending_exe.chmod(0o755)
-        receipt: dict[str, object] = {
-            "schema": 1,
-            "scope": "vela-checked-pure-parser-runtime",
-            "status": "built",
-            "directory": str(runtime_dir),
-            "inputs": wanted,
-            "generated_sha256": {
-                "vela-parser": _sha256(_read_file_bytes(exe_path)),
-                "vela_checked_parser.ml": _sha256(_read_file_bytes(source_tree / "vela_checked_parser.ml")),
-                "vela_checked_parser.mli": _sha256(_read_file_bytes(source_tree / "vela_checked_parser.mli")),
-                "VelaPureGrammar.v": _sha256(_read_file_bytes(source_tree / "VelaPureGrammar.v")),
-            },
-        }
-        _write_json(receipt_path, receipt)
-        return vela_parser.Build(runtime_dir, exe_path, receipt)
+        return _publish_runtime_build(runtime_dir, source_tree, wanted)
 
 
 def ensure_checked_build(root: Path | None = None, *, archive: Path | None = None) -> vela_parser.Build:
     """Return a verified runtime build of vela-checked-parser, compiling if inputs changed."""
     repo = Path(__file__).resolve().parents[2] if root is None else root
     runtime_dir = _runtime_root()
-    with _file_lock(runtime_dir / "runtime.lock", timeout=TIMEOUT):
+    with vela_parser._file_lock(runtime_dir / "runtime.lock", timeout=TIMEOUT):
         wanted = _runtime_inputs(repo)
         exe_path = runtime_dir / "vela-checked-parser"
         receipt_path = runtime_dir / "receipt.json"
@@ -1573,39 +1569,10 @@ def ensure_checked_build(root: Path | None = None, *, archive: Path | None = Non
             _write_json(stamp_path, menhirlib_stamp)
         mly_source = _read_file_bytes(repo / "tools/toolchain/parser/parser.mly").decode("utf-8")
         pure_mly, token_stub = _pure_grammar_view(mly_source)
-        (stage_dir / "VelaPureAst.v").write_text(VELA_PURE_AST_V, encoding="utf-8", newline="")
-        (stage_dir / "VelaPureGrammar.mly").write_text(pure_mly, encoding="utf-8", newline="")
-        _run(_opam(["menhir", "--coq", "--strict", "VelaPureGrammar.mly"], switch=env.SAIL_SWITCH),
-             stage_dir, stage_dir / "menhir-coq.stdout", steps)
-        for module_name in GRAMMAR_MODULES:
-            if module_name == "VelaPureProofs":
-                (stage_dir / "VelaPureProofs.v").write_text(VELA_PURE_PROOFS_V, encoding="utf-8", newline="")
-            _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", f"{module_name}.v"]),
-                 stage_dir, stage_dir / f"{module_name.lower()}.stdout", steps)
-        (stage_dir / "VelaPureExtraction.v").write_text(VELA_PURE_EXTRACTION_V, encoding="utf-8", newline="")
-        _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VelaPureExtraction.v"]),
-             stage_dir, stage_dir / "extraction.stdout", steps)
+        _compile_grammar_and_extract(stage_dir, pure_mly, steps)
         _compile_checked_executable(repo, stage_dir, token_stub, steps)
         _require(_runtime_inputs(repo) == wanted, "checked parser runtime inputs changed during build")
-        exe_bytes = _read_file_bytes(stage_dir / "vela-checked-parser")
-        with atomic_path(exe_path) as pending_exe:
-            pending_exe.write_bytes(exe_bytes)
-            pending_exe.chmod(0o755)
-        receipt = {
-            "schema": 1,
-            "scope": "vela-checked-pure-parser-runtime",
-            "status": "built",
-            "directory": str(runtime_dir),
-            "inputs": wanted,
-            "generated_sha256": {
-                "vela-parser": _sha256(_read_file_bytes(exe_path)),
-                "vela_checked_parser.ml": _sha256(_read_file_bytes(stage_dir / "vela_checked_parser.ml")),
-                "vela_checked_parser.mli": _sha256(_read_file_bytes(stage_dir / "vela_checked_parser.mli")),
-                "VelaPureGrammar.v": _sha256(_read_file_bytes(stage_dir / "VelaPureGrammar.v")),
-            },
-        }
-        _write_json(receipt_path, receipt)
-        return vela_parser.Build(runtime_dir, exe_path, receipt)
+        return _publish_runtime_build(runtime_dir, stage_dir, wanted)
 
 
 def print_guest_executable(root: Path) -> None:
@@ -1788,8 +1755,10 @@ def _observations(candidate: Path, reference: Path, guard: str,
 
 def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
     """Freshly build, compare, kernel-check, extract and qualify the checked pure parser."""
+    from filelock import FileLock  # noqa: PLC0415
+
     work = _work_root(root)
-    with _file_lock(work / "qualification.lock", timeout=1):
+    with FileLock(work / "qualification.lock", timeout=1):
         latest = work / "qualification.json"
         latest.unlink(missing_ok=True)
         directory = Path(tempfile.mkdtemp(prefix="support-", dir=work))
@@ -1812,18 +1781,7 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
                 (tree / "Frozen.v").write_text(FROZEN_QUERY, encoding="utf-8", newline="")
                 _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "Frozen.v"]),
                      tree, tree / "frozen.stdout", steps)
-                (tree / "VelaPureAst.v").write_text(VELA_PURE_AST_V, encoding="utf-8", newline="")
-                (tree / "VelaPureGrammar.mly").write_text(pure_mly, encoding="utf-8", newline="")
-                _run(_opam(["menhir", "--coq", "--strict", "VelaPureGrammar.mly"], switch=env.SAIL_SWITCH),
-                     tree, tree / "menhir-coq.stdout", steps)
-                for module_name in GRAMMAR_MODULES:
-                    if module_name == "VelaPureProofs":
-                        (tree / "VelaPureProofs.v").write_text(VELA_PURE_PROOFS_V, encoding="utf-8", newline="")
-                    _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", f"{module_name}.v"]),
-                         tree, tree / f"{module_name.lower()}.stdout", steps)
-                (tree / "VelaPureExtraction.v").write_text(VELA_PURE_EXTRACTION_V, encoding="utf-8", newline="")
-                _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VelaPureExtraction.v"]),
-                     tree, tree / "extraction.stdout", steps)
+                _compile_grammar_and_extract(tree, pure_mly, steps)
             generated_v = (candidate / "VelaPureGrammar.v").read_bytes()
             _require(bool(generated_v) and generated_v == (reference / "VelaPureGrammar.v").read_bytes(),
                      "fresh menhir --coq --strict generation changed VelaPureGrammar.v bytes")
@@ -1876,13 +1834,7 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
                 _require(checked_parsed == dev_parsed,
                          f"vela-checked-parser disagreed with vela-parser on {rel_example}")
                 examples_verified[rel_example] = _sha256(example_bytes)
-            migration_cases = (
-                *migration.fixtures(vela_parser.read_source(root / "examples/pure.vela")),
-                migration.Fixture("authored-compositional-constants",
-                                  vela_parser.read_source(root / "examples/constants.vela"), "accepted"),
-                migration.Fixture("authored-extended-expressions",
-                                  vela_parser.read_source(root / "examples/expressions.vela"), "accepted"),
-            )
+            migration_cases = migration.authored_cases(root)
             migration_report = migration.compare(checked_build, migration_cases)
             _require(migration_report.get("status") == "agreed" and not migration_report.get("differences"),
                      "vela-checked-parser disagreed with pure migration fixtures")
