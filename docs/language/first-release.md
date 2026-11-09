@@ -512,6 +512,10 @@ context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`).
   these identities against the current checkout and installed inputs, refusing
   changed, missing or malformed data. Its `status: matched` reports byte binding;
   `proof_replayed: false` states that it does not rerun the proof commands.
+  Output directories must belong to the current checkout's local lane; inventories
+  reject aliases and exceedance of 4,096 entries or 256 MiB. Runtime identity
+  normalizes only the qualification working-directory load-path entry, retaining
+  external library paths, logical names, installation markers and file hashes.
   Full local proof replay uses `first-slice`. These receipts preserve
   `accepted` as the source proof's empty solver-trust verdict and explicitly
   record `source_correspondence: false`, `artifact_accepted: false` and
