@@ -579,10 +579,162 @@ def _wire_transcript_replay_and_controls() -> None:
     )
 
 
+def _delta_consumer_controls() -> None:
+    change: dict[str, object] = {"range": {
+        "start": {"line": 0, "character": 3}, "end": {"line": 1, "character": 1}},
+        "text": "delta\r\n"}
+    ensure(lsp_clients._wire_source_edit("a\U0001f600b\r\nc", change) == "a\U0001f600delta\r\n",
+           "wire consumer did not independently apply UTF-16/CRLF coordinates")
+    invalid_change = copy.deepcopy(change)
+    cast("dict[str, object]", cast("dict[str, object]", invalid_change["range"])["start"])["character"] = 2
+    _refuses(lambda: lsp_clients._wire_source_edit("a\U0001f600b\r\nc", invalid_change),
+             "wire edit splitting a supplementary character")
+    oracle = lsp_clients.expected_scenario_oracle(_URI)
+    recovered = cast("dict[str, object]", oracle["stage6"])
+    base = cast("list[int]", cast("dict[str, object]", recovered["recovered_semantic_tokens"])["data"])
+    expected = [2, 11, 2, 0, 1, 0, 7, 5, 1, 3, 0, 10, 5, 1, 2]
+    observation: dict[str, object] = {
+        "base": {"resultId": "1" * 64, "data": base},
+        "changed": {"resultId": "2" * 64,
+                    "edits": [{"start": 0, "deleteCount": len(base), "data": expected}]},
+        "unchanged": {"resultId": "3" * 64, "edits": []},
+        "unknown": {"resultId": "4" * 64, "data": expected},
+        "invalidated": {"resultId": "5" * 64, "data": expected},
+    }
+    lsp_clients._verify_delta_observation(observation, base)
+    for key, replacement in (
+        ("base", {"resultId": "1" * 64, "data": []}),
+        ("changed", {"resultId": "2" * 64, "data": expected}),
+        ("changed", {"resultId": "2" * 64, "edits": []}),
+        ("changed", {"resultId": "2" * 64,
+                     "edits": [{"start": True, "deleteCount": len(base), "data": expected}]}),
+        ("changed", {"resultId": "2" * 64,
+                     "edits": [{"start": 0, "deleteCount": len(base) + 1, "data": expected}]}),
+        ("changed", {"resultId": "2" * 64,
+                     "edits": [{"start": 0, "deleteCount": len(base), "data": expected[:-1]}]}),
+        ("unchanged", {"resultId": "3" * 64,
+                       "edits": [{"start": 0, "deleteCount": 0}]}),
+        ("unknown", {"resultId": "4" * 64, "edits": []}),
+        ("invalidated", {"resultId": "5" * 64, "data": []}),
+        ("invalidated", {"resultId": "4" * 64, "data": expected}),
+    ):
+        corrupted = copy.deepcopy(observation)
+        corrupted[key] = replacement
+        _refuses(lambda c=corrupted: lsp_clients._verify_delta_observation(c, base),
+                 f"corrupted {key} observation")
+    _refuses(lambda: lsp_clients._verify_delta_observation({}, base), "missing delta sequence")
+    _, _, transcript = _synthetic_session(incremental=True)
+    _refuses(lambda: lsp_clients.verify_wire_transcript(
+        transcript, require_ranged_change=True, require_token_deltas=True),
+        "full-token-only transcript presented as delta qualification")
+
+
+def _delta_wire_fixture() -> tuple[dict[str, object], dict[str, object]]:
+    frames: list[dict[str, object]] = []
+    request_id = 0
+
+    def frame(direction: str, payload: dict[str, object]) -> None:
+        frames.append({"index": len(frames), "direction": direction,
+                       "message": {"jsonrpc": "2.0", **payload}})
+
+    def note(method: str, params: object = None) -> None:
+        frame("client_to_server", {"method": method, "params": params})
+
+    def request(method: str, params: object, result: object) -> None:
+        nonlocal request_id
+        request_id += 1
+        frame("client_to_server", {"id": request_id, "method": method, "params": params})
+        frame("server_to_client", {"id": request_id, "result": result})
+
+    request("initialize", {"capabilities": {"textDocument": {
+        "semanticTokens": {"requests": {"full": {"delta": True}}}}}}, {})
+    note("initialized", {})
+    note("textDocument/didOpen", {"textDocument": {
+        "uri": _URI, "languageId": "vela", "version": 1, "text": lsp_clients.RECOVERED_SOURCE}})
+    for method in ("hover", "definition", "references", "documentSymbol", "inlayHint",
+                   "formatting", "hover", "hover"):
+        request("textDocument/" + method, {"textDocument": {"uri": _URI},
+            "position": {"line": 0, "character": 0}, "context": {"includeDeclaration": True},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
+            "options": {"tabSize": 4, "insertSpaces": True}}, {})
+    for code in ("type", "unsupported", None):
+        frame("server_to_client", {"method": "textDocument/publishDiagnostics", "params": {
+            "uri": _URI, "diagnostics": [] if code is None else [{"code": code, "data": {
+                "unqualified": True, "snapshot": "fixture", "generation": 1}}]}})
+    before = [0, 0, 1, 0, 0]
+    after = [2, 11, 2, 0, 1, 0, 7, 5, 1, 3, 0, 10, 5, 1, 2]
+    observed: dict[str, object] = {
+        "base": {"resultId": "1" * 64, "data": before},
+        "changed": {"resultId": "2" * 64, "edits": [
+            {"start": 0, "deleteCount": len(before), "data": after}]},
+        "unchanged": {"resultId": "3" * 64, "edits": []},
+        "unknown": {"resultId": "4" * 64, "data": after},
+        "invalidated": {"resultId": "5" * 64, "data": after},
+    }
+    full = "textDocument/semanticTokens/full"
+    request(full, {"textDocument": {"uri": _URI}}, copy.deepcopy(observed["base"]))
+    note("textDocument/didChange", {"textDocument": {"uri": _URI, "version": 2},
+                                  "contentChanges": [{"text": lsp_clients.DELTA_SOURCE}]})
+    for key, previous in (("changed", "1" * 64), ("unchanged", "2" * 64),
+                          ("unknown", "unknown-client-base"), ("invalidated", "4" * 64)):
+        if key == "invalidated":
+            note("workspace/didChangeConfiguration", {"settings": {}})
+        request(full + "/delta", {"textDocument": {"uri": _URI}, "previousResultId": previous},
+                copy.deepcopy(observed[key]))
+    note("workspace/didChangeWatchedFiles", {"changes": []})
+    note("$/cancelRequest", {"id": 99999})
+    note("textDocument/didClose", {"textDocument": {"uri": _URI}})
+    request("shutdown", None, None)
+    note("exit", None)
+    return {"exit_code": 0, "frames": frames}, observed
+
+
+def _delta_wire_evidence_controls() -> None:
+    transcript, observed = _delta_wire_fixture()
+
+    def verify(value: dict[str, object]) -> None:
+        lsp_clients.verify_wire_transcript(value, require_ranged_change=False,
+            require_token_deltas=True, delta_observation=observed)
+
+    verify(transcript)
+    for identity, replacement in (
+        ("2" * 64, {"resultId": "2" * 64, "edits": []}),
+        ("5" * 64, {"resultId": "5" * 64, "edits": []}),
+        ("4" * 64, {"resultId": "4" * 64, "data": [0, 0, 1, 0, 0]}),
+    ):
+        corrupted = copy.deepcopy(transcript)
+        for raw_frame in cast("list[dict[str, object]]", corrupted["frames"]):
+            message = cast("dict[str, object]", raw_frame["message"])
+            result = message.get("result")
+            if isinstance(result, dict) and result.get("resultId") == identity:
+                message["result"] = replacement
+        _refuses(lambda c=corrupted: verify(c), "wrong token data or stale-base edits on wire")
+    wrong_observation = copy.deepcopy(observed)
+    cast("dict[str, object]", wrong_observation["base"])["data"] = []
+    _refuses(lambda: lsp_clients.verify_wire_transcript(transcript, require_ranged_change=False,
+        require_token_deltas=True, delta_observation=wrong_observation),
+        "observation that disagrees with its exact wire response")
+
+
 def _live_two_client_qualification() -> None:
     with redirect_stdout(io.StringIO()):
         report = lsp_clients.qualify_clients()
     ensure(report.get("status") == "passed", f"live qualification failed: {report!r}")
+    ensure(report.get("schema") == 2, "qualification report lacks retained delta evidence")
+    sessions = cast("dict[str, dict[str, object]]", report["sessions"])
+    for name, session in sessions.items():
+        observation_raw = cast("str", session["observation_json"]).encode("utf-8")
+        transcript_raw = cast("str", session["transcript_json"]).encode("utf-8")
+        ensure(_sha256(observation_raw) == session["observation_sha256"],
+               f"{name}: retained observation hash mismatch")
+        ensure(_sha256(transcript_raw) == session["transcript_sha256"],
+               f"{name}: retained transcript hash mismatch")
+        observation = json.loads(observation_raw)
+        lsp_clients.verify_client_observation(observation, lsp_clients.expected_scenario_oracle(
+            observation["uri"]), require_token_deltas=True)
+        lsp_clients.verify_wire_transcript(json.loads(transcript_raw),
+            require_ranged_change=name != "vim_full_sync", require_token_deltas=True,
+            delta_observation=observation["delta"])
 
 
 def cases() -> list[Case]:
@@ -591,5 +743,7 @@ def cases() -> list[Case]:
         Case("wire-transcript-recording-and-cli", _wire_transcript_recording_and_cli),
         Case("scenario-oracle-and-observation-controls", _scenario_oracle_and_observation_controls),
         Case("wire-transcript-replay-and-controls", _wire_transcript_replay_and_controls),
+        Case("delta-consumer-controls", _delta_consumer_controls),
+        Case("delta-wire-evidence-controls", _delta_wire_evidence_controls),
         Case("live-two-client-qualification", _live_two_client_qualification, slow=True),
     ]
