@@ -1551,14 +1551,24 @@ Capacity coverage requires both compilation subjects, their joint kernel-check
 transcript and retained source/library outputs; declared capacities and byte
 lengths agree with those outputs. All 17 semantic negatives must occur exactly
 once with successful parsing, the intended semantic refusal and positive integer locations.
-The eight receipt cases include omitted capacity processes/artifacts, altered
+The eleven receipt cases include omitted capacity processes/artifacts, altered
 metrics, duplicate or missing controls and syntax-only refusals. These checks
 preserve coverage reporting without rerunning controls or remeasuring work.
 Native proof observations bind stdout/stderr byte lengths and hashes separately;
 the strict assumption audit reads the bound stdout while retaining all stderr.
 The current replay reports source `accepted: true` with zero solver-trusted
 obligations and unavailable CompCert execution; four Sail capability/fault
-controls pass. Receipt matching does not replay or authenticate these proofs.
+controls pass. The binding check regenerates their exact capability ELF images
+and rechecks retained simulator/profile commands, split stdout/stderr identities,
+HTIF verdicts, normalized trace digests/counts and capability summaries. Rehashed
+images, incomplete control coverage and altered process subjects refuse.
+Optional CompCert availability must match the execution identity; retained
+Clight/assembly subjects and execution/perturbation summaries must agree. This
+optional check supplies no compiler-process transcript replay. Receipt matching
+does not replay or authenticate these proofs. Final binding publication rechecks
+source/revision, execution/parser identities, retained outputs and the receipt
+bytes after the tool/runtime probes. Eight late-mutation controls refuse changes
+made during those probes.
 
 Q25ar remains open for external independently checked producer receipts and its
 complete declared coverage. Canonical-machine interpretation, compiler,
@@ -1601,12 +1611,15 @@ whole-cell completion credit or additional hours are recorded for this increment
 
 Partial pure-producer delivery on 2026-11-09 under the
 [pure snapshot contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment).
-`vela inspect` exports immutable source-preserving snapshots with schema-2
+`vela inspect` exports immutable source-preserving snapshots with schema-3
 provenance, UTF-8 byte spans, structured scalar/callable identifier types and
 snapshot-scoped resolved symbols/references. Function types include parameter
 types, required-static flags, result types and constant-callable status.
-Its bounded symbol-at, type-at, symbol-list and reference queries reuse the existing
-isolated pure compiler producer. Source, URI, compiler/dependency, configuration,
+Concrete pieces retain exact keyword, identifier, decimal and punctuation
+spellings, ordinary/documentation comments and whitespace, with contiguous UTF-8
+byte spans. Its bounded token-at, token-list, symbol-at, type-at, symbol-list and
+reference queries reuse the existing isolated pure compiler producer.
+Source, URI, compiler/dependency, configuration,
 target and cross-snapshot handle changes refuse; limited results report partial
 status. Unsupported and failed/timed-out analysis cannot report reference absence.
 
@@ -1615,10 +1628,16 @@ validate the machine-checkable response schema, exact Unicode/CRLF reconstructio
 structured types and sibling scopes, query/export bounds, invalidation and read-only
 CLI behavior. Worker checks refuse malformed types, inconsistent declaration
 labels, missing type records, omitted callable parameters and orphan parameter
-facts; version-1 queries are explicitly refused. Independent review found and
+facts; version-1 and version-2 queries are explicitly refused. Independent review found and
 corrected coordinated signature/parameter omissions.
+Three [concrete consumer cases](../../tools/tests/test_vela_inspection_concrete.py)
+independently reconstruct mixed newline/Unicode source, verify piece classifications
+and half-open queries, and exercise bounds, stale inputs, missing/forged trivia
+and source-reconstructing token splits. The worker boundary rechecks the canonical
+pure token partition before publication; failed semantic analysis cannot advertise
+checked concrete pieces.
 Combined local gate and behavioral validation cover integration.
-Q25ch remains open for concrete syntax/typed-tree, imports, generated/proof and
+Q25ch remains open for syntax/typed trees, imports, generated/proof and
 lowering views and their qualified producers. No whole-cell completion credit
 or additional hours are recorded for this development increment.
 
@@ -1637,12 +1656,19 @@ cannot advance the retained base. Full-only clients keep their data-only respons
 
 Five [independent delta cases](../../tools/tests/test_vela_lsp_delta.py) reconstruct
 exact integer streams, cover lifecycle/refusal and Unicode/CRLF edits, and exercise
-the real stdio process with unsaved source. Existing client observations accept
-the negotiated IDs without changing compiler token expectations. Combined local
-gate and behavioral validation cover integration.
+the real stdio process with unsaved source. Pinned Neovim and Vim sessions,
+including both Vim synchronization modes, request full bases, changed and
+unchanged deltas, and full fallbacks for unknown IDs and configuration invalidation.
+Independent consumers reconstruct exact tokens after actual unsaved supplementary
+Unicode/CRLF edits. The schema-2 qualification report retains observation and
+wire JSON plus hashes after temporary session cleanup. Replay checks enforce
+current-base lifetimes and expected tokens, and join all five observed responses
+to wire result IDs, request chains and source snapshots. Corrupted token streams,
+invalidated bases and detached observations refuse.
+Combined local gate and behavioral validation cover integration.
 
 Q25ci remains open for wider qualified producers, the remaining selected editor
-operations and two-client delta qualification. This increment supplies no wider
+operations. This increment supplies no wider
 language or proof admission and records no whole-cell completion credit or hours.
 
 <a id="q25cp-expose-bounded-compiler-performance-traces"></a>
@@ -1659,11 +1685,18 @@ Event/byte/nesting bounds, clock faults, dropped events, open spans and
 refused/cancelled work preserve truthful completeness. Publication rechecks source
 and producer identities and preserves existing output on preparation failure.
 
-Eight [trace consumer cases](../../tools/tests/test_vela_compiler_trace.py)
+Nine [trace consumer cases](../../tools/tests/test_vela_compiler_trace.py)
 independently recover a deterministic timeline and cover quantized zero-duration
 boundaries, changed compiler/parser files, malformed data, truncation/refusal,
 clock regression and late-publication freshness. Independent code review found
 and corrected producer-path, timestamp-boundary and publication-freshness gaps.
+Producer identity includes Python/opam lock owners, the command bootstrap and
+selected host/guest Python and validated checked-parser executable bytes.
+Same-version executable replacements and changed/missing lock owners invalidate
+recordings; validation rechecks producer identity after reading the recording.
+Windows-to-WSL recording, a three-pair benchmark and both validators pass with
+the real locked toolchain. Installed libraries and operating-system closure
+remain outside this selected-executable binding.
 `vela trace-benchmark` measures bounded alternating plain/traced compilation pairs,
 excludes declared warmups and checks identical outputs and complete recordings.
 The source/producer-bound report retains raw timings and independently recomputed
