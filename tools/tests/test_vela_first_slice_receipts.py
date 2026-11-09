@@ -2,6 +2,7 @@
 """Exact-subject and failure controls for first-slice development receipts."""
 
 import copy
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -16,6 +17,60 @@ from toolchain import first_slice as slice_harness
 from toolchain.cli import vela_parser as cli
 
 INDEPENDENT_CASES = True
+
+
+def _execution_fixture(outputs: Path, *, available: bool = False) -> dict[str, object]:
+    """Assemble retained controls with independently specified process and trace facts."""
+    files: dict[str, object] = {
+        "simulator": {"path": str(outputs.parent / "simulator"), "sha256": "1" * 64},
+        "profile": {"path": str(outputs.parent / "profile.json"), "sha256": "2" * 64},
+    }
+    runs: dict[str, object] = {}
+    trace_lines = ["I 1 0000000080000000 00000013", "W 80008000 8 1 0000000000000042",
+                   "R 80008000 8 1 0000000000000042"]
+    normalized = ["I 0000000080000000 00000013", *trace_lines[1:]]
+    digest = hashlib.sha256("\n".join(normalized).encode()).hexdigest()[:16]
+    for mode in ("pass", "bounds-trap", "tag-trap", "perm-trap"):
+        elf = outputs / f"purecap_{mode}.elf"
+        refused, size = slice_harness.cd.assemble(slice_harness._purecap_cheri_asm_stream(mode), elf.stem, elf)
+        ensure(not refused, "independent receipt fixture image did not assemble")
+        stdout = ("\n".join(trace_lines) + ("\nSUCCESS\n" if mode == "pass" else "\nFAILURE: 284\n")).encode()
+        stderr = "diagnostic λ\n".encode()
+        log = outputs / f"purecap_{mode}.sail.log"
+        log.write_bytes(stdout + stderr)
+        process: dict[str, object] = {
+            "command": [str(outputs.parent / "simulator"), "--config", str(outputs.parent / "profile.json"),
+                        "--trace-commit", "--inst-limit", "1000000", "--terminal-log",
+                        str(outputs / f"purecap_{mode}.term"), str(elf)],
+            "returncode": 0 if mode == "pass" else 1,
+            "log": str(log), "log_sha256": hashlib.sha256(log.read_bytes()).hexdigest(),
+            "stdout_bytes": len(stdout), "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+            "stderr_bytes": len(stderr), "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        }
+        runs[mode] = {"verdict": "pass" if mode == "pass" else "trap", "code": 0 if mode == "pass" else 284,
+                      "records": 3, "trace_digest": digest, "cap_roundtrip": True,
+                      "image_bytes": size, "process": process}
+    compiler: dict[str, object] = {"available": available}
+    if available:
+        ccomp = {"path": str(outputs.parent / "ccomp"), "sha256": "3" * 64}
+        files["ccomp"] = ccomp
+        clight, assembly = outputs / "first_slice/first_slice.light.c", outputs / "first_slice/first_slice.s"
+        clight.parent.mkdir(exist_ok=True)
+        clight.write_bytes(b"retained Clight\n")
+        assembly.write_bytes(b"retained assembly\n")
+        compiler.update({
+            "ccomp_path": ccomp["path"], "ccomp_sha256": ccomp["sha256"],
+            "clight_path": str(clight), "clight_sha256": hashlib.sha256(clight.read_bytes()).hexdigest(),
+            "asm_sha256": hashlib.sha256(assembly.read_bytes()).hexdigest(), "asm_lines": 1,
+            "interp_exit_code": 0, "sail_verdict": "pass", "sail_records": 3,
+            "sail_trace_digest": digest, "sail_cap_roundtrip": True,
+            "perturbed_controls": [
+                {"name": label, "check_id": check, "verdict": "fail", "target_code": check, "interp_code": check}
+                for check, label in ((7, "perturbed-wrong-payload-byte"), (12, "perturbed-stale-trailing-byte"),
+                                     (16, "perturbed-checksum-error-code"), (17, "perturbed-unscrubbed-checksum-dst"))],
+        })
+    return {"execution_inputs": {"files": files, "compcert_available": available},
+            "purecap_cheri_runs": runs, "compcert_sail": compiler}
 
 
 def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
@@ -237,13 +292,14 @@ def _binding_checks() -> None:
         parser_hashes = {name: slice_harness._sha256((parser / name).read_bytes())
                          for name in (*slice_harness.vela_parser.GENERATED, "vela-parser")}
         source_inputs = {"source": "old"}
-        execution = {"files": {}, "compcert_available": False}
+        execution_fixture = _execution_fixture(outputs)
+        execution = execution_fixture["execution_inputs"]
         report: dict[str, object] = {
             "schema": 2, "scope": "vela-first-slice-qualification", "status": "passed",
             "artifact_accepted": False, "source_correspondence": False,
             "production_admission": False, "full_machine_refinement_closed": False,
             "inputs": source_inputs, "producer_revision": "a" * 40,
-            "execution_inputs": execution, "toolchain": {}, "runtime": {},
+            **execution_fixture, "toolchain": {}, "runtime": {},
             "parser": {"directory": str(parser), "generated_sha256": parser_hashes,
                        "inputs": {}, "toolchain": {}},
             "parser_outputs": parser_hashes, "directory": str(outputs),
@@ -283,6 +339,7 @@ def _binding_checks() -> None:
                                ("assumption_exports_count", 0), ("inventory", {}),
                                ("capacity_invariance", {}), ("negative_controls", []),
                                ("negative_controls_count", 0),
+                               ("purecap_cheri_runs", {}), ("compcert_sail", {"available": True}),
                                ("proof_corruption_refused", False)):
             damaged = copy.deepcopy(report)
             damaged[field] = changed
@@ -538,6 +595,146 @@ def _control_coverage() -> None:
                 raise AssertionError(f"omitted capacity process {name} was accepted")
 
 
+def _execution_coverage() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-execution-coverage-") as temporary:
+        directory = Path(temporary) / "slice-fixture"
+        directory.mkdir()
+        mutations = ("none", "missing-run", "unknown-run", "missing-process", "command", "image-command",
+                     "profile-command", "missing-log", "log-alias", "log-hash", "signal", "boolean-returncode",
+                     "stdout-size", "stderr-hash", "verdict", "code", "record-count", "boolean-count",
+                     "trace-digest", "roundtrip", "image-size", "missing-image", "rehashed-image",
+                     "rehashed-trace", "rehashed-verdict", "no-trace", "missing-simulator", "missing-profile",
+                     "promoted-compiler", "boolean-available", "unavailable-claims")
+        for mutation in mutations:
+            report = _execution_fixture(directory)
+            runs = cast("dict[str, dict[str, object]]", report["purecap_cheri_runs"])
+            row = runs["pass"]
+            process = cast("dict[str, object]", row["process"])
+            log, elf = directory / "purecap_pass.sail.log", directory / "purecap_pass.elf"
+            if mutation == "missing-run":
+                del runs["bounds-trap"]
+            elif mutation == "unknown-run":
+                runs["unrelated"] = copy.deepcopy(row)
+            elif mutation == "missing-process":
+                del row["process"]
+            elif mutation in {"command", "image-command", "profile-command"}:
+                command = cast("list[str]", process["command"])
+                command[{"command": 0, "profile-command": 2, "image-command": -1}[mutation]] = "other-subject"
+            elif mutation == "missing-log":
+                log.unlink()
+            elif mutation == "log-alias":
+                process["log"] = str(directory / "purecap_bounds-trap.sail.log")
+            elif mutation == "log-hash":
+                process["log_sha256"] = "0" * 64
+            elif mutation in {"signal", "boolean-returncode", "stdout-size", "stderr-hash"}:
+                field, changed = {"signal": ("returncode", -9), "boolean-returncode": ("returncode", False),
+                                  "stdout-size": ("stdout_bytes", 0), "stderr-hash": ("stderr_sha256", "0" * 64)}[mutation]
+                process[field] = changed
+            elif mutation in {"verdict", "code", "record-count", "boolean-count", "trace-digest", "roundtrip", "image-size"}:
+                field, changed = {"verdict": ("verdict", "trap"), "code": ("code", True),
+                                  "record-count": ("records", 0), "boolean-count": ("records", True),
+                                  "trace-digest": ("trace_digest", "0" * 16), "roundtrip": ("cap_roundtrip", False),
+                                  "image-size": ("image_bytes", 0)}[mutation]
+                row[field] = changed
+            elif mutation == "missing-image":
+                elf.unlink()
+            elif mutation == "rehashed-image":
+                elf.write_bytes(b"substitute image")
+            elif mutation in {"rehashed-trace", "rehashed-verdict", "no-trace"}:
+                raw = log.read_bytes()
+                raw = (raw.replace(b"00000013", b"00000093") if mutation == "rehashed-trace"
+                       else raw.replace(b"SUCCESS", b"FAILURE: 7") if mutation == "rehashed-verdict"
+                       else b"SUCCESS\n")
+                log.write_bytes(raw)
+                process.update(log_sha256=hashlib.sha256(raw).hexdigest(), stdout_bytes=len(raw),
+                               stdout_sha256=hashlib.sha256(raw).hexdigest(), stderr_bytes=0,
+                               stderr_sha256=hashlib.sha256(b"").hexdigest())
+                if mutation == "no-trace":
+                    row.update(records=0, trace_digest=hashlib.sha256(b"").hexdigest()[:16], cap_roundtrip=False)
+            elif mutation in {"missing-simulator", "missing-profile"}:
+                files = cast("dict[str, object]", cast("dict[str, object]", report["execution_inputs"])["files"])
+                del files[mutation.removeprefix("missing-")]
+            elif mutation in {"promoted-compiler", "boolean-available", "unavailable-claims"}:
+                compiler = cast("dict[str, object]", report["compcert_sail"])
+                compiler["available" if mutation != "unavailable-claims" else "interp_exit_code"] = (
+                    True if mutation == "promoted-compiler" else 0)
+            artifacts: dict[str, object] = dict(slice_harness._artifacts(directory))
+            try:
+                slice_harness._retained_execution(report, directory, artifacts)
+            except (ValueError, TypeError, OSError) as error:
+                ensure(mutation != "none", f"complete execution coverage refused: {error}")
+            else:
+                ensure(mutation == "none", f"{mutation} concealed incomplete execution coverage")
+
+
+def _compiler_coverage() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-compiler-coverage-") as temporary:
+        directory = Path(temporary) / "slice-fixture"
+        directory.mkdir()
+        for mutation in ("none", "availability", "compiler-path", "compiler-hash", "clight-path", "clight-hash",
+                         "assembly-hash", "assembly-lines", "interp-code", "boolean-code", "sail-verdict",
+                         "trace-count", "trace-digest", "roundtrip", "missing-control", "duplicate-control",
+                         "wrong-control", "target-code", "interp-control-code", "missing-clight", "missing-assembly"):
+            report = _execution_fixture(directory, available=True)
+            compiler = cast("dict[str, object]", report["compcert_sail"])
+            fields: dict[str, tuple[str, object]] = {
+                "availability": ("available", False), "compiler-path": ("ccomp_path", "other-compiler"),
+                "compiler-hash": ("ccomp_sha256", "0" * 64), "clight-path": ("clight_path", "other-clight"),
+                "clight-hash": ("clight_sha256", "0" * 64), "assembly-hash": ("asm_sha256", "0" * 64),
+                "assembly-lines": ("asm_lines", 0), "interp-code": ("interp_exit_code", 1),
+                "boolean-code": ("interp_exit_code", False), "sail-verdict": ("sail_verdict", "fail"),
+                "trace-count": ("sail_records", 0), "trace-digest": ("sail_trace_digest", "malformed"),
+                "roundtrip": ("sail_cap_roundtrip", 1),
+            }
+            if mutation in fields:
+                field, changed = fields[mutation]
+                compiler[field] = changed
+            elif mutation in {"missing-control", "duplicate-control", "wrong-control", "target-code", "interp-control-code"}:
+                controls = cast("list[dict[str, object]]", compiler["perturbed_controls"])
+                if mutation == "missing-control":
+                    controls.pop()
+                elif mutation == "duplicate-control":
+                    controls[-1] = controls[0]
+                else:
+                    field = {"wrong-control": "name", "target-code": "target_code", "interp-control-code": "interp_code"}[mutation]
+                    controls[0][field] = "another-control" if mutation == "wrong-control" else 0
+            elif mutation in {"missing-clight", "missing-assembly"}:
+                (directory / "first_slice" / ("first_slice.light.c" if mutation == "missing-clight" else "first_slice.s")).unlink()
+            try:
+                slice_harness._retained_execution(report, directory, dict(slice_harness._artifacts(directory)))
+            except (ValueError, TypeError, OSError) as error:
+                ensure(mutation != "none", f"complete optional compiler coverage refused: {error}")
+            else:
+                ensure(mutation == "none", f"{mutation} concealed missing optional compiler coverage")
+
+
+def _simulator_observation() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-simulator-observation-") as temporary:
+        directory = Path(temporary)
+        elf, profile = directory / "control.elf", directory / "profile.json"
+        stdout, stderr = "I 1 0000000080000000 00000013\nSUCCESS\n", "diagnostic λ\n"
+        observations: list[dict[str, object]] = []
+        completed = subprocess.CompletedProcess(["simulator"], 0, stdout, stderr)
+        with patch.object(slice_harness.cd.subprocess, "run", return_value=completed) as run:
+            result = slice_harness.cd.run_image(["simulator"], profile, elf, directory, observations=observations)
+        ensure(result.verdict == "pass" and result.records == 1 and len(observations) == 1,
+               "retaining a simulator observation changed its verdict or lost its process")
+        row = observations[0]
+        raw = (stdout + stderr).encode()
+        ensure(row["command"] == run.call_args.args[0] and row["returncode"] == 0,
+               "simulator observation names another command or exit status")
+        ensure(Path(str(row["log"])).read_bytes() == raw and row["log_sha256"] == hashlib.sha256(raw).hexdigest(),
+               "simulator process log is not bound to exact retained bytes")
+        ensure(row["stdout_bytes"] == len(stdout.encode()) and row["stderr_bytes"] == len(stderr.encode())
+               and row["stdout_sha256"] == hashlib.sha256(stdout.encode()).hexdigest()
+               and row["stderr_sha256"] == hashlib.sha256(stderr.encode()).hexdigest(),
+               "simulator observation lost Unicode byte stream boundaries")
+        with patch.object(slice_harness.cd.subprocess, "run", side_effect=subprocess.TimeoutExpired(["simulator"], 1)):
+            result = slice_harness.cd.run_image(["simulator"], profile, elf, directory, observations=observations)
+        ensure(result.verdict == "no-verdict" and len(observations) == 1,
+               "timed-out simulation fabricated a completed observation")
+
+
 def _output_bounds() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-output-bounds-") as temporary:
         root = Path(temporary)
@@ -587,5 +784,8 @@ def cases() -> list[Case]:
             Case("retained proof coverage and assumption consistency", _retained_coverage),
             Case("stdout audit provenance preserves stderr diagnostics", _process_streams),
             Case("retained capacity and semantic refusal coverage", _control_coverage),
+            Case("retained capability execution transcripts and images", _execution_coverage),
+            Case("retained optional compiler availability and controls", _compiler_coverage),
+            Case("simulator observation preserves exact process streams", _simulator_observation),
             Case("first-slice output directory and inventory bounds", _output_bounds),
             Case("first-slice binding CLI and refusal", _cli_dispatch)]

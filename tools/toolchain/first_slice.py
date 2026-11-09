@@ -47,6 +47,7 @@ from toolchain import (
     env,
     proofenv,
     solver_ledger,
+    trace,
 )
 from toolchain import compiler_diff as cd
 from toolchain import (
@@ -64,6 +65,11 @@ EXAMPLE: Final = "examples/first_slice.vela"
 RECEIPT_BYTES: Final = 16 * 1024 * 1024
 ARTIFACT_ENTRIES: Final = 4_096
 ARTIFACT_BYTES: Final = 256 * 1024 * 1024
+PURECAP_CASES: Final = (("pass", "pass", 0), ("bounds-trap", "trap", cd.TRAP_BASE + 28),
+                       ("tag-trap", "trap", cd.TRAP_BASE + 28),
+                       ("perm-trap", "trap", cd.TRAP_BASE + 28))
+PERTURBED_CASES: Final = ((7, "perturbed-wrong-payload-byte"), (12, "perturbed-stale-trailing-byte"),
+                        (16, "perturbed-checksum-error-code"), (17, "perturbed-unscrubbed-checksum-dst"))
 
 DEFAULT_CCOMP_CANDIDATES: Final[tuple[str, ...]] = (
     "/root/build/lane-scalar-effects-20260926/kernel-protected-final/plain/ccomp",
@@ -536,6 +542,83 @@ def _retained_controls(report: dict[str, object], directory: Path,
                 or type(row.get("column")) is not int or row["column"] < 1):
             raise ValueError("first-slice receipt semantic-refusal subject or verdict changed")
         seen.add(name)
+
+
+def _retained_execution(report: dict[str, object], directory: Path,
+                        artifacts: dict[str, object]) -> None:
+    """Reconstruct retained simulator observations and bind optional compiler coverage."""
+    execution, runs = report.get("execution_inputs"), report.get("purecap_cheri_runs")
+    if not isinstance(execution, dict) or not isinstance(execution.get("files"), dict):
+        raise TypeError("first-slice receipt execution identities are malformed")
+    files = execution["files"]
+    for key in ("simulator", "profile"):
+        if not isinstance(files.get(key), dict) or not isinstance(files[key].get("path"), str):
+            raise TypeError("first-slice receipt simulator or profile identity is missing")
+    if not isinstance(runs, dict) or runs.keys() != {case[0] for case in PURECAP_CASES}:
+        raise ValueError("first-slice receipt capability execution coverage is incomplete")
+    with tempfile.TemporaryDirectory(prefix="image-bindings-", dir=directory.parent) as temporary:
+        for mode, verdict, code in PURECAP_CASES:
+            row = runs[mode]
+            if not isinstance(row, dict) or not isinstance(row.get("process"), dict):
+                raise TypeError("first-slice receipt capability process is missing or malformed")
+            process = row["process"]
+            elf, log = directory / f"purecap_{mode}.elf", directory / f"purecap_{mode}.sail.log"
+            expected_command = [files["simulator"]["path"], "--config", files["profile"]["path"],
+                                "--trace-commit", "--inst-limit", str(cd.INST_LIMIT),
+                                "--terminal-log", str(directory / f"purecap_{mode}.term"), str(elf)]
+            if (process.get("command") != expected_command or type(process.get("returncode")) is not int
+                    or process["returncode"] < 0 or process.get("log") != str(log)
+                    or str(log) not in artifacts or process.get("log_sha256") != artifacts[str(log)]
+                    or str(elf) not in artifacts):
+                raise ValueError("first-slice receipt capability process subject changed")
+            stdout = _retained_stdout(process).decode("utf-8")
+            raw = log.read_bytes()
+            said = stdout + raw[len(stdout.encode("utf-8")):].decode("utf-8")
+            observed_verdict, observed_code, _ = cd.htif_verdict(said, process["returncode"])
+            records = trace.normalize_commit(said.splitlines())
+            regenerated = Path(temporary) / elf.name
+            refused, image_bytes = cd.assemble(_purecap_cheri_asm_stream(mode), elf.stem, regenerated)
+            if (refused or regenerated.read_bytes() != elf.read_bytes()
+                    or (observed_verdict, observed_code) != (verdict, code) or not records
+                    or row.get("verdict") != verdict or type(row.get("code")) is not int or row["code"] != code
+                    or type(row.get("records")) is not int or row["records"] != len(records)
+                    or row.get("trace_digest") != trace.digest(records)
+                    or row.get("cap_roundtrip") is not cd.cap_roundtrip(records)
+                    or type(row.get("image_bytes")) is not int or row["image_bytes"] != image_bytes):
+                raise ValueError("first-slice receipt capability image, trace or verdict changed")
+    compiler = report.get("compcert_sail")
+    available = execution.get("compcert_available")
+    if (type(available) is not bool or not isinstance(compiler, dict)
+            or compiler.get("available") is not available
+            or ("ccomp" in files) is not available):
+        raise ValueError("first-slice receipt CompCert availability contradicts execution identity")
+    if not available:
+        if compiler != {"available": False}:
+            raise ValueError("first-slice receipt unavailable CompCert carries execution claims")
+        return
+    ccomp = files["ccomp"]
+    clight, assembly = directory / "first_slice/first_slice.light.c", directory / "first_slice/first_slice.s"
+    if (not isinstance(ccomp, dict) or compiler.get("ccomp_path") != ccomp.get("path")
+            or compiler.get("ccomp_sha256") != ccomp.get("sha256")
+            or compiler.get("clight_path") != str(clight) or str(clight) not in artifacts
+            or compiler.get("clight_sha256") != artifacts[str(clight)] or str(assembly) not in artifacts
+            or compiler.get("asm_sha256") != artifacts[str(assembly)]
+            or type(compiler.get("asm_lines")) is not int
+            or compiler["asm_lines"] != len(assembly.read_text(encoding="utf-8").splitlines())
+            or type(compiler.get("interp_exit_code")) is not int or compiler["interp_exit_code"] != 0
+            or compiler.get("sail_verdict") != "pass"
+            or type(compiler.get("sail_records")) is not int or compiler["sail_records"] <= 0
+            or not isinstance(compiler.get("sail_trace_digest"), str)
+            or re.fullmatch(r"[0-9a-f]{16}", compiler["sail_trace_digest"]) is None
+            or type(compiler.get("sail_cap_roundtrip")) is not bool):
+        raise ValueError("first-slice receipt CompCert subjects or execution summary changed")
+    controls = compiler.get("perturbed_controls")
+    expected = [{"name": label, "check_id": check, "verdict": "fail", "target_code": check,
+                 "interp_code": check} for check, label in PERTURBED_CASES]
+    if (not isinstance(controls, list) or controls != expected
+            or any(type(row.get(key)) is not int for row in controls
+                   for key in ("check_id", "target_code", "interp_code"))):
+        raise ValueError("first-slice receipt perturbed compiler coverage is incomplete")
 
 
 def _retained_proof(root: Path, report: dict[str, object], directory: Path,
@@ -1607,11 +1690,11 @@ __slice_ret:
 
 def _resolve_ccomp(ccomp_path: Path | None) -> Path | None:
     if ccomp_path is not None:
-        return ccomp_path if ccomp_path.is_file() else None
+        return ccomp_path.resolve() if ccomp_path.is_file() else None
     for candidate in DEFAULT_CCOMP_CANDIDATES:
         path = Path(candidate)
         if path.is_file():
-            return path
+            return path.resolve()
     return None
 
 
@@ -1794,26 +1877,22 @@ def _qualify_attempt(
     c_path.write_text(c_source, encoding="utf-8", newline="\n")
 
     loaded_env = env.load(toolchain=False)
-    profile = loaded_env.profile
-    sim_path = loaded_env.simulator
+    profile = loaded_env.profile.resolve()
+    sim_path = loaded_env.simulator.resolve()
     if not sim_path.is_file():
         raise ValueError(f"Sail emulator not found at {sim_path}; run `python tools/run.py model build`")
     simulator = [str(sim_path)]
 
     # 5a. Purecap hardware capability execution & fault controls on sail_riscv_sim
     purecap_runs: dict[str, object] = {}
-    for mode, expected_verdict, expected_code in (
-        ("pass", "pass", 0),
-        ("bounds-trap", "trap", cd.TRAP_BASE + 28),
-        ("tag-trap", "trap", cd.TRAP_BASE + 28),
-        ("perm-trap", "trap", cd.TRAP_BASE + 28),
-    ):
+    for mode, expected_verdict, expected_code in PURECAP_CASES:
         asm_stream = _purecap_cheri_asm_stream(mode)
         asm_elf = directory / f"purecap_{mode}.elf"
         refusals, img_bytes = cd.assemble(asm_stream, f"purecap_{mode}", asm_elf)
         if refusals:
             raise ValueError(f"purecap_{mode} assembly refused: {refusals}")
-        ran = cd.run_image(simulator, profile, asm_elf, directory)
+        processes: list[dict[str, object]] = []
+        ran = cd.run_image(simulator, profile, asm_elf, directory, observations=processes)
         if ran.verdict != expected_verdict or ran.code != expected_code:
             raise ValueError(
                 f"purecap_{mode} expected ({expected_verdict}, {expected_code}), "
@@ -1826,6 +1905,7 @@ def _qualify_attempt(
             "trace_digest": ran.digest,
             "cap_roundtrip": ran.cap_roundtrip,
             "image_bytes": img_bytes,
+            "process": processes[0],
         }
 
     # 5b. CompCert Clight (-dclight), -interp, and purecap C-to-Sail execution
@@ -1851,12 +1931,7 @@ def _qualify_attempt(
             raise ValueError("CompCert -dclight did not emit first_slice.light.c")
 
         perturbed_runs: list[dict[str, object]] = []
-        for check_id, label in (
-            (7, "perturbed-wrong-payload-byte"),
-            (12, "perturbed-stale-trailing-byte"),
-            (16, "perturbed-checksum-error-code"),
-            (17, "perturbed-unscrubbed-checksum-dst"),
-        ):
+        for check_id, label in PERTURBED_CASES:
             p_src, p_checks = lower_to_c(source, parsed, perturb_check=check_id)
             p_prog = cd.Program(label, "given", p_src, p_checks, check_id)
             p_rep = cd.run_program(p_prog, ccomp_cmd, directory, simulator, profile, "", interp=True)
@@ -2033,6 +2108,7 @@ def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
         raise ValueError("first-slice receipt outputs changed")
     _retained_proof(root, receipt, output_directory, artifacts)
     _retained_controls(receipt, output_directory, artifacts)
+    _retained_execution(receipt, output_directory, artifacts)
     with tempfile.TemporaryDirectory(prefix="bindings-", dir=_work_root(root)) as temporary:
         steps: list[dict[str, object]] = []
         if (replay._toolchain(root, Path(temporary), steps) != receipt.get("toolchain")

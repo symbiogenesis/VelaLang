@@ -537,6 +537,17 @@ not establish checked source correspondence or machine/artifact acceptance.
   hashes within each combined retained transcript. The assumption audit consumes
   that checked stdout segment; tool diagnostics on stderr remain retained without
   becoming assumption reports or weakening malformed-stdout refusals.
+  All four capability execution controls retain simulator commands and separate
+  stdout/stderr identities. The binding check requires the complete named control
+  set, exact simulator/profile/image arguments and retained process logs; it
+  reassembles the frozen control images and derives their verdicts, record counts,
+  trace digests and capability round trips from those logs. Missing observations,
+  substituted images, malformed streams and changed execution summaries refuse.
+  Optional CompCert availability must agree with the execution identity. When
+  available, its declared compiler, retained Clight/assembly hashes and four
+  perturbed-control summaries are checked; an unavailable compiler cannot carry
+  execution claims. This rechecks retained evidence without simulator, compiler
+  or interpreter replay, and supplies no independent source-to-machine theorem.
   Output directories must belong to the current checkout's local lane; inventories
   reject aliases and exceedance of 4,096 entries or 256 MiB. Runtime identity
   normalizes only the qualification working-directory load-path entry, retaining
