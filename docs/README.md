@@ -48,3 +48,4 @@
 | [extensions/metaprogramming.md](extensions/metaprogramming.md) | Staged metaprogramming, structural descriptions, and compiler services |
 | [extensions/unified-source-contract.md](extensions/unified-source-contract.md) | Whole-system authoring proposal and native verified compiler |
 | [extensions/full-language-review.md](extensions/full-language-review.md) | Combined calculus review and admission prerequisites |
+| [extensions/numerical-workloads.md](extensions/numerical-workloads.md) | Deferred e-means research candidate, numerical prerequisites and bounded-client acceptance |

@@ -876,6 +876,23 @@ following table allocates that work rather than creating extra estimate cells.
 | Wider formatting, binding lints and checked edit previews — `vela-authoring`, with `vela-lsp` only for a separately qualified editor action | Qualified wider syntax and compiler facts under the [authoring contract](docs/tooling/authoring-tools.md#lint-policy); extend beyond the implemented pure Nat/bool subset | Cover the canonical declarations, matches, generic calls and collection modes with token/comment/documentation preservation, idempotence and equivalent reparsed meaning. Generate assist-don't-coerce edit previews only from checked compiler facts; preserve source bytes by default, exact candidate interpretation and allow/deny policy, and reject changed or stale inputs without publication. | [Q25ck](#q25ck), [Q25ci](#q25ci); shared prerequisites counted once |
 | Independent ergonomics and adoption evidence — `vela-package-trial` | Accepted synchronous slice plus an independently authored library client under the [first-release adoption protocol](docs/assurance/workflow-contract.md#first-release-qualification-and-adoption) | Exercise bounded input, buffer transformation, ordinary errors, resource-returning exits and a representation/refactor change. Freeze the baseline and material-benefit threshold; measure annotations, authoring/diagnosis effort and target/resource costs separately at the same assurance endpoint. Teach common modes before advanced grading; no safety or admission failure is averaged into a usability gain. | [Q25bb](#q25bb); shared prerequisites counted once |
 
+### Deferred numerical workload selection
+
+`numerical-client-selection` retains the [e-means research candidate](docs/extensions/numerical-workloads.md)
+for a later bounded numerical verification workload. It is outside the priced
+Q25 portfolio and supplies no first-release client or implementation commission.
+
+Revisit when an independently named search-index or quantization-codebook
+consumer has a frozen behavior contract and the required represented arithmetic,
+sequence libraries and compiler joins are qualified. Select and price one bounded
+assignment-and-update pilot, including any separately justified numerical
+semantics work, before dispatch. Accept only under the dossier's
+[bounded pilot contract](docs/extensions/numerical-workloads.md#bounded-pilot-acceptance),
+with independent oracle results, checked source/artifact and resource evidence,
+and separately measured numerical quality and target costs. Missing inputs leave
+this deferred; the synchronous release and its independent package trial retain
+their existing order and scope.
+
 ### Vela whole-system authoring proposal
 
 The [pure translation prototype](docs/tooling/pure-prototype.md) is Q25e's
