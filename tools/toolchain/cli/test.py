@@ -9,6 +9,8 @@ temporary state. Cases within a module run in order, and reports merge in sorted
 module order regardless of scheduling. Discovering no modules or loading a
 module that declares no cases is a failure, though lane, `--slow`, and `--shard`
 filtering may leave a module with zero selected cases in a given run. When
+cases are skipped, reports count slow cases and unavailable lanes separately;
+each case is counted once, with the slow filter applied first. When
 `VOS_GATE_TIMINGS` is set (see [toolchain/timings.py](../timings.py)), each
 module's case count and duration are written to that file.
 
@@ -76,6 +78,8 @@ class ModuleReport(Reporter):
     def __init__(self) -> None:
         super().__init__()
         self.cases = 0
+        self.skipped_slow = 0
+        self.skipped_lane = 0
         self.seconds = 0.0
 
 
@@ -151,7 +155,11 @@ def _run_cases(name: str, cases: list[Case] | str, slow: bool,
     listed = len(cases)
     failures: list[str] = []
     for case in cases if share is None else share.share(cases):
-        if (case.slow and not slow) or case.lane not in lanes:
+        if case.slow and not slow:
+            rep.skipped_slow += 1
+            continue
+        if case.lane not in lanes:
+            rep.skipped_lane += 1
             continue
         rep.cases += 1
         try:
@@ -161,6 +169,9 @@ def _run_cases(name: str, cases: list[Case] | str, slow: bool,
     rep.report(name, "failure(s):", failures,
                ok=f"{rep.cases} case(s)"
                + ("" if share is None else f", this shard's share of {listed}"))
+    if rep.skipped_slow or rep.skipped_lane:
+        rep.line(f"       skipped: {rep.skipped_slow} slow case(s), "
+                 f"{rep.skipped_lane} case(s) for unavailable lanes")
     return rep
 
 
@@ -211,6 +222,7 @@ def run(only: str | None = None, slow: bool = False, jobs: int | None = None,
                  + "; every shard must pass")
         names = [name for name in names if name in splits or name in whole]
     units: list[timings.Unit] = []
+    executed = skipped_slow = skipped_lane = 0
     if not names:
         rep.report("tests", "empty suite:",
                    ["nothing under tools/tests/ matches test_*.py"
@@ -227,10 +239,17 @@ def run(only: str | None = None, slow: bool = False, jobs: int | None = None,
             for name, part in zip(names, parts, strict=True):
                 rep.out.extend(part.out)
                 rep.findings += part.findings
+                executed += part.cases
+                skipped_slow += part.skipped_slow
+                skipped_lane += part.skipped_lane
                 units.append({"kind": "module", "name": name, "cases": part.cases,
+                              "skipped_slow": part.skipped_slow,
+                              "skipped_lane": part.skipped_lane,
                               "share": str(shard) if name in splits else None,
                               "seconds": round(part.seconds, 3)})
     timings.write(record, units)
+    rep.line(f"{executed} case(s) run; {skipped_slow} slow case(s) skipped; "
+             f"{skipped_lane} case(s) skipped for unavailable lanes.")
 
     if rep.findings:
         rep.line(f"{rep.findings} finding(s).")

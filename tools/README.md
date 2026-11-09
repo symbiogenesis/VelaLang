@@ -19,6 +19,12 @@
 | `python tools/run.py vela-playground` | guest (`[wsl]`) | Unified Vela browser playground with dependent mathematics |
 | `python tools/run.py vela-parser` | guest (`[wsl]`) | Menhir parser build/qualification, syntax campaigns, dependent elaboration, first-slice harness, and Rocq kernel replay |
 
+The test runner reports executed cases and skips separately. By default it omits
+`--slow` cases and cases requiring another execution lane or an unavailable
+toolchain. `--slow` includes slow cases in the current lane; it does not enable
+guest or kernel checks on Windows. Parser and elaborator qualification commands
+retain their own native build and replay requirements.
+
 ## Dependency and version policy
 
 - **Single Python version owner**: `project.requires-python` in [tools/pyproject.toml](pyproject.toml) (`>=3.14,<3.15`) is the sole owner of the supported Python minor version.
