@@ -38,10 +38,10 @@ class InspectionError(ValueError):
     """The current source cannot supply a complete bounded inspection result."""
 
 
-def inspect_document(source: bytes) -> dict[str, object]:
+def inspect_document(source: bytes, *, concrete: bool = False) -> dict[str, object]:
     """Run only the checkout's fixed fact producer, never a client-selected tool."""
     try:
-        done = subprocess.run(worker_command("--inspect"),
+        done = subprocess.run(worker_command("--inspect-snapshot" if concrete else "--inspect"),
                               input=source, capture_output=True,
                               timeout=INSPECTION_SECONDS, check=False)
         if done.returncode != 0 or len(done.stdout) > MAX_BODY_BYTES:

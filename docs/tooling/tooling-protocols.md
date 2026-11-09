@@ -228,7 +228,7 @@ checked-generation requests retain their separate metaprogramming obligations.
 
 ### Pure development snapshot increment
 
-`python tools/run.py vela inspect SOURCE` exports version 2 of the bounded
+`python tools/run.py vela inspect SOURCE` exports version 3 of the bounded
 pure inspection view. Its [JSON Schema](../../tools/toolchain/inspection.schema.json)
 covers bulk snapshots and query replies; the
 [implementation](../../tools/toolchain/inspection.py) consumes the existing
@@ -237,7 +237,16 @@ isolated five-second worker. This is partial Q25ch delivery. The wider frontend,
 syntax-tree, generated, proof and lowering views retain their producer prerequisites.
 
 Each snapshot preserves the exact UTF-8 source text, including comments, line
-endings and supplementary characters. Declaration and occurrence spans are
+endings and supplementary characters. The `concrete` view partitions that text
+into source-ordered, nonempty pieces with `kind`, exact `text` and half-open byte
+`span`. Kinds are `keyword`, `identifier`, `decimal`, `punctuation`, `whitespace`,
+`line-comment` and `documentation-comment`. Token kinds come from the existing
+pure authoring token producer; trivia fills the gaps without normalizing line
+endings or discarding comments. Concatenating piece text reproduces the exact
+source. The worker boundary verifies contiguous coverage, byte spelling, token
+kinds and comment/trivia shapes. Only a successful complete pure check publishes
+pieces; this bounded view supplies no syntax tree or error-recovery nodes.
+Declaration and occurrence spans are
 half-open UTF-8 byte offsets. The view supplies source-ordered declaration kinds,
 compiler type/signature labels, structured scalar and callable types, authored
 identifier origins, documentation and resolved reference links. The compiler
@@ -259,9 +268,12 @@ identities describe development inspection inputs; they supply no checked source
 correspondence, kernel or runtime-artifact acceptance. The isolated producer uses
 the existing checked-parser runtime qualification and integrity checks.
 
-`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 2`,
+`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 3`,
 the exported `snapshot` digest and one `operation`: `symbols`, `symbol-at` or
 `type-at` with a byte `offset`, or `references` with a snapshot-scoped `symbol` handle.
+`tokens` returns the full concrete partition subject to the query limit;
+`token-at` with a byte `offset` selects its containing token or trivia piece.
+Piece spans are half-open; source EOF selects no piece.
 `type-at` returns the resolved identifier's structured type, symbol handle and
 occurrence span, including at function calls and declarations. Same-spelled
 function and parameter references retain their separately resolved types. This
@@ -272,12 +284,16 @@ occurrences. An identifier's end, punctuation and comments select no symbol.
 Offsets inside UTF-8 characters or CRLF are refused. The Python `Snapshot.query`
 interface also requires the current source and rechecks URI, configuration, target
 and producer closure; a changed binding or cross-snapshot handle is refused.
-Version 2 makes structured types mandatory. Version-1 queries and obsolete
-worker facts without types are refused; no label-parsing compatibility path
-supplies missing semantic facts. Clients must select the published schema version.
+Version 3 makes the concrete partition mandatory alongside structured types.
+Version-1/2 queries and obsolete worker facts without the mandatory views are
+refused; no label-parsing compatibility path supplies missing semantic facts.
+Clients must select the published schema version.
 
 Bulk inspection retains the existing 65,536-byte source, 1,024-declaration and
-4,096-occurrence bounds, with a 1,048,576-byte compact export bound. Queries report
+4,096-occurrence bounds, with an additional 16,384-piece concrete bound and a
+1,048,576-byte compact export bound. Exceeding either publication bound clears
+all semantic and concrete facts; a truncated partition cannot claim reconstruction.
+Queries report
 the total result count; truncation returns `partial`, `complete: false` and
 `result-limit`. Only a complete successful pure check or query reports `checked`
 and `complete: true`. Invalid or unsupported source yields `unavailable` with no
