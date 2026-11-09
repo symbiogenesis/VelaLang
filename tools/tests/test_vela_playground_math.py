@@ -393,15 +393,11 @@ def _playground_formatting_example_assets() -> None:
     root = Path(__file__).resolve().parents[2]
     playground_dir = root / "tools/toolchain/playground"
     docs_dir = root / "docs"
-    html = (playground_dir / "index.html").read_text(encoding="utf-8")
-    script = (playground_dir / "app.mjs").read_text(encoding="utf-8")
-    styles = (playground_dir / "style.css").read_text(encoding="utf-8")
-    ensure((docs_dir / "index.html").read_text(encoding="utf-8") == html,
-           "GitHub Pages docs/index.html drifted from tools/toolchain/playground/index.html")
-    ensure((docs_dir / "app.mjs").read_text(encoding="utf-8") == script,
-           "GitHub Pages docs/app.mjs drifted from tools/toolchain/playground/app.mjs")
-    ensure((docs_dir / "style.css").read_text(encoding="utf-8") == styles,
-           "GitHub Pages docs/style.css drifted from tools/toolchain/playground/style.css")
+    ensure(not playground_dir.exists() or not any(playground_dir.iterdir()),
+           "duplicate tools/toolchain/playground asset directory must remain retired")
+    html = (docs_dir / "index.html").read_text(encoding="utf-8")
+    script = (docs_dir / "app.mjs").read_text(encoding="utf-8")
+    styles = (docs_dir / "style.css").read_text(encoding="utf-8")
     ensure('href="./style.css"' in html and 'src="./app.mjs"' in html,
            "playground index.html must use relative ./style.css and ./app.mjs asset paths for GitHub Pages")
     for section_id in ("overview", "playground", "pillars", "tour", "reference", "verification", "specifications"):
@@ -473,7 +469,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = process.argv[2];
-const playgroundDir = path.join(repoRoot, "tools", "toolchain", "playground");
+const playgroundDir = path.join(repoRoot, "docs");
 const appPath = path.join(playgroundDir, "app.mjs");
 const htmlPath = path.join(playgroundDir, "index.html");
 const html = fs.readFileSync(htmlPath, "utf8");

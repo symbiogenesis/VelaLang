@@ -112,7 +112,7 @@ See [tools/README.md](tools/README.md) for the full command list and toolchain p
 | [docs/assurance/verification-strategy.md](docs/assurance/verification-strategy.md) | Verification strategy, kernel-checking boundaries, and tool qualification rules |
 | [docs/extensions/](docs/extensions/README.md) | Post-first-release designs: graded types, effect handlers/async, interior mutability, metaprogramming, and whole-system authoring |
 | [examples/](examples/) | Working `.vela` examples ([pure.vela](examples/pure.vela), [constants.vela](examples/constants.vela), [expressions.vela](examples/expressions.vela), [surface.vela](examples/surface.vela), [dependent.vela](examples/dependent.vela), [first_slice.vela](examples/first_slice.vela)) |
-| [tools/toolchain/](tools/toolchain/) | Compiler, dependent elaborator, loan analysis, formatter, linter, LSP server, Menhir parser ([parser/](tools/toolchain/parser/)), and playground ([playground/](tools/toolchain/playground/)) |
+| [tools/toolchain/](tools/toolchain/) | Compiler, dependent elaborator, loan analysis, formatter, linter, LSP server, Menhir parser ([parser/](tools/toolchain/parser/)), and playground server ([playground.py](tools/toolchain/playground.py)) |
 | [tools/tests/](tools/tests/) | Behavioral test suite (`test_vela*.py`) |
 | [COPYRIGHT.md](COPYRIGHT.md) | Licensing overview (`Apache-2.0` for code and examples, `CC-BY-4.0` for documentation) |
 | [THIRD-PARTY.md](THIRD-PARTY.md) | Third-party tool pins, browser editor assets, and upstream license records |

@@ -121,11 +121,7 @@ _JS_MULTI_OPS = (
     "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<", ">>", "?.",
 )
 
-_PLAYGROUND_SYNC_PAIRS = (
-    ("tools/toolchain/playground/index.html", "docs/index.html"),
-    ("tools/toolchain/playground/app.mjs", "docs/app.mjs"),
-    ("tools/toolchain/playground/style.css", "docs/style.css"),
-)
+_PLAYGROUND_CANONICAL_ASSETS = ("docs/index.html", "docs/app.mjs", "docs/style.css")
 _HTML_ID_RE = re.compile(r'\bid="([^"]+)"')
 _HTML_TAB_RE = re.compile(r'\bdata-tab="([^"]+)"')
 _HTML_LOAD_EXAMPLE_RE = re.compile(r'\bdata-load-example="([^"]+)"')
@@ -859,20 +855,14 @@ def _extract_js_object_keys(
 def _playground_asset_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
     findings: list[str] = []
     indexed = loaded.indexed
-    for src_rel, dst_rel in _PLAYGROUND_SYNC_PAIRS:
-        if src_rel not in indexed or dst_rel not in indexed:
-            continue
-        try:
-            src_bytes = (root / src_rel).read_bytes()
-            dst_bytes = (root / dst_rel).read_bytes()
-        except OSError as err:
-            findings.append(f"{dst_rel}: cannot read playground mirror asset: {err}")
-            continue
-        if src_bytes != dst_bytes:
-            findings.append(f"{dst_rel}: playground asset is out of sync with {src_rel}")
+    for rel in sorted(indexed):
+        if rel.startswith("tools/toolchain/playground/"):
+            findings.append(
+                f"{rel}: duplicate playground asset; docs/ is the single canonical asset directory"
+            )
 
-    app_rel = "tools/toolchain/playground/app.mjs"
-    html_rel = "tools/toolchain/playground/index.html"
+    app_rel = "docs/app.mjs"
+    html_rel = "docs/index.html"
     if app_rel not in indexed or html_rel not in indexed:
         return findings
     try:

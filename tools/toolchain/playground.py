@@ -187,7 +187,7 @@ class PlaygroundServer(HTTPServer):
         self.parser_sha256 = (hashlib.sha256(mathematical_parser.read_bytes()).hexdigest()
                               if mathematical_parser is not None else None)
         self.sessions: dict[str, Session] = {}
-        self.assets = (Path(__file__).resolve().parents[1] / "toolchain" / "playground"
+        self.assets = (Path(__file__).resolve().parents[2] / "docs"
                        if assets is None else assets)
         super().__init__(("127.0.0.1", port), PlaygroundHandler)
         self.authority = f"127.0.0.1:{self.server_address[1]}"

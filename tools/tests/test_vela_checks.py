@@ -207,13 +207,9 @@ def _javascript_and_playground_controls() -> None:
         tracked = [
             "docs/app.mjs",
             "docs/index.html",
-            "tools/toolchain/playground/app.mjs",
-            "tools/toolchain/playground/index.html",
         ]
         for rel, content in (
-            ("tools/toolchain/playground/app.mjs", clean_js),
             ("docs/app.mjs", clean_js),
-            ("tools/toolchain/playground/index.html", clean_html),
             ("docs/index.html", clean_html),
         ):
             (root / rel).write_text(content, encoding="utf-8", newline="\n")
@@ -228,9 +224,6 @@ def _javascript_and_playground_controls() -> None:
             'const VELA_GRAMMAR_TYPE_KEYWORD_SET = new Set(["byte"]);\n',
             'const VELA_GRAMMAR_TYPE_SET = new Set(["byte"]);\n',
         )
-        (root / "tools/toolchain/playground/app.mjs").write_text(
-            undeclared_js, encoding="utf-8", newline="\n"
-        )
         (root / "docs/app.mjs").write_text(undeclared_js, encoding="utf-8", newline="\n")
         undeclared_found = checks.javascript_findings(root, clean_corpus)
         ensure(
@@ -241,9 +234,6 @@ def _javascript_and_playground_controls() -> None:
         tpl_undeclared_js = clean_js.replace(
             '$("editor");', '$("editor");\n  const msg = `${MISSING_TPL_VAR}`;'
         )
-        (root / "tools/toolchain/playground/app.mjs").write_text(
-            tpl_undeclared_js, encoding="utf-8", newline="\n"
-        )
         (root / "docs/app.mjs").write_text(tpl_undeclared_js, encoding="utf-8", newline="\n")
         tpl_found = checks.javascript_findings(root, clean_corpus)
         ensure(
@@ -251,28 +241,24 @@ def _javascript_and_playground_controls() -> None:
             f"undeclared identifier inside template expression must be refused: {tpl_found!r}",
         )
 
+        (root / "docs/app.mjs").write_text(clean_js, encoding="utf-8", newline="\n")
         (root / "tools/toolchain/playground/app.mjs").write_text(
             clean_js, encoding="utf-8", newline="\n"
         )
-        (root / "docs/app.mjs").write_text(
-            clean_js + "// drift\n", encoding="utf-8", newline="\n"
-        )
-        drift_found = checks.javascript_findings(root, clean_corpus)
+        dup_tracked = [*tracked, "tools/toolchain/playground/app.mjs"]
+        dup_corpus = corpus.Corpus(root, [], {}, dup_tracked, set(dup_tracked))
+        drift_found = checks.javascript_findings(root, dup_corpus)
         ensure(
-            any("out of sync" in item for item in drift_found),
-            f"out-of-sync docs/app.mjs mirror must be refused: {drift_found!r}",
+            any("duplicate playground asset" in item for item in drift_found),
+            f"reintroduced tools/toolchain/playground/app.mjs mirror must be refused: {drift_found!r}",
         )
 
-        (root / "docs/app.mjs").write_text(clean_js, encoding="utf-8", newline="\n")
         bad_html = (
             '<!doctype html>\n'
             '<button data-tab="problems" aria-controls="missing-aria"></button>\n'
             '<a data-expand-target="missing-card"></a>\n'
             '<button data-load-example="unknown_example"></button>\n'
             '<select id="examples"><option value="unknown_option">Bad</option></select>\n'
-        )
-        (root / "tools/toolchain/playground/index.html").write_text(
-            bad_html, encoding="utf-8", newline="\n"
         )
         (root / "docs/index.html").write_text(bad_html, encoding="utf-8", newline="\n")
         dom_found = checks.javascript_findings(root, clean_corpus)
