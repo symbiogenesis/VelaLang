@@ -1269,6 +1269,26 @@ def _toolchain(root: Path, directory: Path, steps: list[dict[str, object]]) -> d
                               for name in ("rocq", "rocqchk", "ocamlc")}}
 
 
+def _load_path_identity(listing: str, directory: Path) -> tuple[set[Path], str]:
+    """Normalize the qualification cwd while retaining every external load-path row."""
+    roots: set[Path] = set()
+    lines = re.sub(r"\n\s+(/)", r" \1", listing).splitlines()
+    if not lines or lines[0] != "Installed / Logical Path / Physical path:":
+        raise ValueError("Vela replay prover load-path listing is unsupported")
+    identities = [lines[0]]
+    for line in lines[1:]:
+        found = re.fullmatch(r"\s*(?:i\s+)?(?:<>|[\w.]+)\s+(/.+)", line)
+        if found is None:
+            raise ValueError("Vela replay prover load-path row is unsupported")
+        path = Path(found[1]).resolve()
+        if path == directory.resolve():
+            identities.append(line[:found.start(1)] + "<qualification-directory>")
+        else:
+            roots.add(path)
+            identities.append(line)
+    return roots, "\n".join(identities) + "\n"
+
+
 def _runtime(directory: Path, steps: list[dict[str, object]]) -> dict[str, object]:
     """Bind the actual runtime roots, including user-contrib and plugin inputs."""
     config = _run(_opam(["rocq", "c", "-config"]), directory,
@@ -1285,16 +1305,8 @@ def _runtime(directory: Path, steps: list[dict[str, object]]) -> dict[str, objec
         raise ValueError("Vela replay kernel library path is unsupported")
     roots = {Path(settings[key]).resolve() for key in ("COQLIB", "COQCORELIB")}
     roots.add(Path(where).resolve())
-    lines = re.sub(r"\n\s+(/)", r" \1", listing).splitlines()
-    if not lines or lines[0] != "Installed / Logical Path / Physical path:":
-        raise ValueError("Vela replay prover load-path listing is unsupported")
-    for line in lines[1:]:
-        found = re.fullmatch(r"\s*(?:i\s+)?(?:<>|[\w.]+)\s+(/.+)", line)
-        if found is None:
-            raise ValueError("Vela replay prover load-path row is unsupported")
-        path = Path(found[1]).resolve()
-        if path != directory.resolve():
-            roots.add(path)
+    additional, identity = _load_path_identity(listing, directory)
+    roots.update(additional)
     minimal = sorted(path for path in roots
                      if not any(path != other and path.is_relative_to(other) for other in roots))
     files: dict[str, str] = {}
@@ -1308,7 +1320,7 @@ def _runtime(directory: Path, steps: list[dict[str, object]]) -> dict[str, objec
                 files[str(path)] = _sha256(path.read_bytes())
     if not files:
         raise ValueError("Vela replay runtime inventory is empty")
-    return {"config": config, "load_path": listing, "files_sha256": files}
+    return {"config": config, "load_path": identity, "files_sha256": files}
 
 
 def _work_root(root: Path) -> Path:

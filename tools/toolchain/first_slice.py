@@ -62,6 +62,8 @@ from toolchain.jsonutil import unique_object
 TIMEOUT: Final = 120
 EXAMPLE: Final = "examples/first_slice.vela"
 RECEIPT_BYTES: Final = 16 * 1024 * 1024
+ARTIFACT_ENTRIES: Final = 4_096
+ARTIFACT_BYTES: Final = 256 * 1024 * 1024
 
 DEFAULT_CCOMP_CANDIDATES: Final[tuple[str, ...]] = (
     "/root/build/lane-scalar-effects-20260926/kernel-protected-final/plain/ccomp",
@@ -374,17 +376,34 @@ def _execution_inputs(ccomp_path: Path | None) -> dict[str, object]:
             "compcert_available": compiler is not None, "python_version": sys.version}
 
 
+def _receipt_directory(name: str, parent: Path, prefix: str) -> Path:
+    path = Path(name)
+    if (not path.is_absolute() or not path.is_dir() or path.is_symlink()
+            or path.resolve().parent != parent.resolve()
+            or re.fullmatch(re.escape(prefix) + r"[a-z0-9_]+", path.name) is None):
+        raise ValueError("first-slice receipt directory is outside its local output scope")
+    return path
+
+
 def _artifacts(directory: Path) -> dict[str, str]:
     """Inventory retained outputs without including the self-referential journal."""
     files: dict[str, str] = {}
-    for path in sorted(directory.rglob("*")):
+    size = 0
+    for index, path in enumerate(directory.rglob("*"), 1):
+        if index > ARTIFACT_ENTRIES:
+            raise ValueError("first-slice output inventory exceeds its entry bound")
         if path.is_symlink():
             raise ValueError("first-slice output contains an alias")
         if path.is_file() and path != directory / "attempt.json":
-            files[str(path)] = _sha256(path.read_bytes())
+            with path.open("rb") as stream:
+                raw = stream.read(ARTIFACT_BYTES - size + 1)
+            size += len(raw)
+            if size > ARTIFACT_BYTES:
+                raise ValueError("first-slice output inventory exceeds its byte bound")
+            files[str(path)] = _sha256(raw)
     if not files:
         raise ValueError("first-slice output inventory is empty")
-    return files
+    return dict(sorted(files.items()))
 
 
 def _write(path: Path, payload: object) -> None:
@@ -1812,7 +1831,7 @@ def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
     if (not isinstance(parser_receipt, dict) or not isinstance(parser_receipt.get("directory"), str)
             or not isinstance(parser_receipt.get("generated_sha256"), dict)):
         raise TypeError("first-slice receipt parser identity is malformed")
-    directory = Path(parser_receipt["directory"])
+    directory = _receipt_directory(parser_receipt["directory"], vela_parser._work_root(root), "build-")
     compiled = vela_parser.Build(directory, directory / "vela-parser", parser_receipt)
     if (parser_receipt.get("inputs") != vela_parser._inputs(root)
             or parser_receipt.get("toolchain") != vela_parser._toolchain(root)
@@ -1822,7 +1841,8 @@ def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
     directory_name = receipt.get("directory")
     if not isinstance(directory_name, str) or not isinstance(artifacts, dict):
         raise TypeError("first-slice receipt output inventory is malformed")
-    if _artifacts(Path(directory_name)) != artifacts:
+    output_directory = _receipt_directory(directory_name, _work_root(root), "slice-")
+    if _artifacts(output_directory) != artifacts:
         raise ValueError("first-slice receipt outputs changed")
     with tempfile.TemporaryDirectory(prefix="bindings-", dir=_work_root(root)) as temporary:
         steps: list[dict[str, object]] = []

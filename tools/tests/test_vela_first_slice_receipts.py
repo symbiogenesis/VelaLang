@@ -102,11 +102,11 @@ def _publication_freshness() -> None:
 def _binding_checks() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-bindings-") as temporary, ExitStack() as stack:
         root = Path(temporary)
-        outputs = root / "outputs"
+        outputs = root / "slice-fixture"
         outputs.mkdir()
         artifact = outputs / "FirstSlice.vo"
         artifact.write_bytes(b"checked library")
-        parser = root / "parser"
+        parser = root / "build-fixture"
         parser.mkdir()
         for name in (*slice_harness.vela_parser.GENERATED, "vela-parser"):
             (parser / name).write_bytes(name.encode())
@@ -132,6 +132,7 @@ def _binding_checks() -> None:
         stack.enter_context(patch.object(slice_harness, "_work_root", return_value=root))
         stack.enter_context(patch.object(slice_harness.vela_parser, "_inputs", return_value={}))
         stack.enter_context(patch.object(slice_harness.vela_parser, "_toolchain", return_value={}))
+        stack.enter_context(patch.object(slice_harness.vela_parser, "_work_root", return_value=root))
         stack.enter_context(patch.object(slice_harness.replay, "_toolchain", return_value={}))
         stack.enter_context(patch.object(slice_harness.replay, "_runtime", return_value={}))
 
@@ -147,7 +148,8 @@ def _binding_checks() -> None:
                                ("producer_revision", "b" * 40), ("inputs", {}),
                                ("artifact_accepted", True), ("source_correspondence", True),
                                ("execution_inputs", None), ("parser", {}),
-                               ("artifacts_sha256", {}), ("runtime", {"changed": True})):
+                               ("artifacts_sha256", {}), ("directory", str(root)),
+                               ("runtime", {"changed": True})):
             damaged = copy.deepcopy(report)
             damaged[field] = changed
             write(damaged)
@@ -190,6 +192,33 @@ def _binding_checks() -> None:
                 raise AssertionError("oversized receipt was accepted")
 
 
+def _output_bounds() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-output-bounds-") as temporary:
+        root = Path(temporary)
+        output = root / "slice-fixture"
+        output.mkdir()
+        artifact = output / "FirstSlice.vo"
+        artifact.write_bytes(b"checked fixture")
+        ensure(slice_harness._receipt_directory(str(output), root, "slice-") == output,
+               "expected local output directory was refused")
+        for name in (str(root), str(output / ".."), "slice-fixture", str(artifact)):
+            try:
+                slice_harness._receipt_directory(name, root, "slice-")
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("receipt escaped the expected output directory scope")
+        for bound, value, message in (("ARTIFACT_ENTRIES", 0, "entry bound"),
+                                      ("ARTIFACT_BYTES", 1, "byte bound")):
+            with patch.object(slice_harness, bound, value):
+                try:
+                    slice_harness._artifacts(output)
+                except ValueError as error:
+                    ensure(message in str(error), "oversized output inventory lost its bound diagnostic")
+                else:
+                    raise AssertionError("oversized output inventory was hashed")
+
+
 def _cli_dispatch() -> None:
     expected = {"status": "matched", "proof_replayed": False, "artifact_accepted": False}
     with patch.object(cli.vela_first_slice, "verify_bindings", return_value=expected) as verify, \
@@ -209,4 +238,5 @@ def cases() -> list[Case]:
     return [Case("local producer source and dependency inventory", _source_inventory),
             Case("changed inputs withdraw first-slice publication", _publication_freshness),
             Case("retained first-slice identities and malformed refusals", _binding_checks),
+            Case("first-slice output directory and inventory bounds", _output_bounds),
             Case("first-slice binding CLI and refusal", _cli_dispatch)]
