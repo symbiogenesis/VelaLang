@@ -200,6 +200,7 @@ class LoweredFunction:
     name: str
     owners: tuple[Owner, ...]
     graph: Graph
+    node_sites: Mapping[str, dict[str, object]] = field(default_factory=dict)
 
 
 class _Budget:
@@ -1227,6 +1228,30 @@ def _id_text(value: object) -> str:
     return text.replace(".", "_")
 
 
+def _op_text(value: object) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and isinstance(value.get("text"), str):
+        return str(value["text"])
+    return ""
+
+
+def _is_ident(node: dict[str, object]) -> bool:
+    return node.get("kind") in {"identifier", "name"}
+
+
+def _extract_borrow_expr(expr: dict[str, object]) -> tuple[str, dict[str, object]] | None:
+    kind = expr.get("kind")
+    if kind == "borrow":
+        return str(expr.get("mode", "in")), _ast_node(expr["value"])
+    if kind == "unary":
+        op = _op_text(expr.get("operator"))
+        if op in {"in", "ref", "out", "move"}:
+            inner = expr.get("value") if "value" in expr else expr.get("operand")
+            return op, _ast_node(inner)
+    return None
+
+
 def _type_base_name(type_node: object) -> str | None:
     if not isinstance(type_node, dict):
         return None
@@ -1235,11 +1260,77 @@ def _type_base_name(type_node: object) -> str | None:
         name_node = type_node.get("name")
         if isinstance(name_node, dict) and isinstance(name_node.get("text"), str):
             return str(name_node["text"]).split(".")[-1]
+    if kind in {"name", "identifier"} and "name" in type_node:
+        return _id_text(type_node["name"]).split("_")[-1]
+    if kind == "member":
+        member_val = type_node.get("name") or type_node.get("member")
+        if member_val is not None:
+            return _id_text(member_val).split("_")[-1]
+    if kind in {"type_application", "generic_application"}:
+        return _type_base_name(type_node.get("callee") or type_node.get("value"))
     if kind == "modified_type":
         return _type_base_name(type_node.get("type"))
-    if kind == "group_type":
-        return _type_base_name(type_node.get("type"))
+    if kind in {"group_type", "group"}:
+        return _type_base_name(type_node.get("type") or type_node.get("value"))
     return None
+
+
+def _type_modifiers(type_node: object) -> set[str]:
+    mods: set[str] = set()
+    curr = type_node
+    while isinstance(curr, dict) and curr.get("kind") in {"modified_type", "group_type", "group"}:
+        if curr.get("kind") == "modified_type":
+            raw_mods = curr.get("modifiers")
+            if isinstance(raw_mods, list):
+                for m in raw_mods:
+                    mtext = _op_text(m)
+                    if mtext:
+                        mods.add(mtext)
+            raw_mod = curr.get("modifier")
+            if raw_mod is not None:
+                mtext = _op_text(raw_mod)
+                if mtext:
+                    mods.add(mtext)
+        curr = curr.get("type") or curr.get("value")
+    return mods
+
+
+_SCALAR_VALUE_TYPES = frozenset({
+    "Nat",
+    "bool",
+    "char",
+    "Unit",
+    "unit",
+    "byte",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "usize",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "isize",
+})
+
+
+def _is_scalar_value_type(type_node: object) -> bool:
+    if not isinstance(type_node, dict) or _type_modifiers(type_node):
+        return False
+    return _type_base_name(type_node) in _SCALAR_VALUE_TYPES
+
+
+def _body_statements(raw: object) -> list[dict[str, object]]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return _ast_nodes(raw)
+    if isinstance(raw, dict):
+        if raw.get("kind") == "block":
+            return _ast_nodes(raw.get("statements", []))
+        return [cast("dict[str, object]", raw)]
+    raise AnalysisRefusalError("expected statement block or list")
 
 
 def _extract_return_lifetime_place(type_node: object) -> Place | None:
@@ -1248,12 +1339,16 @@ def _extract_return_lifetime_place(type_node: object) -> Place | None:
     kind = type_node.get("kind")
     if kind == "modified_type":
         lifetime = type_node.get("lifetime")
-        if isinstance(lifetime, dict) and isinstance(lifetime.get("text"), str):
-            parts = [part for part in str(lifetime["text"]).split(".") if part]
-            if parts and _NAME.fullmatch(parts[0]):
-                return Place(parts[0], tuple(parts[1:]))
+        if isinstance(lifetime, dict):
+            ltext = lifetime.get("text")
+            if not isinstance(ltext, str) and isinstance(lifetime.get("name"), dict):
+                ltext = cast("dict[str, object]", lifetime["name"]).get("text")
+            if isinstance(ltext, str):
+                parts = [part for part in ltext.split(".") if part]
+                if parts and _NAME.fullmatch(parts[0]):
+                    return Place(parts[0], tuple(parts[1:]))
         return _extract_return_lifetime_place(type_node.get("type"))
-    if kind == "type":
+    if kind in {"type", "type_application", "generic_application"}:
         for arg in _ast_nodes(type_node.get("arguments", [])):
             found = _extract_return_lifetime_place(arg)
             if found is not None:
@@ -1279,12 +1374,21 @@ def _collect_structs(declarations: list[dict[str, object]]) -> dict[str, _Struct
         field_paths: list[tuple[str, ...]] = []
         views: dict[str, tuple[str, ...]] = {}
         invariants: list[str] = []
+        for param_decl in _ast_nodes(decl.get("parameters", [])):
+            if param_decl.get("kind") in {"parameter", "field"} and "name" in param_decl:
+                fname = _id_text(param_decl["name"])
+                if (fname,) not in field_paths:
+                    field_paths.append((fname,))
         for field_decl in _ast_nodes(decl.get("fields", [])):
             if field_decl.get("kind") == "field":
                 fname = _id_text(field_decl["name"])
                 if (fname,) not in field_paths:
                     field_paths.append((fname,))
-        for member in _ast_nodes(decl.get("members", [])):
+        member_items = [
+            *_ast_nodes(decl.get("members", [])),
+            *_ast_nodes(decl.get("declarations", [])),
+        ]
+        for member in member_items:
             mkind = member.get("kind")
             if mkind in {"field", "property"}:
                 fname = _id_text(member["name"])
@@ -1308,8 +1412,9 @@ def _collect_structs(declarations: list[dict[str, object]]) -> dict[str, _Struct
                 if vpath not in field_paths:
                     field_paths.append(vpath)
         for contract in _ast_nodes(decl.get("contracts", [])):
-            if contract.get("kind") == "invariant":
-                label = contract.get("label")
+            ckind = contract.get("kind")
+            if ckind == "invariant" or (ckind == "contract" and contract.get("role") == "invariant"):
+                label = contract.get("label") or contract.get("name")
                 if isinstance(label, dict) and isinstance(label.get("text"), str):
                     cname = _id_text(label)
                 else:
@@ -1331,20 +1436,34 @@ def _find_functions(
             found.extend(_find_functions(_ast_nodes(decl.get("declarations", [])), enclosing_type))
         elif kind in {"struct", "record"}:
             tname = _id_text(decl["name"])
-            for member in _ast_nodes(decl.get("members", [])):
-                if member.get("kind") in {"method", "function"} and member.get("body") is not None:
+            member_items = [
+                *_ast_nodes(decl.get("members", [])),
+                *_ast_nodes(decl.get("declarations", [])),
+            ]
+            for member in member_items:
+                if member.get("kind") in {"method", "function", "definition"} and (
+                    member.get("body") is not None or member.get("value") is not None
+                ):
                     mname = _id_text(member["name"])
                     found.append((f"{tname}.{mname}", member, tname))
                     found.append((mname, member, tname))
         elif kind == "impl":
-            tname = _type_base_name(decl.get("target"))
-            for member in _ast_nodes(decl.get("members", [])):
-                if member.get("kind") in {"method", "function"} and member.get("body") is not None:
+            tname = _type_base_name(decl.get("target") or decl.get("type"))
+            member_items = [
+                *_ast_nodes(decl.get("members", [])),
+                *_ast_nodes(decl.get("declarations", [])),
+            ]
+            for member in member_items:
+                if member.get("kind") in {"method", "function", "definition"} and (
+                    member.get("body") is not None or member.get("value") is not None
+                ):
                     mname = _id_text(member["name"])
                     if tname is not None:
                         found.append((f"{tname}.{mname}", member, tname))
                     found.append((mname, member, tname))
-        elif kind in {"function", "method", "definition"} and decl.get("body") is not None:
+        elif kind in {"function", "method", "definition"} and (
+            decl.get("body") is not None or decl.get("value") is not None
+        ):
             fname = _id_text(decl["name"])
             if enclosing_type is not None:
                 found.append((f"{enclosing_type}.{fname}", decl, enclosing_type))
@@ -1377,15 +1496,20 @@ class _FunctionLowerer:
         self.nodes: list[Node] = []
         self.edges: dict[str, list[str]] = {}
         self.events: dict[str, Event] = {}
+        self.node_sites: dict[str, dict[str, object]] = {}
+        self.current_site: dict[str, object] = fn_node
         self.counter = 0
         self.loan_counter = 0
-        self.return_lifetime_place = _extract_return_lifetime_place(fn_node.get("return_type"))
+        return_type_node = fn_node.get("return_type") or fn_node.get("result")
+        self.return_lifetime_place = _extract_return_lifetime_place(return_type_node)
+        self.returns_scalar_value = _is_scalar_value_type(return_type_node)
 
     def _fresh_node(self, prefix: str = "n", event: Event | None = None) -> str:
         self.counter += 1
         name = f"{prefix}_{self.counter}"
         self.events[name] = Nop() if event is None else event
         self.edges[name] = []
+        self.node_sites[name] = self.current_site
         return name
 
     def _fresh_loan(self, prefix: str = "loan") -> str:
@@ -1406,6 +1530,7 @@ class _FunctionLowerer:
             and not prefix.startswith(("join", "header"))
         ):
             self.events[current] = event
+            self.node_sites[current] = self.current_site
             return current
         nxt = self._fresh_node(prefix, event)
         self._connect(current, nxt)
@@ -1480,31 +1605,49 @@ class _FunctionLowerer:
             elif pkind == "parameter":
                 pname = _id_text(param["name"])
                 pmode = param.get("mode", "value")
-                ptype_node = param.get("parameter_type")
+                ptype_node = param.get("parameter_type") or param.get("type")
                 ptype = _type_base_name(ptype_node)
-                borrowed = pmode in {"in", "ref", "out"}
-                if isinstance(ptype_node, dict) and ptype_node.get("kind") == "modified_type":
-                    mods = ptype_node.get("modifiers", [])
-                    if isinstance(mods, list) and any(m in {"in", "ref", "out"} for m in mods):
-                        borrowed = True
+                mods = _type_modifiers(ptype_node)
+                borrowed = (
+                    pmode in {"in", "ref", "out"}
+                    or bool(mods & {"in", "ref", "out"})
+                    or ptype in {"Span", "Slots"}
+                )
                 self._register_owner(pname, borrowed=borrowed, type_name=ptype)
 
         for contract in _ast_nodes(self.fn_node.get("contracts", [])):
-            if contract.get("kind") == "effects":
+            ckind = contract.get("kind")
+            if ckind == "effects":
                 for eff in _ast_nodes(contract.get("effects", [])):
                     if eff.get("kind") == "call":
                         for arg in _ast_nodes(eff.get("arguments", [])):
-                            val = _ast_node(arg["value"]) if arg.get("kind") == "call_argument" else arg
+                            val = (
+                                _ast_node(arg["value"])
+                                if arg.get("kind") in {"call_argument", "argument"}
+                                else arg
+                            )
                             place = self._try_place(val)
                             if place is not None and place.owner in self.owners and place.fields:
                                 self._add_owner_field(place.owner, place.fields)
+            elif ckind == "contract" and contract.get("role") == "effects":
+                eff_val = contract.get("value")
+                if isinstance(eff_val, dict) and eff_val.get("kind") == "call":
+                    for arg in _ast_nodes(eff_val.get("arguments", [])):
+                        val = (
+                            _ast_node(arg["value"])
+                            if arg.get("kind") in {"call_argument", "argument"}
+                            else arg
+                        )
+                        place = self._try_place(val)
+                        if place is not None and place.owner in self.owners and place.fields:
+                            self._add_owner_field(place.owner, place.fields)
 
         if not self.owners:
             self._register_owner("_unit", borrowed=False)
 
     def _try_place(self, expr: dict[str, object]) -> Place | None:
         kind = expr.get("kind")
-        if kind == "identifier":
+        if _is_ident(expr):
             name = _id_text(expr["name"])
             if name in self.handles and name in self.handle_places:
                 return self.handle_places[name]
@@ -1518,25 +1661,25 @@ class _FunctionLowerer:
             if isinstance(inner, dict):
                 return self._try_place(inner)
         if kind == "member":
-            recv = expr.get("receiver")
-            if isinstance(recv, dict):
+            recv = expr.get("receiver") or expr.get("value")
+            member_val = expr.get("member") or expr.get("name")
+            if isinstance(recv, dict) and member_val is not None:
                 base = self._try_place(recv)
                 if base is not None:
-                    member_name = _id_text(expr["member"])
+                    member_name = _id_text(member_val)
                     view_path = self.owner_views.get(base.owner, {}).get(member_name)
                     if view_path is not None and not base.fields:
                         return Place(base.owner, view_path)
                     return Place(base.owner, (*base.fields, member_name))
         if kind in {"index", "range_index"}:
-            recv = expr.get("receiver")
+            recv = expr.get("receiver") or expr.get("value")
             if isinstance(recv, dict):
                 base = self._try_place(recv)
                 if base is not None:
                     return Place(base.owner, (*base.fields, "*"))
-        if kind == "borrow":
-            inner = expr.get("value")
-            if isinstance(inner, dict):
-                return self._try_place(inner)
+        borrow_info = _extract_borrow_expr(expr)
+        if borrow_info is not None:
+            return self._try_place(borrow_info[1])
         return None
 
     def _resolve_borrow_target(
@@ -1544,7 +1687,7 @@ class _FunctionLowerer:
     ) -> tuple[str | None, str, Place]:
         # Evaluate any index subexpressions first.
         current = self._eval_index_subexpressions(current, expr)
-        if expr.get("kind") == "identifier":
+        if _is_ident(expr):
             name = _id_text(expr["name"])
             if name in self.handles:
                 place = self.handle_places.get(name, Place(next(iter(self.owners))))
@@ -1562,16 +1705,18 @@ class _FunctionLowerer:
             if rkind == "group":
                 root = cast("dict[str, object]", root.get("expression") or root.get("value"))
             elif rkind == "member":
-                fields.append(_id_text(root["member"]))
-                root = cast("dict[str, object]", root["receiver"])
+                fields.append(_id_text(root.get("member") or root["name"]))
+                root = cast("dict[str, object]", root.get("receiver") or root["value"])
             else:
                 fields.append("*")
-                root = cast("dict[str, object]", root["receiver"])
+                root = cast("dict[str, object]", root.get("receiver") or root["value"])
         fields.reverse()
-        if root.get("kind") == "identifier":
+        if _is_ident(root):
             rname = _id_text(root["name"])
             if rname in self.handles:
                 base_place = self.handle_places.get(rname, Place(next(iter(self.owners))))
+                if base_place.owner in self.owners and fields and "*" not in (*base_place.fields, *fields):
+                    self._add_owner_field(base_place.owner, (*base_place.fields, *fields))
                 return current, self.handles[rname], Place(base_place.owner, (*base_place.fields, *fields))
             if rname == "this" and "this" not in self.owners:
                 self._register_owner("this", borrowed=True, type_name=self.enclosing_type)
@@ -1580,6 +1725,8 @@ class _FunctionLowerer:
             if len(fields) == 1 and fields[0] in self.owner_views.get(rname, {}):
                 vpath = self.owner_views[rname][fields[0]]
                 return current, rname, Place(rname, vpath)
+            if fields and "*" not in fields:
+                self._add_owner_field(rname, tuple(fields))
             return current, rname, Place(rname, tuple(fields))
 
         fallback_owner = next(iter(self.owners))
@@ -1590,18 +1737,26 @@ class _FunctionLowerer:
     ) -> str | None:
         kind = expr.get("kind")
         if kind == "member":
-            recv = expr.get("receiver")
+            recv = expr.get("receiver") or expr.get("value")
             if isinstance(recv, dict):
                 return self._eval_index_subexpressions(current, recv)
         elif kind == "index":
-            recv = expr.get("receiver")
+            recv = expr.get("receiver") or expr.get("value")
             idx = expr.get("index")
             if isinstance(recv, dict):
                 current = self._eval_index_subexpressions(current, recv)
             if isinstance(idx, dict):
-                current, _ = self._lower_expr(current, idx)
+                if idx.get("kind") == "range":
+                    start = idx.get("start")
+                    end = idx.get("end")
+                    if isinstance(start, dict):
+                        current, _ = self._lower_expr(current, start)
+                    if isinstance(end, dict):
+                        current, _ = self._lower_expr(current, end)
+                else:
+                    current, _ = self._lower_expr(current, idx)
         elif kind == "range_index":
-            recv = expr.get("receiver")
+            recv = expr.get("receiver") or expr.get("value")
             start = expr.get("start")
             end = expr.get("end")
             if isinstance(recv, dict):
@@ -1622,7 +1777,10 @@ class _FunctionLowerer:
         if pkind == "group_pattern":
             return self._pattern_binders(_ast_node(pattern["pattern"]))
         if pkind in {"tuple_pattern", "constructor_pattern"}:
-            items = pattern.get("elements") if pkind == "tuple_pattern" else pattern.get("arguments", [])
+            if pkind == "tuple_pattern":
+                items = pattern.get("elements") if "elements" in pattern else pattern.get("patterns", [])
+            else:
+                items = pattern.get("arguments", [])
             result: list[str] = []
             for item in _ast_nodes(items):
                 result.extend(self._pattern_binders(item))
@@ -1638,7 +1796,7 @@ class _FunctionLowerer:
     ) -> str | None:
         binders = self._pattern_binders(pattern)
         for bname in binders:
-            if not _NAME.fullmatch(bname) or bname == "_":
+            if not _NAME.fullmatch(bname) or bname == "_" or bname[0].isupper():
                 continue
             if captures:
                 if len(captures) == 1 and captures[0] in self.handle_places:
@@ -1681,206 +1839,235 @@ class _FunctionLowerer:
     ) -> tuple[str | None, tuple[str, ...]]:
         if current is None:
             return None, ()
-        kind = expr.get("kind")
-        if kind in {"nat", "bool", "unit", "string", "bytes", "character", "hole", "operator", "type_expression"}:
-            return current, ()
-
-        if kind == "identifier":
-            name = _id_text(expr["name"])
-            if name in self.handles:
-                handle = self.handles[name]
-                current = self._emit(current, Use(handle), f"use_{name}")
-                return current, (handle,)
-            if name in self.owners:
-                current = self._emit(current, Access(Place(name), "read"), f"read_{name}")
-            return current, ()
-
-        if kind == "member":
-            current = self._eval_index_subexpressions(current, expr)
-            place = self._try_place(expr)
-            if place is not None:
-                recv = expr.get("receiver")
-                if isinstance(recv, dict) and recv.get("kind") == "identifier":
-                    rname = _id_text(recv["name"])
-                    if rname in self.handles:
-                        via = self.handles[rname]
-                        current = self._emit(current, Access(place, "read", via=via), "read_member")
-                        return current, (via,)
-                current = self._emit(current, Access(place, "read"), "read_member")
+        prev_site = self.current_site
+        self.current_site = expr
+        try:
+            kind = expr.get("kind")
+            if kind in {
+                "nat",
+                "bool",
+                "unit",
+                "string",
+                "bytes",
+                "character",
+                "char",
+                "hole",
+                "operator",
+                "type_expression",
+            }:
                 return current, ()
-            recv = expr.get("receiver")
-            if isinstance(recv, dict):
-                return self._lower_expr(current, recv)
-            return current, ()
 
-        if kind in {"index", "range_index"}:
-            current = self._eval_index_subexpressions(current, expr)
-            place = self._try_place(expr)
-            if place is not None:
-                recv = expr.get("receiver")
-                if isinstance(recv, dict) and recv.get("kind") == "identifier":
-                    rname = _id_text(recv["name"])
-                    if rname in self.handles:
-                        via = self.handles[rname]
-                        current = self._emit(current, Access(place, "read", via=via), "read_index")
-                        return current, (via,)
-                current = self._emit(current, Access(place, "read"), "read_index")
+            if _is_ident(expr):
+                name = _id_text(expr["name"])
+                if name in self.handles:
+                    handle = self.handles[name]
+                    current = self._emit(current, Use(handle), f"use_{name}")
+                    return current, (handle,)
+                if name in self.owners:
+                    current = self._emit(current, Access(Place(name), "read"), f"read_{name}")
                 return current, ()
-            return current, ()
 
-        if kind == "borrow":
-            mode = str(expr.get("mode", "in"))
-            inner = _ast_node(expr["value"])
-            if mode == "move":
-                if inner.get("kind") == "identifier":
-                    sname = _id_text(inner["name"])
-                    if sname in self.handles:
-                        old_handle = self.handles.pop(sname)
-                        moved_handle = self._fresh_loan(f"moved_{sname}")
-                        current = self._emit(current, Move(old_handle, moved_handle), f"move_{sname}")
-                        return current, (moved_handle,)
-                current, _, place = self._resolve_borrow_target(current, inner)
-                current = self._emit(current, Access(place, "move"), "move_owner")
+            if kind == "member":
+                current = self._eval_index_subexpressions(current, expr)
+                place = self._try_place(expr)
+                if place is not None:
+                    if place.fields and "*" not in place.fields:
+                        self._add_owner_field(place.owner, place.fields)
+                    recv = expr.get("receiver") or expr.get("value")
+                    if isinstance(recv, dict) and _is_ident(recv):
+                        rname = _id_text(recv["name"])
+                        if rname in self.handles:
+                            via = self.handles[rname]
+                            current = self._emit(current, Access(place, "read", via=via), "read_member")
+                            return current, (via,)
+                    current = self._emit(current, Access(place, "read"), "read_member")
+                    return current, ()
+                recv = expr.get("receiver") or expr.get("value")
+                if isinstance(recv, dict):
+                    return self._lower_expr(current, recv)
                 return current, ()
-            loan_mode: Mode = "shared" if mode == "in" else "exclusive"
-            current, parent, place = self._resolve_borrow_target(current, inner)
-            loan_name = self._fresh_loan("borrow")
-            current = self._emit(
-                current,
-                Borrow(Loan(loan_name, parent, place, mode=loan_mode)),
-                "borrow",
-            )
-            self.handle_places[loan_name] = place
-            self.handle_modes[loan_name] = loan_mode
-            return current, (loan_name,)
 
-        if kind == "interpolated_string":
-            for part in _ast_nodes(expr.get("parts", [])):
-                if part.get("kind") == "interpolation":
-                    hole_expr = _ast_node(part["expression"])
-                    current, _ = self._lower_expr(current, hole_expr)
-            return current, ()
-
-        if kind in {"tuple", "array"}:
-            captures: list[str] = []
-            for elem in _ast_nodes(expr.get("elements", [])):
-                current, caps = self._lower_expr(current, elem)
-                for cap in caps:
-                    if cap not in captures:
-                        captures.append(cap)
-            return current, tuple(captures)
-
-        if kind == "unary":
-            op = expr.get("operator")
-            operand = _ast_node(expr["operand"])
-            current, caps = self._lower_expr(current, operand)
-            if op == "await":
-                current = self._emit(current, Checkpoint("await"), "await")
-            return current, caps
-
-        if kind == "binary":
-            left = _ast_node(expr["left"])
-            right = _ast_node(expr["right"])
-            current, lcaps = self._lower_expr(current, left)
-            current, rcaps = self._lower_expr(current, right)
-            return current, tuple(dict.fromkeys((*lcaps, *rcaps)))
-
-        if kind == "group":
-            inner = _ast_node(expr.get("expression") or expr.get("value"))
-            return self._lower_expr(current, inner)
-
-        if kind == "is":
-            val = _ast_node(expr["value"])
-            return self._lower_expr(current, val)
-
-        if kind == "as":
-            val = _ast_node(expr["value"])
-            return self._lower_expr(current, val)
-
-        if kind == "update":
-            src = _ast_node(expr["source"])
-            current, caps = self._lower_expr(current, src)
-            for fitem in _ast_nodes(expr.get("fields", [])):
-                fval = _ast_node(fitem["value"])
-                current, _ = self._lower_expr(current, fval)
-            return current, caps
-
-        if kind == "let_expression":
-            bname = _id_text(expr["name"])
-            val = _ast_node(expr["value"])
-            body = _ast_node(expr["body"])
-            current = self._lower_binding(current, bname, val, local_type=expr.get("local_type"))
-            return self._lower_expr(current, body)
-
-        if kind == "if_expression":
-            cond = _ast_node(expr["condition"])
-            then_br = _ast_node(expr["then_branch"])
-            else_br = _ast_node(expr["else_branch"])
-            current, cond_caps = self._lower_expr(current, cond)
-            split = self._emit(current, Nop(), "if_split")
-            then_entry = self._fresh_node("if_then")
-            else_entry = self._fresh_node("if_else")
-            self._connect(split, then_entry)
-            self._connect(split, else_entry)
-            saved_handles = dict(self.handles)
-            if cond.get("kind") == "is":
-                pat = _ast_node(cond["pattern"])
-                src_place = self._try_place(_ast_node(cond["value"]))
-                then_entry = self._bind_pattern_from_captures(then_entry, pat, cond_caps, src_place)
-            then_exit, then_caps = self._lower_expr(then_entry, then_br)
-            self.handles = dict(saved_handles)
-            else_exit, else_caps = self._lower_expr(else_entry, else_br)
-            self.handles = saved_handles
-            join = self._fresh_node("join_if")
-            self._connect(then_exit, join)
-            self._connect(else_exit, join)
-            return join, tuple(dict.fromkeys((*then_caps, *else_caps)))
-
-        if kind == "match_expression":
-            scrutinee = _ast_node(expr["scrutinee"])
-            current, scrut_caps = self._lower_expr(current, scrutinee)
-            scrut_place = self._try_place(scrutinee)
-            arms = _ast_nodes(expr.get("arms", []))
-            if not arms:
+            if kind in {"index", "range_index"}:
+                current = self._eval_index_subexpressions(current, expr)
+                place = self._try_place(expr)
+                if place is not None:
+                    recv = expr.get("receiver") or expr.get("value")
+                    if isinstance(recv, dict) and _is_ident(recv):
+                        rname = _id_text(recv["name"])
+                        if rname in self.handles:
+                            via = self.handles[rname]
+                            current = self._emit(current, Access(place, "read", via=via), "read_index")
+                            return current, (via,)
+                    current = self._emit(current, Access(place, "read"), "read_index")
+                    return current, ()
                 return current, ()
-            split = self._emit(current, Nop(), "match_split")
-            join = self._fresh_node("join_match")
-            all_caps: list[str] = []
-            saved_handles = dict(self.handles)
-            for idx, arm in enumerate(arms):
-                arm_entry = self._fresh_node(f"arm_{idx}")
-                self._connect(split, arm_entry)
-                self.handles = dict(saved_handles)
-                pat = _ast_node(arm["pattern"])
-                arm_curr: str | None = self._bind_pattern_from_captures(
-                    arm_entry, pat, scrut_caps, scrut_place
+
+            borrow_info = _extract_borrow_expr(expr)
+            if borrow_info is not None:
+                mode, inner = borrow_info
+                if mode == "move":
+                    if _is_ident(inner):
+                        sname = _id_text(inner["name"])
+                        if sname in self.handles:
+                            old_handle = self.handles.pop(sname)
+                            moved_handle = self._fresh_loan(f"moved_{sname}")
+                            current = self._emit(current, Move(old_handle, moved_handle), f"move_{sname}")
+                            return current, (moved_handle,)
+                    current, _, place = self._resolve_borrow_target(current, inner)
+                    current = self._emit(current, Access(place, "move"), "move_owner")
+                    return current, ()
+                loan_mode: Mode = "shared" if mode == "in" else "exclusive"
+                current, parent, place = self._resolve_borrow_target(current, inner)
+                loan_name = self._fresh_loan("borrow")
+                current = self._emit(
+                    current,
+                    Borrow(Loan(loan_name, parent, place, mode=loan_mode)),
+                    "borrow",
                 )
-                guard = arm.get("guard")
-                if isinstance(guard, dict):
-                    arm_curr, _ = self._lower_expr(arm_curr, guard)
-                body = _ast_node(arm["body"])
-                arm_exit, arm_caps = self._lower_expr(arm_curr, body)
-                self._connect(arm_exit, join)
-                for cap in arm_caps:
-                    if cap not in all_caps:
-                        all_caps.append(cap)
-            self.handles = saved_handles
-            return join, tuple(all_caps)
+                self.handle_places[loan_name] = place
+                self.handle_modes[loan_name] = loan_mode
+                return current, (loan_name,)
 
-        if kind == "call":
-            return self._lower_call(current, expr)
+            if kind == "interpolated_string":
+                for part in _ast_nodes(expr.get("parts", [])):
+                    if part.get("kind") == "interpolation":
+                        hole_expr = _ast_node(part.get("expression") or part["value"])
+                        current, _ = self._lower_expr(current, hole_expr)
+                return current, ()
 
-        if kind == "propagate":
-            inner = _ast_node(expr["value"])
-            current, caps = self._lower_expr(current, inner)
-            split = self._emit(current, Nop(), "try_split")
-            err_node = self._fresh_node("try_err", Return("Err"))
-            ok_node = self._fresh_node("try_ok")
-            self._connect(split, ok_node)
-            self._connect(split, err_node)
-            return ok_node, caps
+            if kind in {"tuple", "array"}:
+                captures: list[str] = []
+                raw_elems = expr.get("elements") if "elements" in expr else expr.get("values", [])
+                for elem in _ast_nodes(raw_elems):
+                    current, caps = self._lower_expr(current, elem)
+                    for cap in caps:
+                        if cap not in captures:
+                            captures.append(cap)
+                return current, tuple(captures)
 
-        return current, ()
+            if kind == "unary":
+                op = _op_text(expr.get("operator"))
+                operand = _ast_node(expr.get("operand") if "operand" in expr else expr["value"])
+                current, caps = self._lower_expr(current, operand)
+                if op == "await":
+                    current = self._emit(current, Checkpoint("await"), "await")
+                    return current, caps
+                return current, ()
+
+            if kind == "binary":
+                left = _ast_node(expr["left"])
+                right = _ast_node(expr["right"])
+                current, _ = self._lower_expr(current, left)
+                current, _ = self._lower_expr(current, right)
+                return current, ()
+
+            if kind == "group":
+                inner = _ast_node(expr.get("expression") or expr.get("value"))
+                return self._lower_expr(current, inner)
+
+            if kind in {"is", "is_expression", "as", "cast_expression"}:
+                val = _ast_node(expr["value"])
+                return self._lower_expr(current, val)
+
+            if kind in {"update", "with_expression"}:
+                src = _ast_node(expr.get("source") or expr["value"])
+                current, caps = self._lower_expr(current, src)
+                raw_fields = expr.get("fields") if "fields" in expr else expr.get("updates", [])
+                for fitem in _ast_nodes(raw_fields):
+                    fval = _ast_node(fitem["value"])
+                    current, _ = self._lower_expr(current, fval)
+                return current, caps
+
+            if kind == "let_expression":
+                if "binding" in expr and isinstance(expr["binding"], dict):
+                    current = self._lower_statement(current, _ast_node(expr["binding"]))
+                    return self._lower_expr(current, _ast_node(expr["body"]))
+                bname = _id_text(expr["name"])
+                val = _ast_node(expr["value"])
+                body = _ast_node(expr["body"])
+                current = self._lower_binding(
+                    current, bname, val, local_type=expr.get("local_type") or expr.get("type")
+                )
+                return self._lower_expr(current, body)
+
+            if kind == "block":
+                current = self._lower_statements(current, _body_statements(expr))
+                return current, ()
+
+            if kind == "if_expression":
+                cond = _ast_node(expr["condition"])
+                then_br = _ast_node(expr.get("then_branch") or expr["then"])
+                else_br = _ast_node(expr.get("else_branch") or expr["else"])
+                current, cond_caps = self._lower_expr(current, cond)
+                split = self._emit(current, Nop(), "if_split")
+                then_entry = self._fresh_node("if_then")
+                else_entry = self._fresh_node("if_else")
+                self._connect(split, then_entry)
+                self._connect(split, else_entry)
+                saved_handles = dict(self.handles)
+                if cond.get("kind") in {"is", "is_expression"}:
+                    pat = _ast_node(cond["pattern"])
+                    src_place = self._try_place(_ast_node(cond["value"]))
+                    then_entry = self._bind_pattern_from_captures(
+                        then_entry, pat, cond_caps, src_place
+                    )
+                then_exit, then_caps = self._lower_expr(then_entry, then_br)
+                self.handles = dict(saved_handles)
+                else_exit, else_caps = self._lower_expr(else_entry, else_br)
+                self.handles = saved_handles
+                join = self._fresh_node("join_if")
+                self._connect(then_exit, join)
+                self._connect(else_exit, join)
+                return join, tuple(dict.fromkeys((*then_caps, *else_caps)))
+
+            if kind == "match_expression":
+                scrutinee = _ast_node(expr.get("scrutinee") or expr["value"])
+                current, scrut_caps = self._lower_expr(current, scrutinee)
+                scrut_place = self._try_place(scrutinee)
+                raw_arms = expr.get("arms") if "arms" in expr else expr.get("cases", [])
+                arms = _ast_nodes(raw_arms)
+                if not arms:
+                    return current, ()
+                split = self._emit(current, Nop(), "match_split")
+                join = self._fresh_node("join_match")
+                all_caps: list[str] = []
+                saved_handles = dict(self.handles)
+                for idx, arm in enumerate(arms):
+                    arm_entry = self._fresh_node(f"arm_{idx}")
+                    self._connect(split, arm_entry)
+                    self.handles = dict(saved_handles)
+                    pat = _ast_node(arm["pattern"])
+                    arm_curr: str | None = self._bind_pattern_from_captures(
+                        arm_entry, pat, scrut_caps, scrut_place
+                    )
+                    guard = arm.get("guard")
+                    if isinstance(guard, dict):
+                        arm_curr, _ = self._lower_expr(arm_curr, guard)
+                    body_node = _ast_node(arm.get("body") or arm["value"])
+                    arm_exit, arm_caps = self._lower_expr(arm_curr, body_node)
+                    self._connect(arm_exit, join)
+                    for cap in arm_caps:
+                        if cap not in all_caps:
+                            all_caps.append(cap)
+                self.handles = saved_handles
+                return join, tuple(all_caps)
+
+            if kind == "call":
+                return self._lower_call(current, expr)
+
+            if kind == "propagate":
+                inner = _ast_node(expr["value"])
+                current, caps = self._lower_expr(current, inner)
+                split = self._emit(current, Nop(), "try_split")
+                err_node = self._fresh_node("try_err", Return("Err"))
+                ok_node = self._fresh_node("try_ok")
+                self._connect(split, ok_node)
+                self._connect(split, err_node)
+                return ok_node, caps
+
+            return current, ()
+        finally:
+            self.current_site = prev_site
 
     def _lower_call(
         self, current: str | None, expr: dict[str, object]
@@ -1892,7 +2079,7 @@ class _FunctionLowerer:
 
         # Receiver member call: e.g. `workspace.TryFirst()`.
         if callee.get("kind") == "member":
-            recv = _ast_node(callee["receiver"])
+            recv = _ast_node(callee.get("receiver") or callee["value"])
             rplace = self._try_place(recv)
             if (
                 rplace is not None
@@ -1916,57 +2103,63 @@ class _FunctionLowerer:
         # Evaluate arguments left-to-right; create scoped borrows for `in`/`ref`/`out` args first
         # as each argument is reached, keeping them live until the call step completes.
         for arg in args:
-            if arg.get("kind") == "call_argument":
-                amode = str(arg.get("mode", "value"))
-                aval = _ast_node(arg["value"])
-            else:
-                amode = "value"
-                aval = arg
-            if amode == "value" and aval.get("kind") == "borrow":
-                amode = str(aval.get("mode", "in"))
-                aval = _ast_node(aval["value"])
+            prev_site = self.current_site
+            self.current_site = arg
+            try:
+                if arg.get("kind") in {"call_argument", "argument"}:
+                    amode = str(arg.get("mode", "value"))
+                    aval = _ast_node(arg["value"])
+                else:
+                    amode = "value"
+                    aval = arg
+                if amode == "value":
+                    borrow_info = _extract_borrow_expr(aval)
+                    if borrow_info is not None:
+                        amode, aval = borrow_info
 
-            if amode in {"in", "ref", "out"}:
-                loan_mode: Mode = "shared" if amode == "in" else "exclusive"
-                if aval.get("kind") == "identifier":
-                    aname = _id_text(aval["name"])
-                    if aname in self.handles and self.handle_modes.get(aname) == loan_mode:
-                        hname = self.handles[aname]
-                        hplace = self.handle_places.get(aname, Place(next(iter(self.owners))))
-                        arg_loans.append((hname, loan_mode, hplace, False))
-                        captured_handles.append(hname)
-                        continue
-                current, parent, place = self._resolve_borrow_target(current, aval)
-                tmp_loan = self._fresh_loan("arg")
-                current = self._emit(
-                    current,
-                    Borrow(Loan(tmp_loan, parent, place, mode=loan_mode, scoped=True)),
-                    "arg_borrow",
-                )
-                self.handle_places[tmp_loan] = place
-                self.handle_modes[tmp_loan] = loan_mode
-                arg_loans.append((tmp_loan, loan_mode, place, True))
-            elif amode == "move":
-                if aval.get("kind") == "identifier":
-                    sname = _id_text(aval["name"])
-                    if sname in self.handles:
-                        old_handle = self.handles.pop(sname)
-                        moved_handle = self._fresh_loan(f"moved_{sname}")
-                        current = self._emit(current, Move(old_handle, moved_handle), f"move_{sname}")
-                        captured_handles.append(moved_handle)
-                        continue
-                current, _, place = self._resolve_borrow_target(current, aval)
-                current = self._emit(current, Access(place, "move"), "arg_move")
-            else:
-                if aval.get("kind") == "identifier":
-                    aname = _id_text(aval["name"])
-                    if aname in self.handles:
-                        captured_handles.append(self.handles[aname])
-                        continue
-                current, caps = self._lower_expr(current, aval)
-                for cap in caps:
-                    if cap not in captured_handles:
-                        captured_handles.append(cap)
+                if amode in {"in", "ref", "out"}:
+                    loan_mode: Mode = "shared" if amode == "in" else "exclusive"
+                    if _is_ident(aval):
+                        aname = _id_text(aval["name"])
+                        if aname in self.handles and self.handle_modes.get(aname) == loan_mode:
+                            hname = self.handles[aname]
+                            hplace = self.handle_places.get(aname, Place(next(iter(self.owners))))
+                            arg_loans.append((hname, loan_mode, hplace, False))
+                            captured_handles.append(hname)
+                            continue
+                    current, parent, place = self._resolve_borrow_target(current, aval)
+                    tmp_loan = self._fresh_loan("arg")
+                    current = self._emit(
+                        current,
+                        Borrow(Loan(tmp_loan, parent, place, mode=loan_mode, scoped=True)),
+                        "arg_borrow",
+                    )
+                    self.handle_places[tmp_loan] = place
+                    self.handle_modes[tmp_loan] = loan_mode
+                    arg_loans.append((tmp_loan, loan_mode, place, True))
+                elif amode == "move":
+                    if _is_ident(aval):
+                        sname = _id_text(aval["name"])
+                        if sname in self.handles:
+                            old_handle = self.handles.pop(sname)
+                            moved_handle = self._fresh_loan(f"moved_{sname}")
+                            current = self._emit(current, Move(old_handle, moved_handle), f"move_{sname}")
+                            captured_handles.append(moved_handle)
+                            continue
+                    current, _, place = self._resolve_borrow_target(current, aval)
+                    current = self._emit(current, Access(place, "move"), "arg_move")
+                else:
+                    if _is_ident(aval):
+                        aname = _id_text(aval["name"])
+                        if aname in self.handles:
+                            captured_handles.append(self.handles[aname])
+                            continue
+                    current, caps = self._lower_expr(current, aval)
+                    for cap in caps:
+                        if cap not in captured_handles:
+                            captured_handles.append(cap)
+            finally:
+                self.current_site = prev_site
 
         # At the call execution point, demand all active `in`/`ref`/`out` argument loans.
         for loan_name, loan_mode, place, is_temp in arg_loans:
@@ -1989,27 +2182,25 @@ class _FunctionLowerer:
     ) -> str | None:
         if current is None:
             return None
-        scoped = False
+        mods = _type_modifiers(local_type)
+        scoped = "scoped" in mods
         explicit_loan_mode: Mode | None = None
-        if isinstance(local_type, dict) and local_type.get("kind") == "modified_type":
-            mods = local_type.get("modifiers", [])
-            if isinstance(mods, list):
-                if "scoped" in mods:
-                    scoped = True
-                if "ref" in mods or "out" in mods:
-                    explicit_loan_mode = "exclusive"
-                elif "in" in mods:
-                    explicit_loan_mode = "shared"
+        if "ref" in mods or "out" in mods:
+            explicit_loan_mode = "exclusive"
+        elif "in" in mods:
+            explicit_loan_mode = "shared"
 
-        if value_expr.get("kind") == "borrow":
-            mode = str(value_expr.get("mode", "in"))
-            inner = _ast_node(value_expr["value"])
+        borrow_info = _extract_borrow_expr(value_expr)
+        if borrow_info is not None:
+            mode, inner = borrow_info
             if mode == "move":
-                if inner.get("kind") == "identifier":
+                if _is_ident(inner):
                     sname = _id_text(inner["name"])
                     if sname in self.handles:
                         old_handle = self.handles.pop(sname)
-                        target_handle = binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
+                        target_handle = (
+                            binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
+                        )
                         current = self._emit(current, Move(old_handle, target_handle), f"move_{binder_name}")
                         self.handles[binder_name] = target_handle
                         if sname in self.handle_places:
@@ -2055,13 +2246,25 @@ class _FunctionLowerer:
                 self.handle_places[loan_name] = place
                 self.handle_modes[binder_name] = explicit_loan_mode
                 self.handle_modes[loan_name] = explicit_loan_mode
+            elif explicit_loan_mode is None and (
+                _is_scalar_value_type(local_type)
+                or (_is_ident(value_expr) and len(caps) == 1 and caps[0] in self.handle_places)
+            ):
+                self._register_owner(binder_name, borrowed=False, type_name=_type_base_name(local_type))
             else:
                 bind_name = binder_name if binder_name not in self.owners else self._fresh_loan(binder_name)
                 current = self._emit(current, Bind(bind_name, caps), f"bind_{binder_name}")
                 self.handles[binder_name] = bind_name
             return current
 
-        self._register_owner(binder_name, borrowed=False, type_name=_type_base_name(local_type))
+        inferred_type = _type_base_name(local_type)
+        if inferred_type is None and value_expr.get("kind") == "call":
+            callee = _ast_node(value_expr["callee"])
+            if _is_ident(callee):
+                cname = _id_text(callee["name"])
+                if cname in self.structs:
+                    inferred_type = cname
+        self._register_owner(binder_name, borrowed=False, type_name=inferred_type)
         return current
 
     def _lower_statements(
@@ -2090,269 +2293,334 @@ class _FunctionLowerer:
     ) -> str | None:
         if current is None:
             return None
-        kind = stmt.get("kind")
+        prev_site = self.current_site
+        self.current_site = stmt
+        try:
+            kind = stmt.get("kind")
 
-        if kind in {"let", "var", "typed_local"}:
-            bname = _id_text(stmt["name"])
-            val = _ast_node(stmt["value"])
-            return self._lower_binding(current, bname, val, local_type=stmt.get("local_type"))
+            if kind == "block":
+                return self._lower_statements(
+                    current,
+                    _body_statements(stmt),
+                    loop_header=loop_header,
+                    loop_exit=loop_exit,
+                )
 
-        if kind in {"let_pattern", "var_pattern"}:
-            pat = _ast_node(stmt["pattern"])
-            val = _ast_node(stmt["value"])
-            current, caps = self._lower_expr(current, val)
-            return self._bind_pattern_from_captures(current, pat, caps, self._try_place(val))
+            if kind in {"let", "var", "typed_local", "constant_local"}:
+                bname = _id_text(stmt["name"])
+                val = _ast_node(stmt["value"])
+                return self._lower_binding(
+                    current,
+                    bname,
+                    val,
+                    local_type=stmt.get("local_type") or stmt.get("type"),
+                )
 
-        if kind in {"let_else", "var_else"}:
-            pat = _ast_node(stmt["pattern"])
-            val = _ast_node(stmt["value"])
-            else_body = _ast_nodes(stmt.get("else_body", []))
-            current, caps = self._lower_expr(current, val)
-            split = self._emit(current, Nop(), "let_else_split")
-            ok_entry = self._fresh_node("let_else_ok")
-            else_entry = self._fresh_node("let_else_err")
-            self._connect(split, ok_entry)
-            self._connect(split, else_entry)
-            saved_handles = dict(self.handles)
-            else_exit = self._lower_statements(
-                else_entry, else_body, loop_header=loop_header, loop_exit=loop_exit
-            )
-            if else_exit is not None and not isinstance(self.events.get(else_exit), Return):
-                self._emit(else_exit, Return("else"), "let_else_ret")
-            self.handles = saved_handles
-            return self._bind_pattern_from_captures(ok_entry, pat, caps, self._try_place(val))
+            if kind in {"let_pattern", "var_pattern"}:
+                pat = _ast_node(stmt["pattern"])
+                val = _ast_node(stmt["value"])
+                current, caps = self._lower_expr(current, val)
+                return self._bind_pattern_from_captures(current, pat, caps, self._try_place(val))
 
-        if kind == "assign":
-            target = _ast_node(stmt["target"])
-            val = _ast_node(stmt["value"])
-            op = str(stmt.get("operator", "="))
-            current, _ = self._lower_expr(current, val)
-            current = self._eval_index_subexpressions(current, target)
-            if op != "=":
-                current, _ = self._lower_expr(current, target)
-            if target.get("kind") == "identifier":
-                tname = _id_text(target["name"])
-                if tname in self.handles and tname in self.handle_places:
-                    via = self.handles[tname]
-                    return self._emit(
-                        current,
-                        Access(self.handle_places[tname], "write", via=via),
-                        f"write_{tname}",
-                    )
-            place = self._try_place(target)
-            if place is not None:
-                if place.fields:
-                    self._add_owner_field(place.owner, place.fields)
-                recv = target.get("receiver")
-                if isinstance(recv, dict) and recv.get("kind") == "identifier":
-                    rname = _id_text(recv["name"])
-                    if rname in self.handles:
+            if kind in {"let_else", "var_else"}:
+                pat = _ast_node(stmt["pattern"])
+                val = _ast_node(stmt["value"])
+                else_raw = stmt.get("else_body") if "else_body" in stmt else stmt.get("else")
+                else_body = _body_statements(else_raw)
+                current, caps = self._lower_expr(current, val)
+                split = self._emit(current, Nop(), "let_else_split")
+                ok_entry = self._fresh_node("let_else_ok")
+                else_entry = self._fresh_node("let_else_err")
+                self._connect(split, ok_entry)
+                self._connect(split, else_entry)
+                saved_handles = dict(self.handles)
+                else_exit = self._lower_statements(
+                    else_entry, else_body, loop_header=loop_header, loop_exit=loop_exit
+                )
+                if else_exit is not None and not isinstance(self.events.get(else_exit), Return):
+                    self._emit(else_exit, Return("else"), "let_else_ret")
+                self.handles = saved_handles
+                return self._bind_pattern_from_captures(ok_entry, pat, caps, self._try_place(val))
+
+            if kind in {"assign", "assignment"}:
+                target = _ast_node(stmt["target"])
+                val = _ast_node(stmt["value"])
+                op = _op_text(stmt.get("operator", "=")) or "="
+                current, _ = self._lower_expr(current, val)
+                current = self._eval_index_subexpressions(current, target)
+                if op != "=":
+                    current, _ = self._lower_expr(current, target)
+                if _is_ident(target):
+                    tname = _id_text(target["name"])
+                    if tname in self.handles and tname in self.handle_places:
+                        via = self.handles[tname]
                         return self._emit(
                             current,
-                            Access(place, "write", via=self.handles[rname]),
-                            "write_field",
+                            Access(self.handle_places[tname], "write", via=via),
+                            f"write_{tname}",
                         )
-                return self._emit(current, Access(place, "write"), "write_field")
-            return current
-
-        if kind == "if":
-            cond = _ast_node(stmt["condition"])
-            then_body = _ast_nodes(stmt.get("then_body", []))
-            else_body = _ast_nodes(stmt.get("else_body", []))
-            current, cond_caps = self._lower_expr(current, cond)
-            split = self._emit(current, Nop(), "if_split")
-            then_entry = self._fresh_node("if_then")
-            else_entry = self._fresh_node("if_else")
-            self._connect(split, then_entry)
-            self._connect(split, else_entry)
-            saved_handles = dict(self.handles)
-            if cond.get("kind") == "is":
-                pat = _ast_node(cond["pattern"])
-                src_place = self._try_place(_ast_node(cond["value"]))
-                then_entry = self._bind_pattern_from_captures(then_entry, pat, cond_caps, src_place)
-            then_exit = self._lower_statements(
-                then_entry, then_body, loop_header=loop_header, loop_exit=loop_exit
-            )
-            self.handles = dict(saved_handles)
-            else_exit = self._lower_statements(
-                else_entry, else_body, loop_header=loop_header, loop_exit=loop_exit
-            )
-            self.handles = saved_handles
-            if then_exit is None and else_exit is None:
-                return None
-            join = self._fresh_node("join_if")
-            if then_exit is not None:
-                self._connect(then_exit, join)
-            if else_exit is not None:
-                self._connect(else_exit, join)
-            return join
-
-        if kind == "match":
-            scrutinee = _ast_node(stmt["scrutinee"])
-            current, scrut_caps = self._lower_expr(current, scrutinee)
-            scrut_place = self._try_place(scrutinee)
-            arms = _ast_nodes(stmt.get("arms", []))
-            if not arms:
-                return current
-            split = self._emit(current, Nop(), "match_split")
-            join = self._fresh_node("join_match")
-            any_fallthrough = False
-            saved_handles = dict(self.handles)
-            for idx, arm in enumerate(arms):
-                arm_entry = self._fresh_node(f"arm_{idx}")
-                self._connect(split, arm_entry)
-                self.handles = dict(saved_handles)
-                pat = _ast_node(arm["pattern"])
-                arm_curr = self._bind_pattern_from_captures(
-                    arm_entry, pat, scrut_caps, scrut_place
-                )
-                guard = arm.get("guard")
-                if isinstance(guard, dict):
-                    arm_curr, _ = self._lower_expr(arm_curr, guard)
-                arm_body = _ast_nodes(arm.get("body", []))
-                arm_exit = self._lower_statements(
-                    arm_curr, arm_body, loop_header=loop_header, loop_exit=loop_exit
-                )
-                if arm_exit is not None:
-                    any_fallthrough = True
-                    self._connect(arm_exit, join)
-            self.handles = saved_handles
-            return join if any_fallthrough else None
-
-        if kind == "open_invariant":
-            target_expr = _ast_node(stmt["target"])
-            lifts = tuple(_id_text(item) for item in _ast_nodes(stmt.get("lifts", [])))
-            targets: list[str] = []
-            items = (
-                _ast_nodes(target_expr.get("elements", []))
-                if target_expr.get("kind") == "tuple"
-                else [target_expr]
-            )
-            for item in items:
-                place = self._try_place(item)
+                place = self._try_place(target)
                 if place is not None:
-                    targets.append(place.owner)
-            if not targets and "this" in self.owners:
-                targets.append("this")
-            for owner_name in targets:
-                if lifts:
-                    self._add_owner_invariants(owner_name, lifts)
-                current = self._emit(current, OpenInvariant(owner_name, lifts), f"open_{owner_name}")
-            body = _ast_nodes(stmt.get("body", []))
-            current = self._lower_statements(
-                current, body, loop_header=loop_header, loop_exit=loop_exit
-            )
-            if current is not None:
-                for owner_name in reversed(targets):
-                    current = self._emit(
-                        current, CloseInvariant(owner_name, lifts), f"close_{owner_name}"
-                    )
-            return current
+                    if place.fields and "*" not in place.fields:
+                        self._add_owner_field(place.owner, place.fields)
+                    recv = target.get("receiver") or target.get("value")
+                    if isinstance(recv, dict) and _is_ident(recv):
+                        rname = _id_text(recv["name"])
+                        if rname in self.handles:
+                            return self._emit(
+                                current,
+                                Access(place, "write", via=self.handles[rname]),
+                                "write_field",
+                            )
+                    return self._emit(current, Access(place, "write"), "write_field")
+                return current
 
-        if kind in {"foreach", "foreach_collection", "while"}:
-            if kind == "foreach":
-                current, _ = self._lower_expr(current, _ast_node(stmt["start"]))
-                current, _ = self._lower_expr(current, _ast_node(stmt["end"]))
-            elif kind == "foreach_collection":
-                current, _ = self._lower_expr(current, _ast_node(stmt["collection"]))
-            header = self._fresh_node("header_loop")
-            self._connect(current, header)
-            body_entry = self._fresh_node("loop_body")
-            exit_node = self._fresh_node("loop_exit")
-            self._connect(header, body_entry)
-            self._connect(header, exit_node)
-            saved_handles = dict(self.handles)
-            body_curr: str | None = body_entry
-            iter_loan: str | None = None
-            if kind == "while":
-                body_curr, _ = self._lower_expr(body_curr, _ast_node(stmt["condition"]))
-            elif kind == "foreach":
-                iname = _id_text(stmt["name"])
-                self._register_owner(iname, borrowed=False)
-            elif kind == "foreach_collection":
-                iname = _id_text(stmt["name"])
-                imode = str(stmt.get("mode", "value"))
-                coll = _ast_node(stmt["collection"])
-                if imode in {"in", "ref"}:
-                    body_curr, parent, cplace = self._resolve_borrow_target(body_curr, coll)
-                    elem_place = Place(cplace.owner, (*cplace.fields, "*"))
-                    loan_mode = "shared" if imode == "in" else "exclusive"
-                    iter_loan = iname if iname not in self.owners else self._fresh_loan(iname)
-                    body_curr = self._emit(
-                        body_curr,
-                        Borrow(Loan(iter_loan, parent, elem_place, mode=loan_mode, scoped=True)),
-                        f"iter_{iname}",
+            if kind == "if":
+                cond = _ast_node(stmt["condition"])
+                then_raw = stmt.get("then_body") if "then_body" in stmt else stmt.get("then")
+                else_raw = stmt.get("else_body") if "else_body" in stmt else stmt.get("else")
+                then_body = _body_statements(then_raw)
+                else_body = _body_statements(else_raw)
+                current, cond_caps = self._lower_expr(current, cond)
+                split = self._emit(current, Nop(), "if_split")
+                then_entry = self._fresh_node("if_then")
+                else_entry = self._fresh_node("if_else")
+                self._connect(split, then_entry)
+                self._connect(split, else_entry)
+                saved_handles = dict(self.handles)
+                if cond.get("kind") in {"is", "is_expression"}:
+                    pat = _ast_node(cond["pattern"])
+                    src_place = self._try_place(_ast_node(cond["value"]))
+                    then_entry = self._bind_pattern_from_captures(
+                        then_entry, pat, cond_caps, src_place
                     )
-                    self.handles[iname] = iter_loan
-                    self.handle_places[iname] = elem_place
-                    self.handle_places[iter_loan] = elem_place
-                    self.handle_modes[iname] = loan_mode
-                    self.handle_modes[iter_loan] = loan_mode
+                then_exit = self._lower_statements(
+                    then_entry, then_body, loop_header=loop_header, loop_exit=loop_exit
+                )
+                self.handles = dict(saved_handles)
+                else_exit = self._lower_statements(
+                    else_entry, else_body, loop_header=loop_header, loop_exit=loop_exit
+                )
+                self.handles = saved_handles
+                if then_exit is None and else_exit is None:
+                    return None
+                join = self._fresh_node("join_if")
+                if then_exit is not None:
+                    self._connect(then_exit, join)
+                if else_exit is not None:
+                    self._connect(else_exit, join)
+                return join
+
+            if kind == "match":
+                scrutinee = _ast_node(stmt.get("scrutinee") or stmt["value"])
+                current, scrut_caps = self._lower_expr(current, scrutinee)
+                scrut_place = self._try_place(scrutinee)
+                raw_arms = stmt.get("arms") if "arms" in stmt else stmt.get("cases", [])
+                arms = _ast_nodes(raw_arms)
+                if not arms:
+                    return current
+                split = self._emit(current, Nop(), "match_split")
+                join = self._fresh_node("join_match")
+                any_fallthrough = False
+                saved_handles = dict(self.handles)
+                for idx, arm in enumerate(arms):
+                    arm_entry = self._fresh_node(f"arm_{idx}")
+                    self._connect(split, arm_entry)
+                    self.handles = dict(saved_handles)
+                    pat = _ast_node(arm["pattern"])
+                    arm_curr = self._bind_pattern_from_captures(
+                        arm_entry, pat, scrut_caps, scrut_place
+                    )
+                    guard = arm.get("guard")
+                    if isinstance(guard, dict):
+                        arm_curr, _ = self._lower_expr(arm_curr, guard)
+                    raw_arm_body = (
+                        arm.get("body")
+                        if "body" in arm
+                        else (arm.get("statements") if "statements" in arm else arm.get("value"))
+                    )
+                    arm_body = _body_statements(raw_arm_body)
+                    arm_exit = self._lower_statements(
+                        arm_curr, arm_body, loop_header=loop_header, loop_exit=loop_exit
+                    )
+                    if arm_exit is not None:
+                        any_fallthrough = True
+                        self._connect(arm_exit, join)
+                self.handles = saved_handles
+                return join if any_fallthrough else None
+
+            if kind == "open_invariant":
+                raw_lifts = stmt.get("lifts")
+                lifts = (
+                    tuple(_id_text(item) for item in _ast_nodes(raw_lifts))
+                    if isinstance(raw_lifts, list)
+                    else ()
+                )
+                targets: list[str] = []
+                if "resources" in stmt and isinstance(stmt["resources"], list):
+                    items = _ast_nodes(stmt["resources"])
                 else:
+                    target_expr = _ast_node(stmt["target"])
+                    items = (
+                        _ast_nodes(target_expr.get("elements", []))
+                        if target_expr.get("kind") == "tuple"
+                        else [target_expr]
+                    )
+                for item in items:
+                    place = self._try_place(item)
+                    if place is not None:
+                        targets.append(place.owner)
+                if not targets and "this" in self.owners:
+                    targets.append("this")
+                for owner_name in targets:
+                    if lifts:
+                        self._add_owner_invariants(owner_name, lifts)
+                    current = self._emit(
+                        current, OpenInvariant(owner_name, lifts), f"open_{owner_name}"
+                    )
+                body = _body_statements(stmt.get("body"))
+                current = self._lower_statements(
+                    current, body, loop_header=loop_header, loop_exit=loop_exit
+                )
+                if current is not None:
+                    for owner_name in reversed(targets):
+                        current = self._emit(
+                            current, CloseInvariant(owner_name, lifts), f"close_{owner_name}"
+                        )
+                return current
+
+            if kind in {"foreach", "foreach_collection", "while"}:
+                if kind == "foreach":
+                    if "range" in stmt and isinstance(stmt["range"], dict):
+                        rnode = _ast_node(stmt["range"])
+                        current, _ = self._lower_expr(current, _ast_node(rnode["start"]))
+                        current, _ = self._lower_expr(current, _ast_node(rnode["end"]))
+                    else:
+                        current, _ = self._lower_expr(current, _ast_node(stmt["start"]))
+                        current, _ = self._lower_expr(current, _ast_node(stmt["end"]))
+                elif kind == "foreach_collection":
+                    coll_node = _ast_node(stmt["collection"])
+                    if coll_node.get("kind") == "range":
+                        current, _ = self._lower_expr(current, _ast_node(coll_node["start"]))
+                        current, _ = self._lower_expr(current, _ast_node(coll_node["end"]))
+                    else:
+                        current, _ = self._lower_expr(current, coll_node)
+                header = self._fresh_node("header_loop")
+                self._connect(current, header)
+                body_entry = self._fresh_node("loop_body")
+                exit_node = self._fresh_node("loop_exit")
+                self._connect(header, body_entry)
+                self._connect(header, exit_node)
+                saved_handles = dict(self.handles)
+                body_curr: str | None = body_entry
+                iter_loan: str | None = None
+                if kind == "while":
+                    body_curr, _ = self._lower_expr(body_curr, _ast_node(stmt["condition"]))
+                elif kind == "foreach":
+                    iname = _id_text(stmt["name"])
                     self._register_owner(iname, borrowed=False)
-            body_exit = self._lower_statements(
-                body_curr,
-                _ast_nodes(stmt.get("body", [])),
-                loop_header=header,
-                loop_exit=exit_node,
-            )
-            if body_exit is not None:
-                if iter_loan is not None:
-                    body_exit = self._emit(body_exit, Drop(iter_loan), f"drop_{iter_loan}")
-                self._connect(body_exit, header)
-            self.handles = saved_handles
-            return exit_node
+                elif kind == "foreach_collection":
+                    iname = _id_text(stmt["name"])
+                    imode = str(stmt.get("mode", "value"))
+                    coll = _ast_node(stmt["collection"])
+                    if coll.get("kind") != "range" and imode in {"in", "ref"}:
+                        body_curr, parent, cplace = self._resolve_borrow_target(body_curr, coll)
+                        elem_place = Place(cplace.owner, (*cplace.fields, "*"))
+                        loan_mode = "shared" if imode == "in" else "exclusive"
+                        iter_loan = iname if iname not in self.owners else self._fresh_loan(iname)
+                        body_curr = self._emit(
+                            body_curr,
+                            Borrow(Loan(iter_loan, parent, elem_place, mode=loan_mode, scoped=True)),
+                            f"iter_{iname}",
+                        )
+                        self.handles[iname] = iter_loan
+                        self.handle_places[iname] = elem_place
+                        self.handle_places[iter_loan] = elem_place
+                        self.handle_modes[iname] = loan_mode
+                        self.handle_modes[iter_loan] = loan_mode
+                    else:
+                        self._register_owner(iname, borrowed=False)
+                body_exit = self._lower_statements(
+                    body_curr,
+                    _body_statements(stmt.get("body")),
+                    loop_header=header,
+                    loop_exit=exit_node,
+                )
+                if body_exit is not None:
+                    if iter_loan is not None:
+                        body_exit = self._emit(
+                            body_exit, Drop(iter_loan), f"drop_{iter_loan}"
+                        )
+                    self._connect(body_exit, header)
+                self.handles = saved_handles
+                return exit_node
 
-        if kind == "break":
-            if loop_exit is not None:
-                self._connect(current, loop_exit)
-            return None
+            if kind == "break":
+                if loop_exit is not None:
+                    self._connect(current, loop_exit)
+                return None
 
-        if kind == "continue":
-            if loop_header is not None:
-                self._connect(current, loop_header)
-            return None
+            if kind == "continue":
+                if loop_header is not None:
+                    self._connect(current, loop_header)
+                return None
 
-        if kind == "return":
-            val = stmt.get("value")
-            if isinstance(val, dict):
-                outcome = "return"
-                if val.get("kind") == "call":
-                    callee = _ast_node(val["callee"])
-                    if callee.get("kind") == "identifier":
-                        cname = _id_text(callee["name"])
-                        if cname and cname[0].isupper():
-                            outcome = cname
-                current, caps = self._lower_expr(current, val)
-                self._emit(current, Return(outcome, caps), "ret")
-            else:
-                self._emit(current, Return("return"), "ret")
-            return None
+            if kind == "return":
+                val = stmt.get("value")
+                if isinstance(val, dict):
+                    outcome = "return"
+                    if val.get("kind") == "call":
+                        callee = _ast_node(val["callee"])
+                        if _is_ident(callee):
+                            cname = _id_text(callee["name"])
+                            if cname and cname[0].isupper():
+                                outcome = cname
+                    current, caps = self._lower_expr(current, val)
+                    ret_caps = (
+                        ()
+                        if self.returns_scalar_value and _extract_borrow_expr(val) is None
+                        else caps
+                    )
+                    self._emit(current, Return(outcome, ret_caps), "ret")
+                else:
+                    self._emit(current, Return("return"), "ret")
+                return None
 
-        if kind == "expression":
-            expr = _ast_node(stmt["expression"])
-            current, _ = self._lower_expr(current, expr)
+            if kind in {"expression", "expression_statement"}:
+                expr = _ast_node(stmt.get("expression") or stmt["value"])
+                current, _ = self._lower_expr(current, expr)
+                return current
+
+            if kind == "assert":
+                expr = _ast_node(stmt.get("expression") or stmt["value"])
+                current, _ = self._lower_expr(current, expr)
+                return current
+
             return current
-
-        if kind == "assert":
-            expr = _ast_node(stmt["expression"])
-            current, _ = self._lower_expr(current, expr)
-            return current
-
-        return current
+        finally:
+            self.current_site = prev_site
 
     def build(self) -> LoweredFunction:
         self._collect_signature_facts()
         entry = self._fresh_node("entry")
-        body = self.fn_node.get("body")
-        if isinstance(body, list):
-            end = self._lower_statements(entry, _ast_nodes(body))
+        body = (
+            self.fn_node.get("body")
+            if self.fn_node.get("body") is not None
+            else self.fn_node.get("value")
+        )
+        if isinstance(body, list) or (isinstance(body, dict) and body.get("kind") == "block"):
+            end = self._lower_statements(entry, _body_statements(body))
             if end is not None and not isinstance(self.events.get(end), Return):
                 self._emit(end, Return("return"), "ret")
         elif isinstance(body, dict):
             end, caps = self._lower_expr(entry, body)
+            ret_caps = (
+                ()
+                if self.returns_scalar_value and _extract_borrow_expr(body) is None
+                else caps
+            )
             if end is not None and not isinstance(self.events.get(end), Return):
-                self._emit(end, Return("return", caps), "ret")
+                self._emit(end, Return("return", ret_caps), "ret")
         else:
             self._emit(entry, Return("return"), "ret")
 
@@ -2377,10 +2645,16 @@ class _FunctionLowerer:
             for name in self.events
             if name in reached
         )
+        site_map = {
+            name: self.node_sites[name]
+            for name in self.events
+            if name in reached and name in self.node_sites
+        }
         return LoweredFunction(
             self.fn_name,
             tuple(self.owners.values()),
             Graph(entry, built_nodes),
+            site_map,
         )
 
 

@@ -30,6 +30,7 @@ from toolchain.loans import (
     analyze,
     analyze_function,
     analyze_module,
+    lower_function,
     lower_module,
 )
 
@@ -1022,6 +1023,147 @@ def _surface_ast_to_loan_graph_lowering() -> None:
     )
 
 
+def _vela_parser_schema2_surface_ast_lowering() -> None:
+    def id_node(text: str) -> dict[str, object]:
+        return {"kind": "identifier", "text": text, "span": [0, len(text)]}
+
+    def name_expr(text: str) -> dict[str, object]:
+        return {"kind": "name", "name": id_node(text), "span": [0, len(text)]}
+
+    def member_expr(value: dict[str, object], field_name: str) -> dict[str, object]:
+        return {"kind": "member", "value": value, "name": id_node(field_name), "span": [0, 1]}
+
+    def unary_borrow(mode: str, value: dict[str, object]) -> dict[str, object]:
+        return {
+            "kind": "unary",
+            "operator": {"kind": "operator", "text": mode, "span": [0, len(mode)]},
+            "value": value,
+            "span": [0, 1],
+        }
+
+    parser_module: dict[str, object] = {
+        "schema": 2,
+        "ast": {
+            "kind": "module",
+            "name": id_node("ParserAstBorrowModule"),
+            "declarations": [
+                {
+                    "kind": "record",
+                    "name": id_node("Window"),
+                    "parameters": [
+                        {"kind": "parameter", "name": id_node("Low"), "type": name_expr("u32")},
+                        {"kind": "parameter", "name": id_node("High"), "type": name_expr("u32")},
+                    ],
+                    "contracts": [
+                        {"kind": "contract", "role": "invariant", "name": id_node("Ordered"), "value": name_expr("true")}
+                    ],
+                    "declarations": [],
+                },
+                {
+                    "kind": "function",
+                    "name": id_node("DisjointRecordFields"),
+                    "parameters": [
+                        {
+                            "kind": "parameter",
+                            "name": id_node("seed"),
+                            "type": name_expr("Window"),
+                        }
+                    ],
+                    "result": name_expr("u32"),
+                    "contracts": [],
+                    "body": {
+                        "kind": "block",
+                        "statements": [
+                            {
+                                "kind": "var",
+                                "name": id_node("w"),
+                                "type": None,
+                                "value": name_expr("seed"),
+                            },
+                            {
+                                "kind": "let",
+                                "name": id_node("low"),
+                                "type": None,
+                                "value": unary_borrow("in", member_expr(name_expr("w"), "Low")),
+                            },
+                            {
+                                "kind": "assignment",
+                                "operator": {"kind": "operator", "text": "="},
+                                "target": member_expr(name_expr("w"), "High"),
+                                "value": {"kind": "nat", "value": "9", "suffix": "u32", "span": [0, 4]},
+                            },
+                            {
+                                "kind": "return",
+                                "value": name_expr("low"),
+                            },
+                        ],
+                    },
+                },
+                {
+                    "kind": "function",
+                    "name": id_node("ConflictingRecordFieldWrite"),
+                    "parameters": [
+                        {
+                            "kind": "parameter",
+                            "name": id_node("seed"),
+                            "type": name_expr("Window"),
+                        }
+                    ],
+                    "result": name_expr("u32"),
+                    "contracts": [],
+                    "body": {
+                        "kind": "block",
+                        "statements": [
+                            {
+                                "kind": "var",
+                                "name": id_node("w"),
+                                "type": None,
+                                "value": name_expr("seed"),
+                            },
+                            {
+                                "kind": "let",
+                                "name": id_node("low"),
+                                "type": None,
+                                "value": unary_borrow("in", member_expr(name_expr("w"), "Low")),
+                            },
+                            {
+                                "kind": "assignment",
+                                "operator": {"kind": "operator", "text": "="},
+                                "target": member_expr(name_expr("w"), "Low"),
+                                "value": {"kind": "nat", "value": "9", "suffix": "u32", "span": [0, 4]},
+                                "span": [10, 20],
+                            },
+                            {
+                                "kind": "return",
+                                "value": name_expr("low"),
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    }
+
+    disjoint_report = analyze_function(parser_module, "DisjointRecordFields").paths[0]
+    ensure(
+        not disjoint_report.issues,
+        f"DisjointRecordFields reported unexpected issues: {disjoint_report.issues}",
+    )
+
+    conflict_lowered = lower_function(parser_module, "ConflictingRecordFieldWrite")
+    conflict_report = analyze_function(parser_module, "ConflictingRecordFieldWrite").paths[0]
+    ensure(
+        "suspended-parent" in _kinds(conflict_report),
+        f"ConflictingRecordFieldWrite did not report suspended-parent: {conflict_report.issues}",
+    )
+    issue_node = conflict_report.issues[0].node
+    ensure(
+        issue_node in conflict_lowered.node_sites
+        and conflict_lowered.node_sites[issue_node].get("span") == [10, 20],
+        f"expected node_sites to map {issue_node} to offending assignment span",
+    )
+
+
 def cases() -> list[Case]:
     return [Case("last-use restoration and unresolved facts", _last_use_and_residuals),
             Case("nested restoration and suspended ancestors", _nested_restoration_and_suspension),
@@ -1044,4 +1186,5 @@ def cases() -> list[Case]:
             Case("complete deterministic exploration and bounded refusal", _complete_exploration_and_budgets),
             Case("selective per-conjunct invariant lifting and unlifted active clauses", _selective_invariant_lifting),
             Case("cfg join-point state merging and bounded loop fixpoint", _cfg_join_merging_and_bounded_loops),
-            Case("schema-2 surface ast to loan graph lowering pass", _surface_ast_to_loan_graph_lowering)]
+            Case("schema-2 surface ast to loan graph lowering pass", _surface_ast_to_loan_graph_lowering),
+            Case("vela_parser schema-2 surface ast lowering and site mapping", _vela_parser_schema2_surface_ast_lowering)]
