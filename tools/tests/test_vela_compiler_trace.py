@@ -237,7 +237,8 @@ def _runtime_executable_identity() -> None:
                 ensure(trace._runtime_identity(Path(directory)) == native, "guest runtime identity differs")
                 ensure(launch.call_args.kwargs["cwd"] == Path(directory), "guest identity uses another checkout")
             for raw in (b"{}", b'{"python":{},"parser_sha256":"bad"}',
-                        b'{"python":{},"python":{},"parser_sha256":"bad"}', b"[]", b"x" * 8193):
+                        b'{"python":{},"python":{},"parser_sha256":"bad"}', b"[]", b"x" * 8193,
+                        b"[" * 1200 + b"0" + b"]" * 1200):
                 with patch.object(trace.subprocess, "run", return_value=subprocess.CompletedProcess(["wsl"], 0, raw, b"")):
                     try:
                         trace._runtime_identity(Path(directory))

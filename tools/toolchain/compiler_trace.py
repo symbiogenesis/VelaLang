@@ -68,7 +68,10 @@ def _runtime_identity(root: Path) -> Object:
         raise ValueError("checked parser runtime identity is unavailable") from error
     if result.returncode or len(result.stdout) > 8192:
         raise ValueError("checked parser runtime identity is unavailable")
-    descriptor = json.loads(result.stdout, object_pairs_hook=unique_object)
+    try:
+        descriptor = json.loads(result.stdout, object_pairs_hook=unique_object)
+    except (ValueError, RecursionError) as error:
+        raise ValueError("malformed checked parser runtime identity") from error
     if (not isinstance(descriptor, dict) or set(descriptor) != {"python", "parser_sha256"}
             or not isinstance(descriptor["python"], dict)
             or set(descriptor["python"]) != {"executable_sha256", "version", "implementation", "platform", "machine"}
