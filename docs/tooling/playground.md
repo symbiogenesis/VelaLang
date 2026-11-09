@@ -236,8 +236,8 @@ outline/documentation/reference navigation, display toggles and
 downloads using available local browser infrastructure. If that infrastructure
 is unavailable, record the missing browser verification explicitly and retain
 focused API/LSP checks and code review as their narrower evidence. Run the
-focused playground controls, Python validation and corpus checker; record the
-settled revision and user-managed hosted selection through `fanout`.
+focused playground controls and the [local validation handoff](../../AGENTS.md#tool-execution-and-validation);
+record the settled revision and recommended user-managed hosted checks.
 
 ## Extended expression examples
 
@@ -275,7 +275,7 @@ infrastructure, including an edit, diagnosis, hover, format, compile, evaluate
 and rejected-source recovery; record unavailable browser verification explicitly.
 Editor asset failure must leave usable compile/evaluate controls.
 
-Run focused behavioral tests, Python validation and the corpus checker locally.
-Record the settled revision and recommended hosted checks through `fanout`.
+Run focused behavioral tests and the [local validation handoff](../../AGENTS.md#tool-execution-and-validation).
+Record the settled revision and recommended hosted checks.
 The user owns publication and Host/Guest CI; pending hosted verdicts do not
 block the local demo handoff or qualify Q25n/Q25o/Q25u's independent-client gates.

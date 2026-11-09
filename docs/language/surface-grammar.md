@@ -1118,9 +1118,10 @@ ignored or dead forbidden dependencies, forward/cyclic references, constant
 reassignment/calls, missing type/initializer, malformed spans and exhausted
 budgets. Check mixed-newline/UTF-8 editor positions and invalidation. Native
 fixtures must reach the intended semantic diagnostic; syntax-only acceptance
-establishes no static, graded, borrowing or admission verdict. Require focused
-host tests and Python checks, both Host CI aggregates and dispatch every Guest
-CI lane; exact locked-parser and kernel evidence remains hosted.
+establishes no static, graded, borrowing or admission verdict. Run focused host
+tests and the [local validation handoff](../../AGENTS.md#tool-execution-and-validation),
+then record the settled revision and recommended Host/Guest CI checks. The user
+owns hosted execution; exact locked-parser and kernel evidence remains hosted.
 
 The compositional increment additionally requires runtime and static calls of the
 same constant function; static-factor/runtime-data specialization with an
@@ -1145,8 +1146,10 @@ changing delimiters or keyword interpretation inside them.
 `vela-parser qualify` must run both the retained pure cases and the surface cases,
 bind all fixture inputs into its receipt, and retain separate syntax verdicts.
 Focused native builds and helper tests may diagnose candidates; hosted exact-version
-qualification owns acceptance. Require Host CI on Windows and Ubuntu and dispatch
-every Guest CI lane for the settled revision, recording pending guest evidence.
+qualification owns acceptance. Complete the
+[local validation handoff](../../AGENTS.md#tool-execution-and-validation), then
+record the settled revision, recommended Host/Guest CI checks and pending guest
+evidence. The user owns hosted execution.
 Q25g/Q25h retain their own acceptance and migration predicates. No parser theorem,
 lexer correctness, full-language elaboration or machine/hardware replacement is
 claimed by this increment.

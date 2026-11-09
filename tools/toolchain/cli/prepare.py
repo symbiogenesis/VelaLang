@@ -87,7 +87,7 @@ def run(args: argparse.Namespace) -> int:
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         print(f"FAIL prepare: {error}")
         return 1
-    print("Review selected-file diffs; full acceptance remains with hosted CI.")
+    print("Review selected-file diffs, then run python tools/run.py gate and python tools/run.py test locally.")
     return code
 
 

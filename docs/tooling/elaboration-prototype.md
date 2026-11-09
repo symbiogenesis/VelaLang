@@ -315,11 +315,11 @@ exercise atomic publication, input aliases and failure preservation. Native
 qualification replays source through the actual parser and kernel rather than
 only using hand-authored syntax fixtures.
 
-Require focused tests, Python type/lint checks, the consistency checker, Host CI
-on Windows and Ubuntu, and dispatch of every Guest CI lane at the settled
-revision. Native acceptance remains pending until its exact-revision hosted
-verdict exists. Finish without waiting for Guest CI, and report the supported
-fragment and remaining production obligations in the command guide.
+Run focused tests and the [local validation handoff](../../AGENTS.md#tool-execution-and-validation).
+Record the settled revision and recommended Host/Guest CI checks; the user owns
+hosted execution. Native acceptance remains pending until its exact-revision
+hosted verdict exists. Report the supported fragment and remaining production
+obligations in the command guide.
 
 ## Try the mathematical fragment
 

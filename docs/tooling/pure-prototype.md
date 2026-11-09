@@ -198,8 +198,8 @@ console suggestions through the same compiler and bounded worker. Focused real
 HTTP/worker controls cover new values, Gallina and semantic refusals. Exercise
 browser editing, formatting, compilation and console evaluation when browser
 infrastructure is available; record its absence explicitly otherwise. Run focused
-host tests, Python validation and corpus checks, then record the local revision
-and full recommended hosted selection through `fanout`. The user owns Host CI
+host tests and the [local validation handoff](../../AGENTS.md#tool-execution-and-validation),
+then record the local revision and recommended hosted checks. The user owns Host CI
 and Guest CI, including native generation and kernel replay; no pending verdict
 counts as qualification or production acceptance.
 
@@ -248,8 +248,8 @@ The [playground examples](playground.md#division-and-remainder-examples) must us
 the shared compiler and isolated worker for compilation and evaluation.
 Exercise Monaco and plain-text editing, formatting, evaluation, type refusals
 and recovery with available browser infrastructure, or record its absence.
-Run focused host tests, Python validation and corpus checks locally and record
-the settled revision and full recommended hosted selection through `fanout`.
+Run focused host tests and the [local validation handoff](../../AGENTS.md#tool-execution-and-validation),
+then record the settled revision and recommended hosted checks.
 Native regeneration and kernel replay require user-managed hosted evidence;
 pending verdicts do not close qualification.
 
@@ -303,8 +303,9 @@ Reject `fn`, colon-typed parameter, arrow-return and undelimited expression
 body forms, along with missing returns and unreachable trailing statements. CLI tests must establish successful publication
 and preservation of existing output on rejection, input aliases and write errors.
 
-Host CI on Windows and Ubuntu supplies the integrated tool verdict. Dispatch
-every Guest CI lane for the same settled revision and finish without waiting.
+Complete the [local validation handoff](../../AGENTS.md#tool-execution-and-validation)
+and record the settled revision and recommended Host/Guest CI checks. The user
+owns hosted execution; missing verdicts remain pending.
 The translation tests do not establish that a kernel has accepted emitted terms;
 a generated-term kernel replay is a separately identified follow-up unless hosted
 evidence explicitly supplies it. Production language and whole-system migration

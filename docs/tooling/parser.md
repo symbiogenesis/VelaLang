@@ -57,9 +57,10 @@ Fixtures must show that name and type errors parse as syntax. Qualification also
 compares two fresh generations and records the inputs and available verdicts.
 Focused local builds and helper tests may guide implementation; hosted execution
 supplies acceptance. Guest CI runs qualification in its model lane using its
-already installed Sail snapshot. Require Host CI on Windows and Ubuntu, dispatch
-every Guest CI lane for the settled revision, and finish without waiting for
-Guest CI; its pending parser verdict remains pending.
+already installed Sail snapshot. Complete the
+[local validation handoff](../../AGENTS.md#tool-execution-and-validation), then
+record the settled revision and recommended Host/Guest CI checks. The user owns
+hosted execution; its pending parser verdict remains pending.
 
 An independent reviewer compares grammar with the prototype contract and selects
 expected trees independently of actions. Retain the Python prototype/tests. Q25g
