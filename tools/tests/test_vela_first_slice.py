@@ -14,6 +14,7 @@ from toolchain import (
 from toolchain import (
     first_slice as vela_first_slice,
 )
+from toolchain import parser, solver_ledger
 from toolchain.ast import VelaError
 
 INDEPENDENT_CASES = True
@@ -818,9 +819,23 @@ def _clight_lowering_and_purecap_assembly() -> None:
             ensure(not refusals and size > 0 and elf.is_file(), f"purecap_{mode} failed assembly: {refusals}")
 
 
+def _first_slice_source_proofs() -> None:
+    root = TOOLS.parent
+    source = (root / "examples/first_slice.vela").read_bytes()
+    with parser.cached_build(root) as compiled:
+        parsed = parser.parse_source(compiled, source, surface=True)
+    translated = vela_elaborate.elaborate(source, parsed)
+    ensure(not solver_ledger.ledger(translated.gallina),
+           "first-slice contracts or scenario theorems exhausted the fixed proof-search budget")
+    for name in ("PrepareAndValidatePacket_ensures_0", "PrepareAndValidatePacket_ensures_2",
+                 "ValidateEmptyPacketOk"):
+        ensure(f"_{name} :" in translated.gallina, f"first-slice proof export {name} disappeared")
+
+
 def cases() -> list[Case]:
     return [
         Case("capacity-invariance-and-restores-ensures-obligations", _capacity_invariance_and_contracts),
         Case("semantic-negative-span-refusals", _negative_span_refusals),
         Case("clight-lowering-and-purecap-cheri-assembly", _clight_lowering_and_purecap_assembly),
+        Case("first-slice-constructive-source-proofs-with-fixed-budgets", _first_slice_source_proofs, lane="guest"),
     ]

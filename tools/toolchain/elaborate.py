@@ -210,8 +210,10 @@ class _Elaborator(
 
     def restore_metas(self, saved: list[_Meta]) -> None:
         """Restore inference state without retaining reductions from abandoned solutions."""
+        unchanged = self.metas == saved
         self.metas = saved
-        self.whnf_cache.clear()
+        if not unchanged:
+            self.whnf_cache.clear()
         self.decl_first_meta = next(
             (index for index, meta in enumerate(saved) if meta.solution is None), len(saved)
         )
