@@ -17,7 +17,8 @@ from unittest.mock import patch
 
 from tests.harness import Case, ensure
 from tests.test_vela_playground import _http, _post, _running
-from toolchain import StaticEvaluation, VelaError, playground
+from toolchain import StaticEvaluation, VelaError, authoring, playground
+from toolchain import ast as syntax
 from toolchain.authoring import Finding
 from toolchain.cli import vela_playground as playground_cli
 from toolchain.commands import COMMANDS
@@ -440,6 +441,8 @@ def _playground_formatting_example_assets() -> None:
     ensure(not (js_keywords & js_types) and not (js_keywords & js_constants) and not (js_types & js_constants),
            "playground VELA_GRAMMAR keyword sets overlapped")
     ensure("export function buildVelaMonarchLanguage()" in script
+           and "export const VELA_LEXICAL_PATTERNS = Object.freeze({" in script
+           and "export function createTicketTracker(" in script
            and "export function projectGrammarSemanticTokens(" in script
            and "export function highlightVelaCodeHtml(" in script
            and "[^<>=\\r\\n;{}&|-]+" not in script
@@ -547,7 +550,20 @@ for (const [stateName, rules] of Object.entries(monarch.tokenizer)) {
   }
 }
 
-const parity = {};
+if (!Object.isFrozen(mod.VELA_LEXICAL_PATTERNS) || !(mod.VELA_LEXICAL_PATTERNS.callableWord instanceof RegExp)) {
+  throw new Error("Expected frozen VELA_LEXICAL_PATTERNS export with shared RegExp patterns");
+}
+const tracker = mod.createTicketTracker((snap) => snap.ok);
+const t1 = tracker.next("compile");
+if (!tracker.isCurrent("compile", t1, { ok: true }) || tracker.isCurrent("compile", t1, { ok: false })) {
+  throw new Error("createTicketTracker failed current snapshot check");
+}
+tracker.invalidate("compile");
+if (tracker.isCurrent("compile", t1, { ok: true })) {
+  throw new Error("createTicketTracker failed invalidate check");
+}
+
+const parity = { examples: {} };
 for (const [key, example] of Object.entries(mod.EXAMPLES)) {
   const compiled = await mod.browserApi("/api/compile", { source: example.source });
   if (!compiled.ok || !compiled.gallina) {
@@ -561,14 +577,59 @@ for (const [key, example] of Object.entries(mod.EXAMPLES)) {
   if (!evaluated.ok) {
     throw new Error(`Example ${key} failed browserApi evaluate: ${JSON.stringify(evaluated)}`);
   }
-  parity[key] = {
+  const suggestions = [];
+  for (const sug of example.suggestions || []) {
+    const sugResult = await mod.browserApi("/api/evaluate", {
+      source: example.source,
+      expression: sug.expression,
+      valueType: sug.valueType,
+    });
+    if (!sugResult.ok) {
+      throw new Error(`Example ${key} suggestion ${sug.expression} failed: ${JSON.stringify(sugResult)}`);
+    }
+    suggestions.push({ expression: sug.expression, valueType: sug.valueType, result: sugResult });
+  }
+  const authoring = compiled.editorServices
+    ? await mod.browserApi("/api/authoring", { source: example.source })
+    : null;
+  parity.examples[key] = {
     source: example.source,
     expression: example.expression,
     valueType: example.valueType,
     compiled,
     evaluated,
+    suggestions,
+    authoring,
   };
 }
+
+const bareLocalPureSource = [
+  "module BareLocalPure;",
+  "",
+  "public Nat Compute(Nat x)",
+  "{",
+  "    Nat current = x + 1;",
+  "    return current;",
+  "}",
+  "",
+].join("\n");
+const bareLocalPureCompile = await mod.browserApi("/api/compile", { source: bareLocalPureSource });
+if (
+  bareLocalPureCompile.ok ||
+  bareLocalPureCompile.error?.message !==
+    "local declaration requires 'let' or 'var' before its type (write 'let T x = e;' or 'var T x = e;')"
+) {
+  throw new Error(`Expected pure bare local to be refused under Q25ah: ${JSON.stringify(bareLocalPureCompile)}`);
+}
+const bareLocalPureAuthoring = await mod.browserApi("/api/authoring", { source: bareLocalPureSource });
+if (!bareLocalPureAuthoring.ok || !bareLocalPureAuthoring.bindingPreview.includes("let Nat current = x + 1;")) {
+  throw new Error(`Expected pure authoring preview to repair bare local: ${JSON.stringify(bareLocalPureAuthoring)}`);
+}
+parity.bareLocalPure = {
+  source: bareLocalPureSource,
+  compiled: bareLocalPureCompile,
+  authoring: bareLocalPureAuthoring,
+};
 
 const bareLocalMath = await mod.browserApi("/api/compile", {
   source: [
@@ -581,9 +642,23 @@ const bareLocalMath = await mod.browserApi("/api/compile", {
     "}",
   ].join("\n"),
 });
-if (bareLocalMath.ok || !bareLocalMath.error?.message.includes("require 'let' or 'var'")) {
+if (
+  bareLocalMath.ok ||
+  bareLocalMath.error?.message !==
+    "local declaration requires 'let' or 'var' before its type (write 'let T x = e;' or 'var T x = e;')"
+) {
   throw new Error(`Expected mathematical bare local to be refused under Q25ah: ${JSON.stringify(bareLocalMath)}`);
 }
+
+const vela105Source = [
+  "module NamingCheck;",
+  "public definition item Identity<item>(item value) => value;",
+].join("\n");
+const vela105Compiled = await mod.browserApi("/api/compile", { source: vela105Source });
+if (!vela105Compiled.ok || vela105Compiled.findings?.length !== 1) {
+  throw new Error(`Expected VELA105 finding on lowercase generic type parameter: ${JSON.stringify(vela105Compiled)}`);
+}
+parity.vela105 = vela105Compiled.findings[0];
 
 class MockElement {
   constructor(tagName = "div", id = "") {
@@ -848,7 +923,7 @@ def _playground_browser_runtime_and_ui_startup() -> None:
         f"playground app.mjs runtime or UI startup check failed (exit {done.returncode}):\n{done.stderr or done.stdout}",
     )
     parity = json.loads(done.stdout.strip())
-    for key, entry in parity.items():
+    for key, entry in parity["examples"].items():
         if not entry["compiled"]["editorServices"]:
             continue
         worker_compiled = compile_request({"action": "compile", "source": entry["source"]})
@@ -858,10 +933,32 @@ def _playground_browser_runtime_and_ui_startup() -> None:
             "expression": entry["expression"],
             "valueType": entry["valueType"],
         })
+        worker_authoring = compile_request({"action": "authoring", "source": entry["source"]})
         ensure(entry["compiled"] == worker_compiled,
                f"pure example {key} drifted on emitted Corelib Gallina or metadata between browserApi and playground_worker")
         ensure(entry["evaluated"] == worker_evaluated,
                f"pure example {key} drifted on expression evaluation between browserApi and playground_worker")
+        ensure(entry["authoring"] == worker_authoring,
+               f"pure example {key} drifted on authoring preview/lints between browserApi and playground_worker")
+        for sug in entry["suggestions"]:
+            worker_sug = compile_request({
+                "action": "evaluate",
+                "source": entry["source"],
+                "expression": sug["expression"],
+                "valueType": sug["valueType"],
+            })
+            ensure(sug["result"] == worker_sug,
+                   f"pure example {key} suggestion {sug['expression']} drifted between browserApi and playground_worker")
+    bare_pure = parity["bareLocalPure"]
+    ensure(bare_pure["authoring"] == compile_request({"action": "authoring", "source": bare_pure["source"]}),
+           "bare local pure authoring preview drifted between browserApi and playground_worker")
+    canonical_vela105 = authoring.generic_type_findings((syntax.Name("item", syntax.Site(2, 33)),))[0]
+    ensure(parity["vela105"] == {
+        "code": canonical_vela105.code,
+        "message": canonical_vela105.message,
+        "line": canonical_vela105.line,
+        "column": canonical_vela105.column,
+    }, "browserApi mathematical VELA105 finding drifted from canonical authoring.generic_type_findings")
 
 
 def cases() -> list[Case]:

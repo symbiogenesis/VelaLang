@@ -150,6 +150,7 @@ public Nat Regroup(Nat count, Nat size) => count / size * 2;
 
 /// Mathematical Nat operations are total: 17 / 0 is 0; 17 % 0 is 17.
 public const Nat ZeroGroups = Groups(17, 0);
+
 public const Nat Unchanged = Leftover(17, 0);
 
 /// Try Leftover(17, 5), Regroup(20, 3), ZeroGroups, and Unchanged.
@@ -980,12 +981,18 @@ class PureParser {
       }
       if (
         this.current.kind === "word" &&
-        (this.current.text === "let" ||
-          this.current.text === "Nat" ||
-          this.current.text === "bool")
+        (this.current.text === "Nat" || this.current.text === "bool")
       ) {
         const startTok = this.current;
-        const letTok = this.match("word", "let");
+        throw new VelaError(
+          "syntax",
+          startTok.site.line,
+          startTok.site.column,
+          "local declaration requires 'let' or 'var' before its type (write 'let T x = e;' or 'var T x = e;')"
+        );
+      }
+      if (this.current.kind === "word" && this.current.text === "let") {
+        const startTok = this.advance();
         let annotation = null;
         if (
           this.current.kind === "word" &&
@@ -1003,8 +1010,8 @@ class PureParser {
           value,
           site: startTok.site,
           annotation,
-          explicitBinding: Boolean(letTok),
-          typeOffset: annotation && !letTok ? startTok.offset : null,
+          explicitBinding: true,
+          typeOffset: null,
         });
         continue;
       }
@@ -2470,42 +2477,29 @@ function pureLintSource(sourceText) {
 
 function purePreviewBindings(sourceText) {
   const tokens = pureTokenize(sourceText);
-  const parser = new PureParser(tokens);
-  const parsed = parser.parseModule();
-  runPureTranslate(sourceText, false);
   const insertOffsets = [];
-
-  function walkBlock(block) {
-    for (const stmt of block.bindings) {
-      if (stmt.kind === "binding" && !stmt.explicitBinding) {
-        let tokIdx = tokens.findIndex(
-          (t) => t.site.line === stmt.site.line && t.site.column === stmt.site.column
-        );
-        if (tokIdx >= 0) {
-          insertOffsets.push(tokens[tokIdx].offset);
-        }
-      }
-    }
-    if (block.terminal.kind === "conditional") {
-      walkBlock(block.terminal.yes);
-      walkBlock(block.terminal.no);
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (
+      (token.text === "Nat" || token.text === "bool") &&
+      index > 0 &&
+      (tokens[index - 1].text === "{" || tokens[index - 1].text === ";") &&
+      index + 2 < tokens.length &&
+      tokens[index + 1].kind === "word" &&
+      !PURE_KEYWORDS.has(tokens[index + 1].text) &&
+      !PURE_UNSUPPORTED.has(tokens[index + 1].text) &&
+      tokens[index + 2].text === "="
+    ) {
+      insertOffsets.push(token.offset);
     }
   }
-
-  for (const decl of parsed.declarations) {
-    if (decl.kind === "function") {
-      walkBlock(decl.body);
-    }
-  }
-  if (insertOffsets.length === 0) {
-    return sourceText;
-  }
-  insertOffsets.sort((a, b) => b - a);
   let updated = sourceText;
-  for (const offset of insertOffsets) {
+  for (let i = insertOffsets.length - 1; i >= 0; i -= 1) {
+    const offset = insertOffsets[i];
     updated = `${updated.slice(0, offset)}let ${updated.slice(offset)}`;
   }
   checkSourceText(updated);
+  runPureTranslate(updated, false);
   return updated;
 }
 
@@ -4073,7 +4067,7 @@ class MathParser {
         "syntax",
         this.current.site.line,
         this.current.site.column,
-        "local variable declarations require 'let' or 'var'"
+        "local declaration requires 'let' or 'var' before its type (write 'let T x = e;' or 'var T x = e;')"
       );
     }
     const lhs = this.parseExpression();
@@ -4972,6 +4966,36 @@ export function projectGrammarSemanticTokens(sourceText) {
   return { tokens, data };
 }
 
+const VELA_GENERIC_ANGLE_SOURCE =
+  "<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\\r\\n;{}&|-]|<[^<>=\\r\\n;{}&|]*>)*>)";
+const VELA_CALL_SUFFIX_SOURCE = `\\s*(?:${VELA_GENERIC_ANGLE_SOURCE}(?:->|-(?!>)|[^<>=\\r\\n;{}&|-]|<[^<>=\\r\\n;{}&|]*>)*>\\s*\\(|\\()`;
+const VELA_NUM_SUFFIX_SOURCE = "(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\\b";
+const VELA_OPERATOR_SOURCE =
+  "<==>|==>|::|\\.\\.|=>|->|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|\\/=|%=|[+*\\/%!=<>~^&|?-]";
+
+export const VELA_LEXICAL_PATTERNS = Object.freeze({
+  regionParam: /'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/,
+  unificationVar: /\?[A-Za-z_][A-Za-z0-9_]*/,
+  regionOrVarPrefix:
+    /^(?:'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*|\?[A-Za-z_][A-Za-z0-9_]*)/,
+  hexNumber: new RegExp(`0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*${VELA_NUM_SUFFIX_SOURCE}`),
+  binNumber: new RegExp(`0[bB][01](?:_?[01])*${VELA_NUM_SUFFIX_SOURCE}`),
+  decNumber: new RegExp(`[0-9](?:_?[0-9])*${VELA_NUM_SUFFIX_SOURCE}`),
+  bareNumber: /0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|[0-9](?:_?[0-9])*/,
+  anyNumberPrefix: new RegExp(
+    `^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|[0-9](?:_?[0-9])*)${VELA_NUM_SUFFIX_SOURCE}`
+  ),
+  genericOpen: new RegExp(VELA_GENERIC_ANGLE_SOURCE),
+  genericOpenPrefix: new RegExp(`^${VELA_GENERIC_ANGLE_SOURCE}`),
+  callableWord: new RegExp(`[A-Za-z_][A-Za-z0-9_]*(?=${VELA_CALL_SUFFIX_SOURCE})`),
+  callableSuffixPrefix: new RegExp(`^${VELA_CALL_SUFFIX_SOURCE}`),
+  genericTypeWord: new RegExp(`[A-Za-z_][A-Za-z0-9_]*(?=\\s*${VELA_GENERIC_ANGLE_SOURCE})`),
+  typeParamWord: /\b(?:T[A-Z][A-Za-z0-9_]*|[A-Z])\b/,
+  typeParamExact: /^(?:T[A-Z][A-Za-z0-9_]*|[A-Z])$/,
+  operator: new RegExp(VELA_OPERATOR_SOURCE),
+  operatorPrefix: new RegExp(`^(?:${VELA_OPERATOR_SOURCE})`),
+});
+
 export function buildVelaMonarchLanguage() {
   return {
     keywords: [...VELA_GRAMMAR.keywords],
@@ -4987,25 +5011,13 @@ export function buildVelaMonarchLanguage() {
         [/\$"/, "string", "@formatString"],
         [/"(?:\\.|[^"\\])*"/, "string"],
         [/'(?:\\.|[^'\\\r\n])'/, "string"],
-        [/'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/, "typeParameter"],
-        [/\?[A-Za-z_][A-Za-z0-9_]*/, "typeParameter"],
-        [
-          /0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/,
-          "number",
-        ],
-        [
-          /0[bB][01](?:_?[01])*(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/,
-          "number",
-        ],
-        [
-          /[0-9](?:_?[0-9])*(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/,
-          "number",
-        ],
+        [VELA_LEXICAL_PATTERNS.regionParam, "typeParameter"],
+        [VELA_LEXICAL_PATTERNS.unificationVar, "typeParameter"],
+        [VELA_LEXICAL_PATTERNS.hexNumber, "number"],
+        [VELA_LEXICAL_PATTERNS.binNumber, "number"],
+        [VELA_LEXICAL_PATTERNS.decNumber, "number"],
         [/::</, { token: "delimiter.angle", next: "@genericArgs" }],
-        [
-          /<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)/,
-          { token: "delimiter.angle", next: "@genericArgs" },
-        ],
+        [VELA_LEXICAL_PATTERNS.genericOpen, { token: "delimiter.angle", next: "@genericArgs" }],
         [
           /\b(?:record|struct|union|inductive|coinductive|interface|type|alias)\b(?=\s+[A-Za-z_][A-Za-z0-9_]*)/,
           { token: "keyword", next: "@typeDeclarationName" },
@@ -5033,7 +5045,7 @@ export function buildVelaMonarchLanguage() {
           },
         ],
         [
-          /[A-Za-z_][A-Za-z0-9_]*(?=\s*(?:<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)(?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>\s*\(|\())/,
+          VELA_LEXICAL_PATTERNS.callableWord,
           {
             cases: {
               "@keywords": "keyword",
@@ -5044,7 +5056,7 @@ export function buildVelaMonarchLanguage() {
           },
         ],
         [
-          /[A-Za-z_][A-Za-z0-9_]*(?=\s*<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>))/,
+          VELA_LEXICAL_PATTERNS.genericTypeWord,
           {
             cases: {
               "@keywords": "keyword",
@@ -5055,7 +5067,7 @@ export function buildVelaMonarchLanguage() {
           },
         ],
         [
-          /\b(?:T[A-Z][A-Za-z0-9_]*|[A-Z])\b/,
+          VELA_LEXICAL_PATTERNS.typeParamWord,
           {
             cases: {
               "@typeKeywords": "type",
@@ -5085,10 +5097,7 @@ export function buildVelaMonarchLanguage() {
             },
           },
         ],
-        [
-          /<==>|==>|::|\.\.|=>|->|==|!=|<=|>=|&&|\|\||\+=|-=|\*=|\/=|%=|[+*\/%!=<>~^&|?-]/,
-          "operator",
-        ],
+        [VELA_LEXICAL_PATTERNS.operator, "operator"],
         [/[{}()\[\]]/, "@brackets"],
         [/[;,.:@@]/, "delimiter"],
       ],
@@ -5110,19 +5119,13 @@ export function buildVelaMonarchLanguage() {
         [/[ \t\r\n]+/, "white"],
         [/\/\/.*$/, "comment"],
         [/\/\*/, "comment", "@blockComment"],
-        [
-          /<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)/,
-          { token: "delimiter.angle", next: "@genericArgs" },
-        ],
+        [VELA_LEXICAL_PATTERNS.genericOpen, { token: "delimiter.angle", next: "@genericArgs" }],
         [/->/, "operator"],
         [/>/, { token: "delimiter.angle", next: "@pop" }],
         [/[;{}]/, { token: "@rematch", next: "@popall" }],
-        [/'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/, "typeParameter"],
-        [/\?[A-Za-z_][A-Za-z0-9_]*/, "typeParameter"],
-        [
-          /0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|[0-9](?:_?[0-9])*/,
-          "number",
-        ],
+        [VELA_LEXICAL_PATTERNS.regionParam, "typeParameter"],
+        [VELA_LEXICAL_PATTERNS.unificationVar, "typeParameter"],
+        [VELA_LEXICAL_PATTERNS.bareNumber, "number"],
         [
           /[A-Za-z_][A-Za-z0-9_]*(?=\s*<)/,
           {
@@ -5134,7 +5137,7 @@ export function buildVelaMonarchLanguage() {
           },
         ],
         [
-          /\b(?:T[A-Z][A-Za-z0-9_]*|[A-Z])\b/,
+          VELA_LEXICAL_PATTERNS.typeParamWord,
           {
             cases: {
               "@typeKeywords": "type",
@@ -5267,18 +5270,13 @@ export function highlightVelaCodeHtml(sourceText) {
         col += strMatch[0].length;
         continue;
       }
-      const regionOrVar = /^(?:'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*|\?[A-Za-z_][A-Za-z0-9_]*)/.exec(
-        rest
-      );
+      const regionOrVar = VELA_LEXICAL_PATTERNS.regionOrVarPrefix.exec(rest);
       if (regionOrVar) {
         out += `<span class="tok-typeParameter">${escapeVelaHtml(regionOrVar[0])}</span>`;
         col += regionOrVar[0].length;
         continue;
       }
-      const numMatch =
-        /^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|[0-9](?:_?[0-9])*)(?:u8|u16|u32|u64|usize|byte|i8|i16|i32|i64)?\b/.exec(
-          rest
-        );
+      const numMatch = VELA_LEXICAL_PATTERNS.anyNumberPrefix.exec(rest);
       if (numMatch) {
         out += `<span class="tok-number">${escapeVelaHtml(numMatch[0])}</span>`;
         col += numMatch[0].length;
@@ -5298,13 +5296,9 @@ export function highlightVelaCodeHtml(sourceText) {
           cls = "type";
         } else if (VELA_GRAMMAR_CONSTANT_SET.has(word)) {
           cls = "constant";
-        } else if (/^(?:T[A-Z][A-Za-z0-9_]*|[A-Z])$/.test(word)) {
+        } else if (VELA_LEXICAL_PATTERNS.typeParamExact.test(word)) {
           cls = "typeParameter";
-        } else if (
-          /^\s*(?:<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)(?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>\s*\(|\()/.test(
-            afterWord
-          )
-        ) {
+        } else if (VELA_LEXICAL_PATTERNS.callableSuffixPrefix.test(afterWord)) {
           cls = "function";
         } else if (genericDepth > 0) {
           cls = /^[A-Z]/.test(word) ? "typeParameter" : "parameter";
@@ -5317,9 +5311,7 @@ export function highlightVelaCodeHtml(sourceText) {
         col += word.length;
         continue;
       }
-      if (
-        /^<(?=[A-Za-z_0-9'?(](?:->|-(?!>)|[^<>=\r\n;{}&|-]|<[^<>=\r\n;{}&|]*>)*>)/.test(rest)
-      ) {
+      if (VELA_LEXICAL_PATTERNS.genericOpenPrefix.test(rest)) {
         genericDepth += 1;
         out += `<span class="tok-angle">&lt;</span>`;
         col += 1;
@@ -5331,10 +5323,7 @@ export function highlightVelaCodeHtml(sourceText) {
         col += 1;
         continue;
       }
-      const opMatch =
-        /^(?:<==>|==>|::|\.\.|=>|->|==|!=|<=|>=|&&|\|\||\+=|-=|\*=|\/=|%=|[+*\/%!=<>~^&|?-])/.exec(
-          rest
-        );
+      const opMatch = VELA_LEXICAL_PATTERNS.operatorPrefix.exec(rest);
       if (opMatch) {
         out += `<span class="tok-operator">${escapeVelaHtml(opMatch[0])}</span>`;
         col += opMatch[0].length;
@@ -6584,7 +6573,7 @@ class MathElaborator {
       if (!isPascalCase(binder.text)) {
         findings.push({
           code: "VELA105",
-          message: `use PascalCase for generic type parameter '${binder.text}'`,
+          message: `generic type parameter '${binder.text}' should use PascalCase (for example T or TValue); value indices remain camelCase`,
           line: binder.site.line,
           column: binder.site.column,
         });
@@ -6691,19 +6680,34 @@ function renderMathBodyGallina(body) {
   return parts.length > 0 ? parts.join("\n  ") : "tt";
 }
 
+let lastBrowserCompilation = null;
+
 function compileMathematical(sourceText, sourceHash = "") {
+  if (
+    lastBrowserCompilation &&
+    lastBrowserCompilation.kind === "math" &&
+    lastBrowserCompilation.sourceText === sourceText &&
+    (!sourceHash || lastBrowserCompilation.sourceHash === sourceHash)
+  ) {
+    return lastBrowserCompilation.mathRes;
+  }
   const tokens = mathTokenize(sourceText);
   const parser = new MathParser(tokens);
   const parsedModule = parser.parseModule();
   const elaborator = new MathElaborator(parsedModule, sourceText, sourceHash);
-  return {
+  const mathRes = {
     ...elaborator.elaborate(),
     elaborator,
   };
+  if (sourceHash) {
+    lastBrowserCompilation = { kind: "math", sourceText, sourceHash, mathRes };
+  }
+  return mathRes;
 }
 
-function evaluateMathematical(sourceText, expressionText, valueType) {
-  const { elaborator } = compileMathematical(sourceText);
+function evaluateMathematical(sourceText, expressionText, valueType, elaborator = null) {
+  const activeElaborator = elaborator || compileMathematical(sourceText).elaborator;
+  activeElaborator.steps = 0;
   if (valueType !== "Nat" && valueType !== "bool") {
     throw new VelaError("type", 1, 1, "expression: expected Nat or bool result type");
   }
@@ -6734,7 +6738,7 @@ function evaluateMathematical(sourceText, expressionText, valueType) {
         `unexpected '${parser.current.text}' after expression`
       );
     }
-    const val = elaborator.evalExpr(expr, new Map());
+    const val = activeElaborator.evalExpr(expr, new Map());
     const actual = typeof val === "boolean" ? "bool" : typeof val === "bigint" ? "Nat" : "other";
     if (actual !== valueType) {
       throw new VelaError(
@@ -6801,6 +6805,7 @@ export async function browserApi(path, body) {
   if (path === "/api/compile") {
     try {
       const pureRes = runPureTranslate(sourceText, false, { sourceHash });
+      lastBrowserCompilation = { kind: "pure", sourceText, sourceHash, pureRes };
       return {
         ok: true,
         sourceHash,
@@ -6830,23 +6835,34 @@ export async function browserApi(path, body) {
   }
 
   if (path === "/api/evaluate") {
-    let pureRes = null;
-    try {
-      pureRes = runPureTranslate(sourceText, false, { sourceHash });
-    } catch (pureErr) {
-      if (
-        !(
-          pureErr instanceof VelaError &&
-          (pureErr.kind === "syntax" || pureErr.kind === "unsupported")
-        )
-      ) {
-        return formatErrorPayload(sourceHash, pureErr);
+    let pureEvaluator = null;
+    let mathElaborator = null;
+    if (lastBrowserCompilation && lastBrowserCompilation.sourceText === sourceText) {
+      if (lastBrowserCompilation.kind === "pure") {
+        pureEvaluator = lastBrowserCompilation.pureRes.evaluator;
+      } else {
+        mathElaborator = lastBrowserCompilation.mathRes.elaborator;
+      }
+    } else {
+      try {
+        const pureRes = runPureTranslate(sourceText, false, { sourceHash });
+        lastBrowserCompilation = { kind: "pure", sourceText, sourceHash, pureRes };
+        pureEvaluator = pureRes.evaluator;
+      } catch (pureErr) {
+        if (
+          !(
+            pureErr instanceof VelaError &&
+            (pureErr.kind === "syntax" || pureErr.kind === "unsupported")
+          )
+        ) {
+          return formatErrorPayload(sourceHash, pureErr);
+        }
       }
     }
     try {
-      const res = pureRes
-        ? pureEvaluate(sourceText, body.expression, body.valueType, pureRes.evaluator)
-        : evaluateMathematical(sourceText, body.expression, body.valueType);
+      const res = pureEvaluator
+        ? pureEvaluate(sourceText, body.expression, body.valueType, pureEvaluator)
+        : evaluateMathematical(sourceText, body.expression, body.valueType, mathElaborator);
       return {
         ok: true,
         sourceHash,
@@ -6860,8 +6876,8 @@ export async function browserApi(path, body) {
 
   if (path === "/api/authoring") {
     try {
-      const findings = pureLintSource(sourceText);
       const bindingPreview = purePreviewBindings(sourceText);
+      const findings = pureLintSource(bindingPreview);
       return {
         ok: true,
         sourceHash,
@@ -6874,6 +6890,25 @@ export async function browserApi(path, body) {
   }
 
   throw new Error(`Unknown API endpoint: ${path}`);
+}
+
+export function createTicketTracker(isSnapshotCurrent = () => true) {
+  const counts = Object.create(null);
+  return {
+    next(name) {
+      counts[name] = (counts[name] || 0) + 1;
+      return counts[name];
+    },
+    invalidate(...names) {
+      for (const name of names) {
+        counts[name] = (counts[name] || 0) + 1;
+      }
+    },
+    isCurrent(name, ticket, captured = null) {
+      if ((counts[name] || 0) !== ticket) return false;
+      return captured === null ? true : isSnapshotCurrent(captured);
+    },
+  };
 }
 
 function initPlaygroundUi() {
@@ -6894,21 +6929,21 @@ function initPlaygroundUi() {
     connection: null,
     queue: Promise.resolve(),
     requestId: 0,
-    compileTicket: 0,
-    evaluateTicket: 0,
     checkTimer: null,
     gallina: "",
-    authoringTicket: 0,
     authoring: null,
-    outlineTicket: 0,
-    inspectTicket: 0,
     outlineSnapshot: null,
     undoSource: null,
     inspectPending: false,
     inspectSelection: "",
     editorServices: null,
-    analysisTicket: 0,
   };
+  const tickets = createTicketTracker(
+    (captured) =>
+      captured.version === state.version &&
+      captured.text === state.text &&
+      captured.generation === state.generation
+  );
 
   let token = new URLSearchParams(location.hash.slice(1)).get("token") || "";
   try {
@@ -6981,7 +7016,7 @@ function initPlaygroundUi() {
   }
 
   function invalidateServices() {
-    state.analysisTicket++;
+    tickets.invalidate("analysis");
     state.editorServices = null;
     clearAuthoring("Checking whether authoring services support the current source.");
     clearInspection("Checking whether symbol inspection supports the current source.");
@@ -6989,7 +7024,7 @@ function initPlaygroundUi() {
   }
 
   function clearCompilation(message) {
-    state.compileTicket++;
+    tickets.invalidate("compile");
     state.gallina = "";
     $("copy-output").disabled = true;
     $("download-output").disabled = true;
@@ -7364,7 +7399,7 @@ function initPlaygroundUi() {
   }
 
   async function acceptAnalysis(result, captured, ticket) {
-    if (!current(captured) || ticket !== state.analysisTicket) return;
+    if (!tickets.isCurrent("analysis", ticket, captured)) return;
     if (typeof result.editorServices !== "boolean") {
       throw new Error("The compiler returned incomplete editor-service availability.");
     }
@@ -7374,11 +7409,11 @@ function initPlaygroundUi() {
     if (state.editorServices === true) {
       try {
         await enqueue(() => synchronize(captured));
-        if (current(captured) && ticket === state.analysisTicket && !$("inspect-panel").hidden) {
+        if (tickets.isCurrent("analysis", ticket, captured) && !$("inspect-panel").hidden) {
           refreshOutline();
         }
       } catch (error) {
-        if (current(captured) && ticket === state.analysisTicket) {
+        if (tickets.isCurrent("analysis", ticket, captured)) {
           disconnected(error, captured.generation);
         }
       }
@@ -7387,23 +7422,23 @@ function initPlaygroundUi() {
 
   function scheduleCheck(delay = 280) {
     clearTimeout(state.checkTimer);
-    const ticket = ++state.analysisTicket;
+    const ticket = tickets.next("analysis");
     state.checkTimer = setTimeout(async () => {
       const captured = snapshot();
       try {
         await state.connection;
-        if (!current(captured) || ticket !== state.analysisTicket || !state.connected) return;
+        if (!tickets.isCurrent("analysis", ticket, captured) || !state.connected) return;
         const [result, hash] = await Promise.all([
           api("/api/compile", { source: captured.text }),
           expectedHash(captured.text),
         ]);
-        if (!current(captured) || ticket !== state.analysisTicket) return;
+        if (!tickets.isCurrent("analysis", ticket, captured)) return;
         if (result.sourceHash !== hash) {
           throw new Error("The compiler response does not match the requested source.");
         }
         await acceptAnalysis(result, captured, ticket);
       } catch (error) {
-        if (!current(captured) || ticket !== state.analysisTicket) return;
+        if (!tickets.isCurrent("analysis", ticket, captured)) return;
         invalidateServices();
         clearDiagnostics(`Source check unavailable: ${error.message}`);
         activity("Source check unavailable; compile or reconnect to retry");
@@ -7412,7 +7447,7 @@ function initPlaygroundUi() {
   }
 
   function clearEvaluation(message = "Evaluate an expression against the current source.") {
-    state.evaluateTicket++;
+    tickets.invalidate("evaluate");
     $("evaluate-button").disabled = false;
     const emptyBox = element("div", "empty-console");
     emptyBox.append(
@@ -7528,7 +7563,7 @@ function initPlaygroundUi() {
   }
 
   function clearAuthoring(message) {
-    state.authoringTicket++;
+    tickets.invalidate("authoring");
     state.authoring = null;
     $("check-authoring").disabled = state.editorServices !== true;
     $("apply-binding-preview").disabled = true;
@@ -7540,8 +7575,8 @@ function initPlaygroundUi() {
   async function checkAuthoring() {
     if (state.editorServices !== true) return;
     const captured = snapshot();
-    const ticket = ++state.authoringTicket;
-    const stillCurrent = () => current(captured) && ticket === state.authoringTicket;
+    const ticket = tickets.next("authoring");
+    const stillCurrent = () => tickets.isCurrent("authoring", ticket, captured);
     state.authoring = null;
     $("check-authoring").disabled = true;
     $("apply-binding-preview").disabled = true;
@@ -7600,8 +7635,7 @@ function initPlaygroundUi() {
   }
 
   function clearInspection(message) {
-    state.outlineTicket++;
-    state.inspectTicket++;
+    tickets.invalidate("outline", "inspect");
     state.outlineSnapshot = null;
     state.inspectPending = false;
     $("refresh-outline").disabled = state.editorServices !== true;
@@ -7616,8 +7650,8 @@ function initPlaygroundUi() {
     if (state.editorServices !== true) return;
     const captured = snapshot();
     clearInspection("Loading compiler-resolved symbols\u2026");
-    const ticket = ++state.outlineTicket;
-    const stillCurrent = () => current(captured) && ticket === state.outlineTicket;
+    const ticket = tickets.next("outline");
+    const stillCurrent = () => tickets.isCurrent("outline", ticket, captured);
     $("refresh-outline").disabled = true;
     $("outline").replaceChildren(
       element("p", "muted-message", "Loading compiler-resolved symbols\u2026")
@@ -7661,8 +7695,8 @@ function initPlaygroundUi() {
   async function inspectSymbol(position = null) {
     if (state.editorServices !== true) return;
     const captured = snapshot();
-    const ticket = ++state.inspectTicket;
-    const stillCurrent = () => current(captured) && ticket === state.inspectTicket;
+    const ticket = tickets.next("inspect");
+    const stillCurrent = () => tickets.isCurrent("inspect", ticket, captured);
     if (!position) {
       position = state.editor
         ? toPosition(state.editor.getPosition())
@@ -7737,7 +7771,7 @@ function initPlaygroundUi() {
   function sourceSelectionChanged() {
     if (state.editorServices !== true) return;
     if (!state.inspectPending || state.inspectSelection === sourceSelectionKey()) return;
-    state.inspectTicket++;
+    tickets.invalidate("inspect");
     state.inspectPending = false;
     $("inspect-symbol").disabled = false;
     $("symbol-details").textContent =
@@ -8150,10 +8184,10 @@ function initPlaygroundUi() {
 
   async function compile() {
     const captured = snapshot();
-    const ticket = ++state.compileTicket;
+    const ticket = tickets.next("compile");
     clearTimeout(state.checkTimer);
-    const analysisTicket = ++state.analysisTicket;
-    const stillCurrent = () => current(captured) && ticket === state.compileTicket;
+    const analysisTicket = tickets.next("analysis");
+    const stillCurrent = () => tickets.isCurrent("compile", ticket, captured);
     selectTab("gallina");
     state.gallina = "";
     $("copy-output").disabled = true;
@@ -8188,7 +8222,7 @@ function initPlaygroundUi() {
       activity("Gallina output ready");
     } catch (error) {
       if (!stillCurrent()) return;
-      if (analysisTicket === state.analysisTicket) invalidateServices();
+      if (tickets.isCurrent("analysis", analysisTicket)) invalidateServices();
       $("compile-summary").textContent = "Compilation unavailable; no generated output.";
       $("gallina-output").textContent = error.message;
       activity("Compilation unavailable");
@@ -8202,10 +8236,9 @@ function initPlaygroundUi() {
     const captured = snapshot();
     const expression = $("expression").value;
     const valueType = $("value-type").value;
-    const ticket = ++state.evaluateTicket;
+    const ticket = tickets.next("evaluate");
     const stillCurrent = () =>
-      current(captured) &&
-      ticket === state.evaluateTicket &&
+      tickets.isCurrent("evaluate", ticket, captured) &&
       expression === $("expression").value &&
       valueType === $("value-type").value;
     selectTab("console");

@@ -1366,12 +1366,15 @@ Landed: Tier A. Full review of the compact language reference, extension-dossier
 
 Accepted on 2026-11-08 under the [playground architecture contract](../tooling/playground.md#single-source-unification-and-worker-efficiency):
 
-1. **Single canonical asset root (`docs/`):**
+1. **Single canonical asset root (`docs/`) and static checks:**
    [PlaygroundServer](../../tools/toolchain/playground.py) serves `docs/index.html`,
    `docs/app.mjs` and `docs/style.css` directly, retiring the 11,180-line duplicate
    asset mirror under `tools/toolchain/playground/`. The static check gate
    ([checks.py](../../tools/toolchain/checks.py)) verifies DOM/example bindings on
-   `docs/` and refuses any reintroduced `tools/toolchain/playground/*` files.
+   `docs/`, enforces canonical formatting (`authoring.format_source`) on all pure
+   inline `EXAMPLES`, verifies `VELA_GRAMMAR` keyword/type/constant/retired-keyword
+   parity against [lexer.mll](../../tools/toolchain/parser/lexer.mll), and refuses
+   any reintroduced `tools/toolchain/playground/*` files.
 2. **Single-pass worker evaluation and stat-cached binary identity:**
    [tools/toolchain/__init__.py](../../tools/toolchain/__init__.py) caches a fresh
    copy of the elaborated pure module environment from `translate(source)` by
@@ -1382,17 +1385,23 @@ Accepted on 2026-11-08 under the [playground architecture contract](../tooling/p
    caches `vela_parser.Build` by `(parser, st_mtime_ns, st_size, st_ino)` across
    unchanged native parser invocations while preserving fail-closed refusal when the
    executable changes.
-3. **Exact `Corelib` Gallina, `Q25ah` syntax, Web Crypto, and `lexer.mll` parity:**
+3. **Exact `Corelib` Gallina, `Q25ah` syntax, `VELA105` lint, and client unification:**
    [docs/app.mjs](../app.mjs) replaces custom bitwise SHA-256 with Web Crypto
-   `crypto.subtle.digest("SHA-256", ...)`, emits canonical `Corelib.Init.Datatypes`
-   and `Corelib.Init.Nat` Gallina (`Module Vela_<name>.`, `Definition c_<name>`,
-   `Definition f_<name>`, `const` parameter specialization) matching
+   `crypto.subtle.digest("SHA-256", ...)`, shares `VELA_LEXICAL_PATTERNS` between
+   `buildVelaMonarchLanguage()` and `highlightVelaCodeHtml()`, consolidates the six
+   UI staleness counters into `createTicketTracker()`, emits canonical
+   `Corelib.Init.Datatypes` and `Corelib.Init.Nat` Gallina matching
    [tools/toolchain/__init__.py](../../tools/toolchain/__init__.py), enforces
-   `Q25ah`'s mandatory `let`/`var` local binding rule in `MathParser.parseStatement`,
-   and reuses the elaborated pure evaluator in `browserApi("/api/evaluate", ...)`.
+   `Q25ah`'s mandatory `let`/`var` local binding rule in both `PureParser.parseBlock`
+   and `MathParser.parseStatement` while repairing bare typed locals via
+   `purePreviewBindings` in `/api/authoring` matching
+   [authoring.py](../../tools/toolchain/authoring.py), emits the exact canonical
+   `VELA105` diagnostic in `MathElaborator.elaborate()`, and caches
+   `lastBrowserCompilation` so `browserApi("/api/evaluate", ...)` evaluates both pure
+   and mathematical expressions in a single pass.
    [test_vela_playground_math.py](../../tools/tests/test_vela_playground_math.py)
-   verifies differential compilation and evaluation parity between `browserApi` and
-   `playground_worker.compile_request`.
+   verifies differential compilation, evaluation, suggestion, authoring, `Q25ah`,
+   and `VELA105` parity between `browserApi` and `playground_worker.compile_request`.
 
 The original 8 h estimate, range 6–12, is retained with `n/a` calibration columns.
 

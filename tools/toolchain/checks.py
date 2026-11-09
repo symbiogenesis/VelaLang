@@ -913,6 +913,24 @@ def _playground_asset_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
             for key in sorted(option_keys - example_keys)
         )
 
+    if "export const EXAMPLES = {" in app_text and "\nconst UTF8_ENCODER" in app_text:
+        examples_block = app_text.split("export const EXAMPLES = {", 1)[1].split("\nconst UTF8_ENCODER", 1)[0]
+        for key, raw_source in re.findall(
+            r"^\s{2}([A-Za-z_][A-Za-z0-9_]*):\s*\{.*?source:\s*`([^`]*)`",
+            examples_block,
+            re.MULTILINE | re.DOTALL,
+        ):
+            raw_bytes = raw_source.encode("utf-8")
+            try:
+                vela.translate(raw_bytes)
+            except vela.VelaError:
+                continue
+            try:
+                if authoring.format_source(raw_bytes) != raw_bytes:
+                    findings.append(f"{app_rel}: EXAMPLES.{key} is not canonically formatted")
+            except vela.VelaError as err:
+                findings.append(f"{app_rel}: EXAMPLES.{key} failed canonical formatting: {err}")
+
     lexer_rel = "tools/toolchain/parser/lexer.mll"
     if lexer_rel in indexed and "export const VELA_GRAMMAR = Object.freeze({" in app_text:
         try:
