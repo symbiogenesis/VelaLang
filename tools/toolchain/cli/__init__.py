@@ -7,22 +7,12 @@ displays that command's own help.
 """
 
 import argparse
-import sys
 from collections.abc import Callable
-from pathlib import Path
 
 # Subcommand handler and dispatch table mapping each subcommand name to its
 # handler and `--help` summary.
 type Handler = Callable[[argparse.Namespace], int]
 type Table = dict[str, tuple[Handler, str]]
-
-
-def positive_int(value: str) -> int:
-    """An argparse count that cannot accidentally request unlimited workers."""
-    number = int(value)
-    if number < 1:
-        raise argparse.ArgumentTypeError("must be positive")
-    return number
 
 
 def dispatch(doc: str | None, table: Table, argv: list[str] | None,
@@ -43,9 +33,3 @@ def dispatch(doc: str | None, table: Table, argv: list[str] | None,
     args = parser.parse_args(argv)
     handler, _ = table[args.command]
     return handler(args)
-
-
-def entry(command: str, *args: str) -> list[str]:
-    """Build an argv list that invokes `run.py <command>` under the current interpreter."""
-    return [sys.executable, str(Path(__file__).resolve().parents[2] / "run.py"),
-            command, *args]

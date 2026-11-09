@@ -12,7 +12,6 @@ from toolchain import corpus, schema, toolenv
 from toolchain.report import Reporter
 
 CONFIG = "tools/rumdl.toml"
-SCHEMA = "tools/rumdl-config.schema.json"
 ADMITTED_DISABLED = frozenset({"MD013", "MD063", "MD082", "MD093"})
 TIMEOUT = 120
 

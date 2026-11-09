@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Proof-toolchain paths, filesystem classification, worktree Git overlays, and worker sizing.
+"""Proof-toolchain paths, filesystem classification, and worktree Git overlays.
 
 Shared by [env.py](env.py) and [corpus.py](corpus.py) without
 importing model-build state from [env.py](env.py).
@@ -10,8 +10,6 @@ import re
 import shlex
 import shutil
 import subprocess
-import sys
-from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 # Default guest build root for all worktree lanes.
@@ -81,70 +79,6 @@ def lane_of(root: Path, *, declared: bool = True) -> str:
     return admin.name.lower() if admin.parent.name == "worktrees" else ""
 
 
-def _cpus() -> int:
-    """Return the number of CPUs available to this process (at least 1)."""
-    return os.process_cpu_count() or 1
-
-
-def _read_mem_available_mb() -> int | None:
-    """Guest memory available without swapping, in MiB; None when unreadable."""
-    try:
-        for line in Path("/proc/meminfo").read_text().splitlines():
-            if line.startswith("MemAvailable:"):
-                fields = line.split()
-                if len(fields) == 3 and fields[2] == "kB":
-                    value = int(fields[1])
-                    if value >= 0:
-                        return value // 1024
-                return None
-    except OSError, ValueError:
-        return None
-    return None
-
-
-# Per-worker memory budgets in MiB for proof compilation and kernel re-checking.
-PROOF_COMPILE_WORKER_MIB = 1024
-PROOF_KERNEL_WORKER_MIB = 10240
-
-
-@dataclass(frozen=True)
-class Workers:
-    """Computed worker limit along with the CPU count and `MemAvailable` reading (MiB) used to size it."""
-
-    jobs: int
-    cpus: int
-    mem_available_mb: int | None
-
-
-def proof_jobs(*, kernel: bool = False) -> int:
-    """Return the worker count for proof compilation (`kernel=False`) or kernel checking (`kernel=True`)."""
-    return proof_workers(kernel=kernel).jobs
-
-
-def proof_workers(*, kernel: bool = False) -> Workers:
-    """Size proof workers after a 2 GiB reserve using `PROOF_KERNEL_WORKER_MIB` or `PROOF_COMPILE_WORKER_MIB`."""
-    return size_workers(PROOF_KERNEL_WORKER_MIB if kernel else PROOF_COMPILE_WORKER_MIB,
-                        fallback=1 if kernel else 4,
-                        label="kernel" if kernel else "compile/audit")
-
-
-def worker_jobs(memory_mb: int, *, fallback: int = 1, label: str = "worker") -> int:
-    """Limit workers to usable CPUs and a per-worker MiB budget after a 2 GiB reserve."""
-    return size_workers(memory_mb, fallback=fallback, label=label).jobs
-
-
-def size_workers(memory_mb: int, *, fallback: int = 1, label: str = "worker") -> Workers:
-    """Compute worker count from usable CPUs and `/proc/meminfo` `MemAvailable` with a 2 GiB reserve."""
-    cpus = _cpus()
-    available = _read_mem_available_mb()
-    if available is None:
-        jobs = min(cpus, fallback)
-        print(f"WARNING no MemAvailable figure from /proc/meminfo: automatic {label} "
-              f"jobs limited to {jobs}; use --jobs to override", file=sys.stderr)
-        return Workers(jobs, cpus, None)
-    return Workers(min(cpus, max(1, (available - 2048) // memory_mb)), cpus, available)
-
-
 def build_root() -> Path:
     """Return the guest build root (`VOS_BUILD_ROOT` or `BUILD_ROOT`)."""
     return _env_path("VOS_BUILD_ROOT", BUILD_ROOT)
@@ -205,21 +139,6 @@ def rocq_command() -> list[str]:
         return [found, "c"]
     raise SystemExit(f"no prover: neither $VOS_ROCQ, nor {pinned}, nor rocq on PATH. "
                      f"{install_line(ROCQ_INSTALL)}")
-
-
-def rocqchk_command() -> list[str]:
-    """Resolve the Rocq kernel checker (`[rocqchk]`) from `VOS_ROCQCHK`, `ROCQ_SWITCH`, or `PATH`."""
-    override = os.environ.get("VOS_ROCQCHK")
-    if bool(override):
-        return [override]
-    pinned = opam_root() / ROCQ_SWITCH / "bin" / "rocqchk"
-    if pinned.is_file():
-        return [str(pinned)]
-    found = shutil.which("rocqchk")
-    if bool(found):
-        return [found]
-    raise SystemExit(f"no kernel re-checker: neither $VOS_ROCQCHK, nor {pinned}, nor "
-                     f"rocqchk on PATH. {install_line(ROCQ_INSTALL)}")
 
 
 def git_dir(root: Path) -> Path | None:

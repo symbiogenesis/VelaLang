@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
 import toolchain as vela
-from toolchain import authoring, corpus, toolenv
+from toolchain import authoring, corpus, markdown, toolenv
 from toolchain.cli import typecheck
 from toolchain.report import Reporter
 
@@ -335,18 +335,16 @@ def _comment_and_docstring_chunks(rel: str, text: str) -> list[tuple[int, str]]:
             chunks.append((1, f"[invalid-python](__syntax_error__:{err})"))
         return chunks
     if rel.endswith((".yml", ".yaml")):
-        chunks.extend(
+        return [
             (lineno, line)
             for lineno, line in enumerate(text.splitlines(), 1)
             if line.lstrip().startswith("#")
-        )
-        return chunks
-    chunks.extend(
+        ]
+    return [
         (lineno, line)
         for lineno, line in enumerate(text.splitlines(), 1)
         if any(marker in line for marker in ("//", "/*", "(*"))
-    )
-    return chunks
+    ]
 
 
 def source_ref_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
@@ -1032,18 +1030,6 @@ def run(root: Path) -> Reporter:
 def run_gate(root: Path) -> Reporter:
     """Run check, markdown, and typecheck in one unified static gate."""
     rep = run(root)
-    md_rep = corpus_markdown_run(root)
-    rep.findings += md_rep.findings
-    rep.out.extend(md_rep.out)
-    rep.decisions.extend(md_rep.decisions)
-    tc_rep = typecheck.run(root)
-    rep.findings += tc_rep.findings
-    rep.out.extend(tc_rep.out)
-    rep.decisions.extend(tc_rep.decisions)
+    rep.extend(markdown.run(root))
+    rep.extend(typecheck.run(root))
     return rep
-
-
-def corpus_markdown_run(root: Path) -> Reporter:
-    from toolchain import markdown  # noqa: PLC0415
-
-    return markdown.run(root)

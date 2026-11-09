@@ -7,11 +7,9 @@ binary-search line resolution, fenced/indented code masks, headings, and HTML
 """
 
 import bisect
-import gzip
 import os
 import re
 import subprocess
-from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
@@ -22,29 +20,9 @@ from toolchain import proofenv
 if TYPE_CHECKING:
     from markdown_it import MarkdownIt
 
-# Retained text may have a lossless compressed representation. Scanners read its
-# original bytes so a storage change does not hide a citation or encoding defect.
-COMPRESSED_EVIDENCE = "docs/implementation/retained-evidence/"
-
-
-def gzip_contents(blob: bytes) -> bytes:
-    """Require a gzip member rather than accepting empty or plaintext evidence."""
-    if not blob.startswith(b"\x1f\x8b"):
-        raise ValueError("missing gzip header")
-    return gzip.decompress(blob)
-
-
-def scan_bytes(root: Path, rel: str) -> bytes:
-    """Read one indexed surface, expanding retained gzip evidence losslessly."""
-    blob = (root / rel).read_bytes()
-    if rel.startswith(COMPRESSED_EVIDENCE) and rel.endswith(".gz"):
-        return gzip_contents(blob)
-    return blob
-
 # Semantic readers retain their prescribed line forms. General Markdown structure
 # comes from the shared CommonMark parser, without serializing its tokens to disk.
 ANCHOR_RE = re.compile(r'<a id="([^"]+)"')
-HEADING_RE = re.compile(r"#{1,6}[ \t]+([^\r\n]+)")
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _PUNCT_RE = re.compile(r"[^\w\s-]")
@@ -85,11 +63,6 @@ def _syntax(lines: list[str]) -> tuple[list[bool], list[tuple[int, str]]]:
     return fenced, headings
 
 
-def fence_lines(lines: list[str]) -> list[bool]:
-    """Mask fenced, container and indented code, retaining the historical API name."""
-    return _syntax(lines)[0]
-
-
 def slug(heading: str) -> str:
     """A heading's fragment id: tags and backticks vanish, punctuation vanishes,
     spaces hyphenate. Markdown makes no distinction between a slug and a declared
@@ -111,23 +84,6 @@ class Document:
     def line_of(self, offset: int) -> int:
         """The 0-based line containing a raw-text offset."""
         return bisect.bisect_right(self.starts, offset) - 1
-
-    def at(self, offset: int) -> int:
-        """The 1-based line, for a finding a person has to go and visit."""
-        return self.line_of(offset) + 1
-
-    def is_fenced(self, offset: int) -> bool:
-        return self.fenced[self.line_of(offset)]
-
-    def unfenced(self, lead: str,
-                 pattern: re.Pattern[str]) -> Iterator[tuple[int, re.Match[str]]]:
-        """Yield `(line_index, match)` for each unfenced line containing `lead` and matching `pattern`.
-
-        Checks `lead in line` before invoking the regex engine to skip non-matching lines quickly.
-        """
-        for i, line in enumerate(self.lines):
-            if lead in line and not self.fenced[i] and (m := pattern.match(line)):
-                yield i, m
 
 
 def _read(path: Path, name: str) -> Document:
@@ -160,43 +116,8 @@ def from_text(raw: str, name: str) -> Document:
                     headings=headings)
 
 
-PROSE = "docs/spec.md"
-PROSE_SECTION_RE = re.compile(r"## (\d+)\.")
-
 # Directory prefix excluded from Markdown corpus loading.
 UNREAD_PREFIX = "model/"
-
-# Model files whose values are checked against documentation.
-MODEL_FACTS = (
-    "model/model/riscv.sail_project",
-    "model/model/core/cap_format.sail",
-    "model/model/core/cap_common.sail",
-    "model/model/core/xlen.sail",
-    "model/model/core/timing.sail",
-    "model/model/core/extensions.sail",
-    "model/model/core/platform_config.sail",
-    "model/model/postlude/device_tree.sail",
-    "model/model/postlude/validate_config.sail",
-    "model/model/unit_tests/test_cheri_insts.sail",
-    "model/config/verifiedos.json",
-    "model/config/verifiedos-v.json",
-    "model/config/verifiedos-rot.json",
-    "model/config/config.json.in",
-    "model/.pre-commit-config.yaml",
-)
-
-# File suffixes and names included in model citation scans.
-MODEL_CITATION_SUFFIXES = (".sail", ".json", ".in", ".cpp", ".hpp", ".c", ".h",
-                           ".cmake")
-MODEL_CITATION_NAMES = ("CMakeLists.txt",)
-
-
-def is_model_citation_path(rel: str) -> bool:
-    """Whether `rel` is a tracked model file included in citation scans (excluding `model/dependencies/`)."""
-    return (rel.startswith(UNREAD_PREFIX)
-            and not rel.startswith(UNREAD_PREFIX + "dependencies/")
-            and (rel.endswith(MODEL_CITATION_SUFFIXES)
-                 or rel.rsplit("/", 1)[-1] in MODEL_CITATION_NAMES))
 
 # an index entry's mode, which is what tells a submodule from a file
 GITLINK_MODE = "160000"
@@ -227,27 +148,12 @@ class Corpus:
             for _, heading in d.headings:
                 d.targets.add(slug(heading))
 
-        # Every bookmark: where it is declared, how often, and the prose §n it sits in.
-        # A bookmark may be cited more than once from the prose only by taking a -2/-3
-        # suffix; the base id it belongs to is what the trace check resolves against.
-        # Ids are per-file, so two documents may carry the same one; within a file a
-        # repeat is a fault, and the link check needs the whole set, not the prose's.
-        self.anchor_count: dict[str, int] = {}   # prose bookmark -> how often declared
-        self.anchor_sec: dict[str, str | None] = {}  # prose bookmark -> the §n it sits in
         self.buried: list[str] = []              # anchors code displays instead of declaring
         self.declared_twice: list[str] = []
         for d in docs:
             self._read_anchors(d)
 
     def _read_anchors(self, d: Document) -> None:
-        prose = d.name == PROSE
-        head_offsets: list[int] = []
-        head_secs: list[str] = []
-        if prose:
-            for i, m in d.unfenced("## ", PROSE_SECTION_RE):
-                head_offsets.append(d.starts[i])
-                head_secs.append(m.group(1))
-
         here: dict[str, int] = {}
         for m in ANCHOR_RE.finditer(d.raw):
             i = d.line_of(m.start())
@@ -265,17 +171,9 @@ class Corpus:
                     f"{d.name} declares #{ident} more than once; "
                     "a link to it resolves to whichever comes first"
                 )
-            if prose:
-                self.anchor_count[ident] = self.anchor_count.get(ident, 0) + 1
-                if ident not in self.anchor_sec:
-                    j = bisect.bisect_right(head_offsets, m.start()) - 1
-                    self.anchor_sec[ident] = head_secs[j] if j >= 0 else None
 
     def get(self, name: str) -> Document | None:
         return self.by_name.get(name)
-
-    def __contains__(self, name: str) -> bool:
-        return name in self.by_name
 
 
 def _git_environment(root: Path) -> dict[str, str] | None:
@@ -301,72 +199,11 @@ def _git(root: Path, *args: str) -> list[str]:
     return proc.stdout.decode("utf-8").split("\0")[:-1]
 
 
-def staged_bytes(root: Path, path: str) -> bytes | None:
-    """Return the stage-zero index blob for `path` as raw bytes, or `None` if absent."""
-    proc = subprocess.run(["git", "cat-file", "blob", f":{path}"],
-                          cwd=root, capture_output=True, check=False,
-                          env=_git_environment(root))
-    return proc.stdout if proc.returncode == 0 else None
-
-
-def staged_blobs(root: Path, paths: Iterable[str]) -> dict[str, bytes | None]:
-    """Read a batch of stage-zero blobs in one process, without retaining a cache.
-
-    Git's `cat-file --batch -Z` frames headers with NUL and contents by byte size.
-    Splitting the entire output on a delimiter would corrupt binary blobs. Explicit
-    stage zero also prevents an absent/conflicted path from resolving through HEAD.
-    Older Git versions without `-Z`, or another batch failure, retain the individual
-    reader's per-path decisions rather than turning every requested file into a miss.
-    """
-    requests = {path: f":0:{path}".encode() for path in paths}
-    if not requests:
-        return {}
-    if any(b"\0" in request for request in requests.values()):
-        raise ValueError("an indexed path cannot contain NUL")
-    proc = subprocess.run(
-        ["git", "cat-file", "--batch", "-Z"], cwd=root,
-        input=b"".join(request + b"\0" for request in requests.values()),
-        capture_output=True, check=False, env=_git_environment(root))
-    if proc.returncode != 0:
-        return {path: staged_bytes(root, path) for path in requests}
-    return _batch_blobs(proc.stdout, requests)
-
-
-def _batch_blobs(output: bytes, requests: dict[str, bytes]) -> dict[str, bytes | None]:
-    """Decode Git's byte-framed response, refusing incomplete or extra records."""
-    found: dict[str, bytes | None] = {}
-    cursor = 0
-    for path, request in requests.items():
-        end = output.find(b"\0", cursor)
-        if end < 0:
-            raise RuntimeError(f"git cat-file returned no complete header for {path}")
-        header = output[cursor:end]
-        cursor = end + 1
-        if header == request + b" missing" or header.endswith(b" submodule"):
-            found[path] = None
-            continue
-        fields = header.split()
-        if len(fields) != 3 or not fields[2].isdigit():
-            raise RuntimeError(f"git cat-file returned an invalid header for {path}")
-        end = cursor + int(fields[2])
-        if output[end:end + 1] != b"\0":
-            raise RuntimeError(f"git cat-file returned incomplete contents for {path}")
-        found[path] = output[cursor:end] if fields[1] == b"blob" else None
-        cursor = end + 1
-    if cursor != len(output):
-        raise RuntimeError("git cat-file returned unrequested contents")
-    return found
-
-
 def find_root(start: Path | None = None) -> Path:
     """Locate the repository root by walking upward from `start` (or this file)."""
     here = (start or Path(__file__)).resolve()
     for candidate in [here, *here.parents]:
-        if (candidate / ".git").exists() and (
-            (candidate / "docs" / "language" / "reference.md").exists()
-            or (candidate / "docs" / "reference.md").exists()
-            or (candidate / "docs" / "requirements-register.md").exists()
-        ):
+        if (candidate / ".git").exists() and (candidate / "docs" / "language" / "reference.md").exists():
             return candidate
     raise SystemExit(
         f"no repository root above '{here}': expected a .git and docs/language/reference.md"

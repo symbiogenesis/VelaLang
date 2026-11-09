@@ -45,12 +45,3 @@ COMMANDS: tuple[Command, ...] = (
 )
 
 BY_NAME: dict[str, Command] = {command.name: command for command in COMMANDS}
-
-HELP_FLAGS = frozenset({"--help", "-h"})
-LANE_REFERENCE = "tools/generated/command-lanes.md"
-
-
-def help_declarations() -> frozenset[tuple[str, str]]:
-    """Usage-only declarations; operational handlers still need independent fixtures."""
-    return frozenset((command.name, flag) for command in COMMANDS
-                     for flag in command.host_ok & HELP_FLAGS)

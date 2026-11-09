@@ -2,10 +2,9 @@
 """Lazy JSON Schema validation with Python integers and caller-owned schemas."""
 
 import json
-from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from toolchain.jsonutil import unique_object
 
@@ -24,15 +23,6 @@ def _validator_class() -> type[Validator]:
 
     checker = Draft202012Validator.TYPE_CHECKER.redefine("integer", _is_integer)
     return validators.extend(Draft202012Validator, type_checker=checker)
-
-
-def strict_integer_validator(schema: Mapping[str, Any] | bool, *,
-                             check_schema: bool = False) -> Validator:
-    """Build a Draft 2020-12 validator that rejects floats and booleans for `integer` fields."""
-    validator = _validator_class()
-    if check_schema:
-        validator.check_schema(schema)
-    return validator(schema)
 
 
 def validate(schema_path: Path, value: object) -> None:

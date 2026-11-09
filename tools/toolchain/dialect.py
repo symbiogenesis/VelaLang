@@ -180,9 +180,6 @@ def _load(root: Path | None = None) -> dict[str, Row]:
 
 TABLE: Final[dict[str, Row]] = _load()
 
-# Sorted tuple of all supported instruction mnemonics.
-MNEMONICS = tuple(sorted(TABLE))
-
 
 def signature(mnemonic: str) -> tuple[str, ...]:
     """Return the expected operand-kind tuple for `mnemonic` in source order."""

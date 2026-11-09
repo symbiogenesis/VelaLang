@@ -601,8 +601,7 @@ def run(root: Path) -> Reporter:
         for done in tasks:
             done.result()
     for part in (ty_rep, ruff_rep, imports_rep):
-        rep.out.extend(part.out)
-        rep.findings += part.findings
+        rep.extend(part)
 
     if rep.findings:
         rep.line(f"{rep.findings} finding(s).")
