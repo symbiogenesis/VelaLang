@@ -505,13 +505,6 @@ function normalizeNewlines(text) {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
-function codePointSite(prefix) {
-  const normalized = normalizeNewlines(prefix);
-  const parts = normalized.split("\n");
-  const last = parts[parts.length - 1];
-  return { line: parts.length, column: Array.from(last).length + 1 };
-}
-
 function checkSourceText(sourceText) {
   const bytes = utf8Bytes(sourceText);
   if (bytes.length > MAX_SOURCE_BYTES) {
@@ -605,21 +598,6 @@ const PURE_ONE_CHAR_SYMBOLS = new Set([
   "<",
   ">",
   "!",
-]);
-const PURE_BINARY_OPERATORS = new Set([
-  "||",
-  "&&",
-  "==",
-  "!=",
-  "<",
-  "<=",
-  ">",
-  ">=",
-  "+",
-  "-",
-  "*",
-  "/",
-  "%",
 ]);
 const PURE_COMPARISON_OPERATORS = new Set(["==", "!=", "<", "<=", ">", ">="]);
 
@@ -1010,8 +988,6 @@ class PureParser {
           value,
           site: startTok.site,
           annotation,
-          explicitBinding: true,
-          typeOffset: null,
         });
         continue;
       }
@@ -2179,23 +2155,26 @@ function runPureTranslate(sourceText, collectFacts = false, { sourceHash = "" } 
   };
 }
 
-function pureEvaluate(sourceText, expressionText, valueType, evaluator = null) {
-  const activeEvaluator = evaluator || runPureTranslate(sourceText, false).evaluator;
+function validateConsoleExpression(expressionText, valueType, byteUnit = "bytes") {
   if (valueType !== "Nat" && valueType !== "bool") {
     throw new VelaError("type", 1, 1, "expression: expected Nat or bool result type");
   }
   if (typeof expressionText !== "string") {
     throw new VelaError("syntax", 1, 1, "expression: expected UTF-8 text");
   }
-  const rawBytes = utf8Bytes(expressionText);
-  if (rawBytes.length > MAX_CONSOLE_EXPRESSION_BYTES) {
+  if (utf8Bytes(expressionText).length > MAX_CONSOLE_EXPRESSION_BYTES) {
     throw new VelaError(
       "limit",
       1,
       1,
-      `expression: exceeds ${MAX_CONSOLE_EXPRESSION_BYTES} bytes`
+      `expression: exceeds ${MAX_CONSOLE_EXPRESSION_BYTES} ${byteUnit}`
     );
   }
+}
+
+function pureEvaluate(sourceText, expressionText, valueType, evaluator = null) {
+  const activeEvaluator = evaluator || runPureTranslate(sourceText, false).evaluator;
+  validateConsoleExpression(expressionText, valueType);
   try {
     const tokens = pureTokenize(expressionText, { allowSemicolon: false });
     if (tokens.length === 1) {
@@ -2329,9 +2308,8 @@ function formatPureBlock(block, indent) {
     } else if (stmt.kind === "reassignment") {
       lines.push(`${inner}${stmt.name.text} = ${formatPureExpr(stmt.value)};`);
     } else {
-      const prefix = stmt.explicitBinding ? "let " : "";
       const ann = stmt.annotation ? `${stmt.annotation} ` : "";
-      lines.push(`${inner}${prefix}${ann}${stmt.name.text} = ${formatPureExpr(stmt.value)};`);
+      lines.push(`${inner}let ${ann}${stmt.name.text} = ${formatPureExpr(stmt.value)};`);
     }
   }
   if (block.terminal.kind === "return") {
@@ -2634,7 +2612,6 @@ function projectPureInspection(sourceText, facts, method, position, includeDecla
 
 class BrowserLspSession {
   constructor() {
-    this.initialized = false;
     this.document = null;
     this.cachedFacts = null;
   }
@@ -2646,7 +2623,6 @@ class BrowserLspSession {
     const params = message.params || {};
 
     if (method === "initialize") {
-      this.initialized = true;
       return [
         {
           jsonrpc: "2.0",
@@ -3040,41 +3016,7 @@ function parseRawStringLiteral(sourceText, startIndex, startLine, startCol) {
       throw new VelaError("syntax", startLine, startCol, "unterminated raw string literal");
     }
     if (sourceText[idx] === "\r" || sourceText[idx] === "\n") {
-      const rawLine = sourceText.slice(lineStart, idx);
-      const trimmedLeft = rawLine.replace(/^[ \t]+/, "");
-      if (trimmedLeft.startsWith(closingQuotes)) {
-        const indentPrefix = rawLine.slice(0, rawLine.length - trimmedLeft.length);
-        const dedented = contentLines.map((cl, lineOffset) => {
-          if (cl.length === 0) return "";
-          if (!cl.startsWith(indentPrefix)) {
-            throw new VelaError(
-              "syntax",
-              startLine + 1 + lineOffset,
-              1,
-              "raw string content line has less indentation than closing quotes"
-            );
-          }
-          return cl.slice(indentPrefix.length);
-        });
-        const textValue = dedented.join("\n");
-        if (utf8Bytes(textValue).length > 256) {
-          throw new VelaError(
-            "limit",
-            startLine,
-            startCol,
-            "string literal exceeds 256 UTF-8 bytes"
-          );
-        }
-        const endIdx = lineStart + indentPrefix.length + quoteCount;
-        const endCol = Array.from(indentPrefix).length + quoteCount + 1;
-        return {
-          value: textValue,
-          endIndex: endIdx,
-          endLine: currentLine,
-          endCol,
-        };
-      }
-      contentLines.push(rawLine);
+      contentLines.push(sourceText.slice(lineStart, idx));
       if (sourceText[idx] === "\r" && sourceText[idx + 1] === "\n") {
         idx += 2;
       } else {
@@ -5429,7 +5371,6 @@ class MathElaborator {
     this.sourceText = sourceText;
     this.sourceHash = sourceHash;
     this.records = new Map();
-    this.unions = new Map();
     this.unionCtors = new Map();
     this.constants = new Map();
     this.callables = new Map();
@@ -6132,37 +6073,21 @@ class MathElaborator {
         }
         throw new VelaError("type", expr.site.line, expr.site.column, "ByteLength requires String, Vec, or TextBuilder");
       }
-      if (name === "Written") {
+      if (name === "Written" || name === "Fits") {
         if (expr.args.length !== 1) {
-          throw new VelaError("type", expr.site.line, expr.site.column, "Written expects 1 TextBuilder argument");
+          throw new VelaError("type", expr.site.line, expr.site.column, `${name} expects 1 TextBuilder argument`);
         }
         const target = this.evalExpr(expr.args[0].value, env);
         if (!target || target.__kind !== "builder") {
-          throw new VelaError("type", expr.site.line, expr.site.column, "Written requires a TextBuilder");
+          throw new VelaError("type", expr.site.line, expr.site.column, `${name} requires a TextBuilder`);
         }
         if (expr.typeArgs.length === 1) {
           const cap = this.evalTypeIndex(expr.typeArgs[0], env);
           if (cap !== null && cap !== target.capacity) {
-            throw new VelaError("type", expr.site.line, expr.site.column, "Written capacity mismatch");
+            throw new VelaError("type", expr.site.line, expr.site.column, `${name} capacity mismatch`);
           }
         }
-        return target.written;
-      }
-      if (name === "Fits") {
-        if (expr.args.length !== 1) {
-          throw new VelaError("type", expr.site.line, expr.site.column, "Fits expects 1 TextBuilder argument");
-        }
-        const target = this.evalExpr(expr.args[0].value, env);
-        if (!target || target.__kind !== "builder") {
-          throw new VelaError("type", expr.site.line, expr.site.column, "Fits requires a TextBuilder");
-        }
-        if (expr.typeArgs.length === 1) {
-          const cap = this.evalTypeIndex(expr.typeArgs[0], env);
-          if (cap !== null && cap !== target.capacity) {
-            throw new VelaError("type", expr.site.line, expr.site.column, "Fits capacity mismatch");
-          }
-        }
-        return Boolean(target.ok && target.written <= target.capacity);
+        return name === "Written" ? target.written : Boolean(target.ok && target.written <= target.capacity);
       }
       if (this.records.has(name)) {
         const rec = this.records.get(name);
@@ -6467,7 +6392,6 @@ class MathElaborator {
         continue;
       }
       if (decl.kind === "union") {
-        this.unions.set(decl.name, decl);
         const ctorLines = [];
         for (const c of decl.cases) {
           this.unionCtors.set(c.name, c);
@@ -6708,21 +6632,7 @@ function compileMathematical(sourceText, sourceHash = "") {
 function evaluateMathematical(sourceText, expressionText, valueType, elaborator = null) {
   const activeElaborator = elaborator || compileMathematical(sourceText).elaborator;
   activeElaborator.steps = 0;
-  if (valueType !== "Nat" && valueType !== "bool") {
-    throw new VelaError("type", 1, 1, "expression: expected Nat or bool result type");
-  }
-  if (typeof expressionText !== "string") {
-    throw new VelaError("syntax", 1, 1, "expression: expected UTF-8 text");
-  }
-  const rawBytes = utf8Bytes(expressionText);
-  if (rawBytes.length > MAX_CONSOLE_EXPRESSION_BYTES) {
-    throw new VelaError(
-      "limit",
-      1,
-      1,
-      `expression: exceeds ${MAX_CONSOLE_EXPRESSION_BYTES} UTF-8 bytes`
-    );
-  }
+  validateConsoleExpression(expressionText, valueType, "UTF-8 bytes");
   try {
     const tokens = mathTokenize(expressionText, { allowSemicolon: false });
     if (tokens.length === 1) {
@@ -6925,7 +6835,6 @@ function initPlaygroundUi() {
     generation: 0,
     opened: false,
     syncedVersion: 0,
-    capabilities: {},
     connection: null,
     queue: Promise.resolve(),
     requestId: 0,
@@ -7295,7 +7204,7 @@ function initPlaygroundUi() {
       let adopted = false;
       try {
         if (generation !== state.generation) return;
-        const initialized = await wire(
+        await wire(
           session,
           {
             jsonrpc: "2.0",
@@ -7313,7 +7222,6 @@ function initPlaygroundUi() {
         await wire(session, { jsonrpc: "2.0", method: "initialized", params: {} }, generation);
         if (generation !== state.generation) return;
         state.session = session;
-        state.capabilities = initialized.capabilities;
         adopted = true;
         state.connected = true;
         status(token ? "Language server connected" : "In-browser engine ready");
@@ -7430,7 +7338,7 @@ function initPlaygroundUi() {
         if (!tickets.isCurrent("analysis", ticket, captured) || !state.connected) return;
         const [result, hash] = await Promise.all([
           api("/api/compile", { source: captured.text }),
-          expectedHash(captured.text),
+          sha256Hex(captured.text),
         ]);
         if (!tickets.isCurrent("analysis", ticket, captured)) return;
         if (result.sourceHash !== hash) {
@@ -7586,7 +7494,7 @@ function initPlaygroundUi() {
     try {
       const [result, hash] = await Promise.all([
         api("/api/authoring", { source: captured.text }),
-        expectedHash(captured.text),
+        sha256Hex(captured.text),
       ]);
       if (!stillCurrent()) return;
       if (result.sourceHash !== hash) {
@@ -8178,10 +8086,6 @@ function initPlaygroundUi() {
     return `${error.kind || "error"} at ${error.line || 1}:${error.column || 1}: ${error.message || "The compiler refused this input."}`;
   }
 
-  async function expectedHash(text) {
-    return sha256Hex(text);
-  }
-
   async function compile() {
     const captured = snapshot();
     const ticket = tickets.next("compile");
@@ -8199,7 +8103,7 @@ function initPlaygroundUi() {
     try {
       const [result, hash] = await Promise.all([
         api("/api/compile", { source: captured.text }),
-        expectedHash(captured.text),
+        sha256Hex(captured.text),
       ]);
       if (!stillCurrent()) return;
       if (result.sourceHash !== hash) {
@@ -8250,7 +8154,7 @@ function initPlaygroundUi() {
     try {
       const [result, hash] = await Promise.all([
         api("/api/evaluate", { source: captured.text, expression, valueType }),
-        expectedHash(captured.text),
+        sha256Hex(captured.text),
       ]);
       if (!stillCurrent()) return;
       if (result.sourceHash !== hash) {
