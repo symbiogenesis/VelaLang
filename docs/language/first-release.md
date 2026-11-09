@@ -429,10 +429,13 @@ Obligations the elaborator cannot kernel-prove reach Rocq with their real
 statements as named solver-trust axioms recorded in `solver_trust`, so
 `Print Assumptions` and the harness report kernel-proved definitions and
 solver-trusted obligations separately; a non-empty solver-trust ledger leaves
-the slice unaccepted as a closed kernel proof. On `examples/first_slice.vela`,
-all 69 exported definitions, carrier laws, `restores` and `ensures` obligations,
-and scenario theorems are constructively kernel-proved (`Closed under the global
-context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`).
+the slice unaccepted as a closed kernel proof. The current local replay audits
+69 exports and reports three solver-trusted obligations:
+`PrepareAndValidatePacket_ensures_0`, `PrepareAndValidatePacket_ensures_2` and
+`ValidateEmptyPacketOk`. Their full generated names appear in the receipt's
+`solver_trusted_obligations` ledger. Consequently `solver_trusted_count == 3`,
+`accepted: false` and `kernel_checked: false`; successful command execution and
+recursive checking with these assumptions do not close the source proof.
 
 - **Concrete `Span<byte>` carrier and contract obligations:** `Span<byte>` lowers
   in the mathematical consumer to `vela_Span` (`vela_ByteStore` paired with
@@ -466,7 +469,7 @@ context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`).
   explicit `effects writes(...), reads(...)` lists, returned subslice views in
   `ValidatedPacket<'dst>`, `foreach` loops with `invariant`/`decreases`, 20
   kernel-proved automatic `ref` descriptor preservation obligations and
-  kernel-proved `ensures` contracts), and seven symbolic scenario theorems
+  `ensures` contracts with the two residual obligations named above), and seven symbolic scenario theorems
   (`ValidateEmptyPacketOk`, `ValidateFullPacketOk`,
   `ValidatePartialPacketScrubsStaleAndTrailingBytes`, `RejectFramingShort`,
   `RejectBadMagic`, `RejectLengthOutOfBounds`,
@@ -475,8 +478,8 @@ context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`).
 - **End-to-end qualification (`python tools/run.py vela-parser first-slice`):**
   1. Parses `first_slice.vela` through the native Menhir `--surface` parser,
      elaborates all declarations into `FirstSlice.v`, compiles with `rocq c`,
-     audits all 69 exported definitions via `Print Assumptions` (`Closed under
-     the global context (0 axioms)` against the empty `solver_trust` ledger),
+     audits all 69 exported definitions via `Print Assumptions` against the
+     explicit `solver_trust` ledger, requiring an empty ledger for acceptance,
      and runs `rocqchk`, plus a fail-closed proof-corruption negative control.
   2. Runs the capacity-invariance gate at $N = 8$ (`8usize`) and $N = 10^9$
      (`1_000_000_000usize`), checking that obligation count, inference work
@@ -493,14 +496,15 @@ context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`).
   4. Executes the purecap CHERI-RISC-V hardware capability slice (`csetbounds`,
      `candperm`, capability round-trip and byte checks) and three hardware fault
      controls (`bounds-trap`, `perm-trap`, `tag-trap`) on `sail_riscv_sim`.
-  5. Lowers the executable union, record and function AST declarations
+  5. When a CompCert executable is supplied, lowers the executable union, record and function AST declarations
      (`ValidationError`, `ValidatedPacket`, `WritePacket8`, `CopyPacketToDst`,
      `ComputePacketChecksum`, `PrepareAndValidatePacket`) and their seven scenario
      drivers to CompCert Clight/C (`-fverifiedos-typed -dclight`), executes the C
      harness under both `ccomp -interp` and purecap `sail_riscv_sim`, and verifies
      four perturbed C negative controls (`wrong-expected-byte`,
      `stale-trailing-leak`, `checksum-scrub-omitted`,
-     `restores-length-corrupted`).
+     `restores-length-corrupted`). The current local endpoint has no CompCert
+     executable and records `compcert_sail.available: false`.
 - **Retained development receipts:** schema 2 binds the producer Git revision,
   current local toolchain Python sources, parser sources and generated outputs,
   dependency locks, instruction-encoding data, locked prover binaries and runtime

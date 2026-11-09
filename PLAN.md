@@ -59,6 +59,11 @@ frozen scope and prepares local receipt integration:
 | Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
 | Local first-slice receipts | Schema-2 receipts and `first-slice-bindings` check producer, tool, runtime, parser and retained-output identities under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ar remains open for external checked producer receipts and complete declared coverage |
 
+The full first-slice replay currently reports three solver-trusted obligations
+and `accepted: false`; its binding check reports only matching identities.
+[First-slice qualification](docs/language/first-release.md#first-slice-qualification)
+names the residual source obligations and unavailable local CompCert replay.
+
 The [completion log](docs/assurance/completion-log.md) records the scoped landing
 evidence. Q25am–aq and the supported-release cells retain their stated entry and
 acceptance predicates; these development increments close no whole release cell.
@@ -301,7 +306,7 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 <a id="q25ba"></a>
 
 - [ ] **Q25ba · Accept the synchronous component at the exact-artifact endpoint** · 96 h, range 48–144 · X
-  - **Owner:** `vela-first-slice`. **Start:** Existing validator-specific source/lowering and independently checked first-client core, machine, compiler, security and admission receipts. **Check:** Bind the already authored and zero-axiom source-proved [first slice](docs/language/first-release.md#first-slice-qualification) to those exact receipts and bytes; independent output, alias/restoration, wrong-operation, stale-input and corruption controls pass. Broader library/general lowering and the second client's receipts are subsequent work. Existing source proof and Sail/C execution receive no second completion credit.
+  - **Owner:** `vela-first-slice`. **Start:** Existing validator-specific source/lowering and independently checked first-client core, machine, compiler, security and admission receipts. **Check:** Close the three currently residual source obligations in [first-slice qualification](docs/language/first-release.md#first-slice-qualification), then bind the authored slice to those exact receipts and bytes; independent output, alias/restoration, wrong-operation, stale-input and corruption controls pass. Broader library/general lowering and the second client's receipts are subsequent work. Existing closed source proofs and Sail/C execution receive no second completion credit.
 
 <a id="q25bb"></a>
 

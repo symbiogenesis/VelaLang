@@ -1293,14 +1293,12 @@ to the synchronous design:
 - `WritePacket8`, `PrepareSliceHeader`, `CopyPacketToDst`,
   `ComputePacketChecksum` and `PrepareAndValidatePacket` exercise fat-arrow
   `match`, `foreach` loops with `invariant`/`decreases` and automatic `ref`
-  descriptor preservation (`restores`). All 69 exported definitions—including
-  the 20 metadata-preservation (`restores`) obligations across `WritePacket8`,
-  `PrepareSliceHeader`, `CopyPacketToDst` and `PrepareAndValidatePacket`, all 11
-  carrier laws, the two zeroed-header lemmas, `WritePacket8` and
-  `PrepareAndValidatePacket`'s `ensures` postconditions, and all 7 symbolic
-  scenario theorems—are 100% constructively kernel-proved (`Closed under the
-  global context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`) and
-  verified by `rocq c`, `Print Assumptions` and `rocqchk`.
+  descriptor preservation (`restores`). The current local harness audits 69
+  exports with `rocq c`, `Print Assumptions` and `rocqchk`. Three obligations
+  remain solver-trusted: `PrepareAndValidatePacket_ensures_0`,
+  `PrepareAndValidatePacket_ensures_2` and `ValidateEmptyPacketOk`, so the
+  receipt reports `accepted: false` and `kernel_checked: false` under
+  [first-slice qualification](../language/first-release.md#first-slice-qualification).
 - Executable functions forbid `Span.AllocZeroed` capability fabrication,
   `in<'a> Span<byte>` record fields forbid mutation, returning a view derived
   from a span already restored in the same scope is rejected, and `effects`
@@ -1309,8 +1307,9 @@ to the synchronous design:
   capacity-wide symbolic loop (`0usize..dst.Length`) with identical obligation
   count (`11`), reduction steps (`0`), work steps (`1478`) and emitted Gallina
   bytes (`97754`), all 17 schema-2 negative controls fail with `category == "type"`,
-  and the AST-lowered CompCert Clight/C and purecap `sail_riscv_sim` harness
-  passes with 4 perturbed C negative controls.
+  and the purecap `sail_riscv_sim` controls pass. AST-lowered CompCert Clight/C
+  and its four perturbed C controls require the currently unavailable local
+  CompCert executable.
 
 The original 24 h estimate, range 16–32, is retained because implementation and
 WSL qualification intervals were shared across the Q25af–Q25ai batch; both
@@ -1544,6 +1543,10 @@ Late input changes withdraw publication and preserve a failed attempt journal.
 [receipt controls](../../tools/tests/test_vela_first_slice_receipts.py) cover
 stale/missing/corrupt inputs and outputs, malformed records, refusal and CLI
 dispatch. The binding verdict does not authorize source or machine admission.
+The current main replay's retained receipt matches its bytes while reporting
+three solver-trusted source obligations, `accepted: false` and unavailable
+CompCert execution. Its four Sail capability/fault controls pass. The named
+residuals remain prerequisites for Q25ba; receipt matching closes none of them.
 
 Q25ar remains open for external independently checked producer receipts and its
 complete declared coverage. Canonical-machine interpretation, compiler,
