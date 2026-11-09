@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vela pure development inspection version 1",
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "span": {
+      "type": "array", "prefixItems": [{"type": "integer", "minimum": 0}, {"type": "integer", "minimum": 0}],
+      "items": false, "minItems": 2
+    },
+    "handle": {"type": "string", "pattern": "^[0-9a-f]{64}:symbol:[0-9]+$"},
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["uri", "source_sha256", "producer", "configuration", "target", "coordinate_unit", "symbol_lifetime"],
+      "properties": {
+        "uri": {"type": "string", "minLength": 1},
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "configuration": {"type": "string"}, "target": {"type": "string"},
+        "coordinate_unit": {"const": "utf8-byte"}, "symbol_lifetime": {"const": "snapshot"},
+        "producer": {
+          "type": "object", "additionalProperties": false,
+          "required": ["name", "stage", "version", "dependencies", "python", "implementation"],
+          "properties": {
+            "name": {"const": "vela-pure-development"}, "stage": {"const": "pure-resolution"},
+            "version": {"$ref": "#/$defs/digest"},
+            "dependencies": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/digest"}},
+            "python": {"type": "string", "minLength": 1}, "implementation": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "symbol": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "kind", "detail", "span", "origin", "documentation"],
+      "properties": {
+        "id": {"$ref": "#/$defs/handle"}, "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"},
+        "kind": {"enum": ["function", "parameter", "variable", "constant"]},
+        "detail": {"type": "string", "minLength": 1}, "span": {"$ref": "#/$defs/span"},
+        "documentation": {"type": ["string", "null"]},
+        "origin": {
+          "type": "object", "additionalProperties": false, "required": ["kind", "span"],
+          "properties": {"kind": {"const": "authored"}, "span": {"$ref": "#/$defs/span"}}
+        }
+      }
+    },
+    "occurrence": {
+      "type": "object", "additionalProperties": false, "required": ["symbol", "span", "declaration"],
+      "properties": {
+        "symbol": {"$ref": "#/$defs/handle"}, "span": {"$ref": "#/$defs/span"}, "declaration": {"type": "boolean"}
+      }
+    }
+  },
+  "type": "object",
+  "required": ["schema", "scope", "snapshot", "binding", "status", "complete", "reason"],
+  "properties": {
+    "schema": {"const": 1}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
+    "status": {"enum": ["checked", "unavailable", "timed-out", "partial", "unsupported", "refused"]},
+    "complete": {"type": "boolean"}, "reason": {"type": ["string", "null"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "checked"}}},
+      "then": {"properties": {"complete": {"const": true}, "reason": {"type": "null"}}},
+      "else": {"properties": {"complete": {"const": false}, "reason": {"type": "string", "minLength": 1}}}
+    },
+    {
+      "oneOf": [
+        {
+          "required": ["source", "symbols", "occurrences", "supported_views", "unsupported_views"],
+          "properties": {
+            "scope": {"const": "vela-pure-inspection"}, "source": {"type": "string"},
+            "symbols": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/symbol"}},
+            "occurrences": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/occurrence"}},
+            "supported_views": {"const": ["source-text", "pure-resolved-identifiers"]},
+            "unsupported_views": {"const": ["syntax-tree", "imports", "generated-origins", "proof", "lowering"]}
+          },
+          "allOf": [{
+            "if": {"properties": {"status": {"not": {"const": "checked"}}}},
+            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}}}
+          }]
+        },
+        {
+          "required": ["items", "total"],
+          "properties": {
+            "scope": {"const": "vela-pure-inspection-query"}, "total": {"type": "integer", "minimum": 0},
+            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}]}}
+          }
+        }
+      ]
+    }
+  ],
+  "unevaluatedProperties": false
+}
