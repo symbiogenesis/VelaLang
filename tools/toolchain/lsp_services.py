@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Bounded projection of the pure compiler's resolved facts into LSP results."""
 
+import hashlib
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -44,11 +45,15 @@ def inspect_document(source: bytes) -> dict[str, object]:
                               timeout=INSPECTION_SECONDS, check=False)
         if done.returncode != 0 or len(done.stdout) > MAX_BODY_BYTES:
             raise InspectionError("Pure prototype inspection worker failed or exceeded its output bound")
-        return decode_message(done.stdout)
+        result = decode_message(done.stdout)
+        if result.pop("source_sha256", None) != hashlib.sha256(source).hexdigest():
+            raise InspectionError("Inspection result differs from the requested source")
     except subprocess.TimeoutExpired as error:
         raise InspectionError("Pure prototype inspection exceeded 5 seconds") from error
     except (OSError, ValueError) as error:
         raise InspectionError("Pure prototype inspection worker unavailable") from error
+    else:
+        return result
 
 
 @dataclass(frozen=True)
