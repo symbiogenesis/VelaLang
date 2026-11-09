@@ -103,6 +103,10 @@ The supported increment includes:
   `Some(false && absent?)` returns `Some(false)` and
   `Some(true || absent?)` returns `Some(true)` when `absent` is `None`.
   Left-operand and nested propagation preserve the same evaluation order.
+  Extraction across earlier sibling values refuses when either sibling contains
+  a call, ownership transfer or block evaluation; write the earlier computation
+  as an explicit local first. The dedicated `&&`/`||` guard evaluates its left
+  operand once before deciding whether to propagate from its right operand.
 - Nominal `record Name(T1 Field1, ...)` and `union Name { Case1(...); ... }`
   declarations with primary-constructor fields and tagged sum variants (lowering
   non-dependent field telescopes to `@Corelib.Init.Datatypes.prod` and dependent
