@@ -281,4 +281,4 @@ byte-for-byte on [`examples/pure.vela`](../../examples/pure.vela),
 [`examples/expressions.vela`](../../examples/expressions.vela), and agrees on all `173`
 migration fixtures (`0` differences), retiring the Python `_Parser`
 (`"python_retired": true`, `"host_routes": ["linux", "win32"]`, `"deferred": []`).
-User-managed Host CI and Guest CI verdicts remain Q25h's open items.
+User-managed Host CI and Guest CI verdicts remain separate from local qualification.

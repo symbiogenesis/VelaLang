@@ -194,6 +194,152 @@ remain separately scoped work.
 Landed: Tier A. Independent full reads checked the source grammar against the
 design dossier and the parser against independently chosen returning-block cases.
 
+<a id="q25g-build-the-menhir-development-parser-for-pure-vela"></a>
+
+#### Q25g · Build the Menhir development parser for pure Vela
+
+Accepted on 2026-11-08 under the [bounded parser contract](../tooling/parser.md#bounded-increment)
+and [acceptance commands](../tooling/parser.md#acceptance-and-commands).
+The single authored OCaml grammar ([tools/toolchain/parser/parser.mly](../../tools/toolchain/parser/parser.mly),
+`c249a367a6c7cadae2caf42d613afccb54173270ed453d97593c301c561373d2`), lexer
+([lexer.mll](../../tools/toolchain/parser/lexer.mll),
+`7247ea2d0cf4084a9a8d2c0fb895d8f058335b014494028ed4ddb08da92f5d38`), located AST
+([ast.ml](../../tools/toolchain/parser/ast.ml),
+`7f499a8caafa3bf67769540b78a2f7ce8b2de3763b1d6f32e3a13c032184da90`), bounded native
+driver ([main.ml](../../tools/toolchain/parser/main.ml),
+`fa40e2fdfddc896db33b9b60ab54a26584e88c2e2781a16ba887192d3bb87863`) and host
+orchestration ([tools/toolchain/parser.py](../../tools/toolchain/parser.py))
+compile cleanly with `menhir --strict --infer --explain` (`menhir, version 20260209`,
+binary `290c659064d26cb1c51b743ec6a414ed4269e7f686821637656d526333c6c7a2`) and
+`ocamlc 5.4.1` (`454b023dfdebe17bd760300da10dd5b97833a11597cc5f2287444d0ed428a9fc`)
+in `verifiedos-sail-0.20.3-ocaml-5.4.1` without linking `menhirLib`, under the
+generator-output reading recorded in
+[THIRD-PARTY.md](../../THIRD-PARTY.md#vela-development-and-proof-reuse-candidates).
+
+`python tools/run.py vela-parser qualify` verifies byte-identical deterministic
+regeneration across two fresh builds (`lexer.ml`
+`f36a7807363e6d20bfb39dd19e0c6ad014fcea5c0a9ed430931dfaa1cf8ee95b`, `parser.ml`
+`f34d3366aa4f4fe12f24b81488833d065fabd84a769e46b40e8a9ce8908a2eee`, `parser.mli`
+`a185d0e1e41f62ee49381180a8d75d8500e0c4b30defa003146251170d347c43`, `vela-parser`
+`af01c1ca23fe30f6c45f90257ff56c131f92144137c6b8c0e1f832e3e51eaeae`) and passes all
+`70` independent pure AST, precedence/associativity, original-byte span, LF/CRLF/bare-CR
+and UTF-8 comment, syntax-vs-semantics separation, and refusal (`syntax`,
+`unsupported`, `encoding`, `limit`) fixtures, plus [examples/pure.vela](../../examples/pure.vela),
+[examples/constants.vela](../../examples/constants.vela) and
+[examples/expressions.vela](../../examples/expressions.vela). Hosted CI remains
+user-managed with no hosted verdict claimed from local execution; Q25h separately
+owns checked parsing and Python-parser retirement. The original 6 h estimate,
+range 4–8, is retained because earlier authoring and qualification intervals were
+shared across parser batches; both calibration columns remain `n/a`.
+
+Landed: Tier A. Independent full reads cover the pure Menhir grammar, AST and
+span construction, resource/depth limits, generator-output terms and local WSL
+qualification.
+
+<a id="q25h-qualify-checked-vela-parsing-and-retire-the-python-parser"></a>
+
+#### Q25h · Qualify checked Vela parsing and retire the Python parser
+
+Accepted on 2026-11-08 under the
+[promotion and retirement contract](../tooling/parser.md#promotion-and-retirement)
+and [Rocq support prerequisite](../tooling/parser.md#rocq-support-prerequisite).
+[`vela-parser support`](../../tools/toolchain/parser_checked.py) qualifies the exact
+generator (`menhir 20260209 --coq --strict` in `verifiedos-sail-0.20.3-ocaml-5.4.1`,
+binary `290c659064d26cb1c51b743ec6a414ed4269e7f686821637656d526333c6c7a2`) and Rocq
+support-library pair (`MenhirLib` from `menhir.20260209` archive
+`69f0414b047d1d5b3507eb8277cd328a60d430bdff51de912b47adb2c25de4f3` in
+`verifiedos-rocq-9.3.0-ocaml-5.4.1`, `rocq`
+`9a2a4eacf47b44c6ec582bc2b9f9cde9de11af77164e0637103fca9865efd5ac`, `rocqchk`
+`46aae2e2a655bec07928a94df91b028bf1eeb899b2df8d8e277d942e57ff5412`), preserving
+`Version.v` (`3746feeefa899fe0d43e4db0ec53f2d7ddd72076d9fab29cdcc9ecb0250072e6`)
+and `require_20260209`. `_pure_grammar_view` extracts and drift-checks all `37`
+pure terminals and `29` reachable pure rules from the single owner
+[`parser.mly`](../../tools/toolchain/parser/parser.mly)
+(`c249a367a6c7cadae2caf42d613afccb54173270ed453d97593c301c561373d2`) to emit
+`VelaPureGrammar.mly`
+(`71325e79c1c655d83210bf5c1589373ef827841b6f668f9b73cafea085004aca`) and
+deterministic `VelaPureGrammar.v`
+(`27a38fdde4322a39e056ba89a1b0d0b2470338e55d91c37c4b584e27753ed1e9`).
+
+Together with the digest-guarded `Interpreter.v`
+(`69cfbdd086858ef37fa50eed10866379a51bd858113a9716331d88f9e46e7fde`) and
+`Validator_complete.v`
+(`1a284ece0e5b547e2b816c0f7623ee1ee628d30385f5d3dde4dd1a180589cb66`) proof
+adaptations (verified public-reading-equal to the unadapted reference twin at
+`17c1e9beb756127c9079803fc99e6273c0515188ab8c4d42d36bc3ffafb85ae9`),
+`VelaPureProofs.v`
+(`f6dbcd0a4aa8f0de1d940e2d96412a261a764ebe9f55c5c27752659c72a06e9c`) proves
+`vela_file_safe`, `vela_file_complete_validator`, `vela_file_correct`,
+`vela_file_complete`, `vela_file_unambiguity`, `vela_file_positive_precedence`,
+`vela_file_bare_local_refused`, `vela_file_empty_module_rejected` and
+`vela_file_zero_fuel_timeout` with `Closed under the global context` (`0` axioms,
+reading `308b14375eb599e10c9320eefc5e0fef85a89b5ebeee30d98ec395be842e7d86`) and
+passes recursive `rocqchk` across all 14 `MenhirLib.*` modules.
+`VelaPureExtraction.v` extracts `vela_checked_parser.ml`
+(`0cb4541b65af4a606b075bd6dee0450929ea887ae3d60a3b2a9251a56b0050bd`) and compiles
+`vela-checked-parser`
+(`2bf312bd2e1e38f62878c8cb4f2fdbc8d8288dbab5488a7a127393ae7a735529`) over the
+shared UTF-8/lexer boundary with zero code-backend Menhir tables, passing all `70`
+pure qualification fixtures, matching `vela-parser` byte-for-byte on
+[examples/pure.vela](../../examples/pure.vela),
+[examples/constants.vela](../../examples/constants.vela) and
+[examples/expressions.vela](../../examples/expressions.vela), and agreeing across
+all `173` [migration fixtures](../tooling/parser.md#executable-migration-preparation)
+(`0` differences). [`parse_checked`](../../tools/toolchain/parser_checked.py) and
+[`vela.parse_module`](../../tools/toolchain/__init__.py) now serve all pure Vela
+parsing (`translate`, `evaluate`, `inspect_source`, `format_source`, `lint_source`)
+on both Ubuntu (`linux`) and Windows (`win32` via `wsl.exe` batch framing over
+`/root/build/vela-parser-checked-runtime/vela-checked-parser`), and the handwritten
+Python `_Parser` is retired (`"python_retired": true`,
+`"host_routes": ["linux", "win32"]`, `"deferred": []`). Hosted CI remains
+user-managed with no hosted pass claimed from local execution, and full-language
+frontend admission retains Q25d's prerequisites. The original 16 h estimate,
+range 8–24, is retained because earlier support-library and migration intervals
+were shared across parser batches; both calibration columns remain `n/a`.
+
+Landed: Tier A. Independent full reads cover the `MenhirLib` support adaptations,
+drift-checked pure grammar view, nine zero-axiom Rocq parser theorems, extracted
+`vela-checked-parser` runtime, 173-fixture migration comparison and complete
+retirement of the Python `_Parser`.
+
+<a id="q25i-extend-the-menhir-grammar-across-the-vela-authoring-surface"></a>
+
+#### Q25i · Extend the Menhir grammar across the Vela authoring surface
+
+Accepted on 2026-11-08 under the
+[development surface grammar contract](../language/surface-grammar.md).
+The single authored Menhir grammar ([tools/toolchain/parser/parser.mly](../../tools/toolchain/parser/parser.mly))
+exposes the `surface_file` entry (`vela-parser parse --surface SOURCE`, schema 2)
+alongside the pure `file` entry (schema 1), sharing lexical lookahead, operator
+precedence, generic-call probe productions and resource bounds. It covers modules,
+imports, aliases, namespaces, `public`/`private` declarations, typed constants,
+interfaces and `impl` declarations, records/structs/unions, dependent callable
+telescopes, kinded/computed types, `type TYPE` expressions, `typed_lambda` values,
+place-named loans (`in`/`ref`/`out`), pointer operations, explicit options,
+unnamed and named `invariant Clause: ...` contracts, selective
+`open (ref this) lifts Clause, ... { ... }` blocks, `scope (...) { ... }` task
+scopes, effect operations with resumption bounds and contracts, named handler
+capabilities (`handle ... as chosen`) and `dispose` clauses, grades and domain
+dictionaries, `theorem`/`lemma`/`proof`/`assert ... by`/`calc` blocks, and
+`machine`/`hardware` containers.
+
+`python tools/run.py vela-parser qualify` compiles the grammar conflict-free under
+locked `menhir 20260209 --strict --infer --explain` and `ocamlc 5.4.1` in
+`verifiedos-sail-0.20.3-ocaml-5.4.1` and passes all `400` independent surface
+positive, span, precedence, lookahead-limit and refusal fixtures
+([tools/toolchain/surface.py](../../tools/toolchain/surface.py)) plus
+[examples/surface.vela](../../examples/surface.vela)
+(`3bba4ffee2c7c6221f747b0cf9d262d1810238fe5f491dfc5a8ada8f7260ea88`) while
+preserving all `70` pure fixtures and `173` migration comparisons. Syntax parsing
+grants no elaboration, checked-parser or resource-safety verdict, and hosted CI
+remains user-managed. The original 24 h estimate, range 16–32, is retained because
+surface-grammar extensions were authored across multiple feature batches; both
+calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of the unified Menhir grammar, surface AST schema,
+400 independent surface fixtures, permanent-exclusion refusals and local WSL
+qualification.
+
 <a id="q25j-prototype-path-sensitive-loan-end-inference-over-explicit-flow-facts"></a>
 
 #### Q25j · Prototype path-sensitive loan-end inference over explicit flow facts
@@ -218,6 +364,60 @@ both calibration columns remain `n/a`.
 
 Landed: Tier A. Independent full reads cover the implementation, diagnostic
 contract and positive, conflict, malformed-input and incomplete-exploration cases.
+
+<a id="q25k-elaborate-generic-dependent-mathematics-and-first-class-proofs"></a>
+
+#### Q25k · Elaborate generic dependent mathematics and first-class proofs
+
+Accepted on 2026-11-08 under the
+[mathematical elaboration contract](../tooling/elaboration-prototype.md).
+The schema-2 elaborator ([tools/toolchain/elaborate.py](../../tools/toolchain/elaborate.py)
+and its `elaborate_*.py` submodules) and [examples/dependent.vela](../../examples/dependent.vela)
+support generic and ghost-index telescopes, predicative universes `Type`/`Type<n>`,
+dependent callables and type families, higher-order bidirectional inference,
+length-indexed `Vec<T, n>` and `Fin<n>` lookup, products, `char` Unicode scalar
+values, exact fixed-width integers (`u8`..`u64`, `i8`..`i64`, `usize`, `isize`,
+`byte`) and imported `Vela.Numerics` aliases (`int`, `uint`, `long`, `ulong`,
+`short`, `ushort`, `sbyte`), pure `Seq<T>` sequences and `.Model` combinators
+(`.Count`, `.At`, `.Append`, `.Update`, `.Take`, `.Skip`, `.Slice`, `.Contains`,
+`.All`, `.Any`), mutable `var` locals with bounded `foreach` and
+`while ... decreases` loops, nominal `record` and `union` types with
+primary-constructor fields, total read-only `property` declarations, member
+methods and named `invariant Clause: ...` conjuncts with selective
+`open (ref this) lifts Clause, ... { ... }` lifting, `.Field` and `.Property`
+projections, postfix `with { ... }` record updates, vacant-slot storage
+(`Slots<T, capacity>`) with two-step `CopyRepresentation` and `TransferType<T>`
+bulk relocation, `calc` equational/relational proof chains, path-sensitive
+`out T` initialization loan parameters, `interface` declarations with explicit
+nonoverlapping `impl` instances (checked for structural-unification coherence,
+Liskov contracts and explicit `lemma`/`theorem` law obligations) and
+`where Interface(type T)` generic witness dispatch, multi-module `import`
+composition (`elaborate(..., imports=...)` and `elaborate_package`) with
+`public`/`private` visibility and cycle/collision refusal, exhaustive `match`
+expressions and returning statement `match` with optional declaration-order
+`label: pattern` constructor fields and dependent `as name : Type` motives,
+irrefutable `let` destructuring, `if (cond) a else b` expressions, `expr is Pattern`,
+flow-refined `if (x is Pattern)` and `let Pattern = expr else { ... }` guards,
+and first-class equality/existential proposition proofs.
+
+`python tools/run.py vela-parser elaborate-qualify`
+([tools/toolchain/elaboration_check.py](../../tools/toolchain/elaboration_check.py))
+replays all `142` native parser and Rocq kernel cases (`Case000`..`Case141`) in
+`verifiedos-rocq-9.3.0-ocaml-5.4.1` (`rocq 9.3.0`
+`9a2a4eacf47b44c6ec582bc2b9f9cde9de11af77164e0637103fca9865efd5ac`, `rocqchk`
+`46aae2e2a655bec07928a94df91b028bf1eeb899b2df8d8e277d942e57ff5412`), verifying
+`Closed under the global context` (`0` axioms) via `Print Assumptions` and
+recursive `rocqchk` across all compiled libraries plus exact semantic refusal
+categories (`name`, `type`, `inference`, `unsupported`, `protocol`, `limit`) on
+all negative neighbors. Hosted CI remains user-managed with no hosted pass claimed
+from local execution; checked source correspondence and the full production
+frontend remain open. The original 24 h estimate, range 16–32, is retained because
+elaborator increments were shared across multiple batches; both calibration
+columns remain `n/a`.
+
+Landed: Tier A. Full review of the schema-2 protocol validator, bidirectional
+elaborator, Gallina emission, independent host controls and 142-case native
+parser/Rocq kernel replay.
 
 <a id="q25l-clarify-vela-borrowing-evidence-and-resource-interfaces"></a>
 
@@ -295,6 +495,171 @@ Landed: Tier A. Independent full reads covered the complete companion and change
 product, composition, evidence and implementation boundaries. No normative
 requirement, coverage cell, semantic anchor or kernel equality was amended.
 
+<a id="q25n-prototype-and-qualify-vela-lsp-lifecycle-and-pure-diagnostics"></a>
+
+#### Q25n · Prototype and qualify Vela LSP lifecycle and pure diagnostics
+
+Accepted on 2026-11-08 under the
+[host LSP contract](../tooling/lsp-prototype.md#interface-and-bounds) and
+[protocol qualification](../tooling/tooling-protocols.md#qualification-and-delivery).
+`vela-lsp` ([tools/toolchain/lsp.py](../../tools/toolchain/lsp.py)) serves bounded
+stdio lifecycle (`initialize`/`initialized`, `shutdown`/`exit`) and versioned
+pure-prototype diagnostics over full and incremental unsaved overlays using the
+shared immutable source and UTF-8/UTF-16 coordinate utilities
+([tools/toolchain/source.py](../../tools/toolchain/source.py)). Reversed ranges
+refuse before coordinate clamping; diagnostic-worker replies require strict bounded
+JSON, known categories, Unicode text and source-valid positions; and invalid edits
+or worker failures preserve synchronized overlays and session generations.
+
+[`vela-lsp --qualify-clients`](../../tools/toolchain/lsp_clients.py) qualifies two
+pinned independent editor clients recorded in
+[THIRD-PARTY.md](../../THIRD-PARTY.md#vela-development-and-proof-reuse-candidates)
+— Neovim `0.11.0` (`vim.lsp`, incremental sync: `97` frames / `37` requests / `7`
+ranged edits on Windows ARM64 and `99` frames / `38` requests / `7` ranged edits
+on Ubuntu 24.04 ARM64) and Vim `9.1.2141` + `yegappan/lsp`
+(`58eac06e81bad174cfa897614ae01adf0d31d10a`, full sync `101` frames / `36` requests
+and incremental sync `101` frames / `36` requests / `12` ranged edits on both
+platforms) — across six lifecycle stages (`didOpen`, formatting edit, incremental
+identifier rename with supplementary-character UTF-16 comments, `check_failure`
+unknown-identifier and `unsupported` runtime-constant-argument diagnostics,
+recovery, and clean `shutdown`/`exit`), replaying bidirectional wire transcripts
+(`vela-lsp --transcript`) and client observations against independent expected
+oracles in [test_vela_lsp_clients.py](../../tools/tests/test_vela_lsp_clients.py).
+Hosted CI remains user-managed with no hosted pass claimed from local execution,
+and this increment supplies no wider-language or production qualification. The
+original 6 h estimate, range 4–8, is retained because implementation and
+client-qualification intervals were shared across the LSP batch; both calibration
+columns remain `n/a`.
+
+Landed: Tier A. Full review of stdio framing, UTF-8/UTF-16 coordinate conversion,
+atomic overlay rollback, worker isolation and two-client headless qualification
+on Windows and Ubuntu.
+
+<a id="q25o-add-and-qualify-pure-vela-lsp-navigation"></a>
+
+#### Q25o · Add and qualify pure Vela LSP navigation
+
+Accepted on 2026-11-08 under the
+[pure navigation contract](../tooling/lsp-prototype.md#pure-navigation-increment).
+Compiler-owned resolution facts (`inspect_source` in
+[tools/toolchain/__init__.py](../../tools/toolchain/__init__.py)) drive
+`textDocument/hover`, `textDocument/definition`, `textDocument/references` and
+`textDocument/documentSymbol` over synchronized open buffers in
+[tools/toolchain/lsp.py](../../tools/toolchain/lsp.py), with exact half-open
+identifier ranges, distinct function/branch and call/value identities, and
+bounded 5-second worker inspection. Independent fixtures in
+[test_vela_lsp_services.py](../../tools/tests/test_vela_lsp_services.py) exercise
+function/branch scopes, separate call/value namespaces, inferred types,
+Unicode/newlines, incremental edits and refusal recovery, worker/response limits
+and real stdio sessions.
+
+[`vela-lsp --qualify-clients`](../../tools/toolchain/lsp_clients.py) qualifies both
+pinned Neovim `0.11.0` and Vim `9.1.2141` + `yegappan/lsp`
+(`58eac06e81bad174cfa897614ae01adf0d31d10a`) clients across initial, formatted,
+incrementally renamed (`start` -> `seed` with `includeDeclaration` reference sets
+and UTF-16 supplementary-character positions), broken-source (empty/null
+responses) and recovered overlays in
+[test_vela_lsp_clients.py](../../tools/tests/test_vela_lsp_clients.py) on Windows
+and Ubuntu. Hosted CI remains user-managed with no hosted pass claimed from local
+execution, and this increment supplies no wider-language or production
+qualification. The original 8 h estimate, range 6–10, is retained because
+navigation and client-qualification intervals were shared across the LSP batch;
+both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of compiler resolution fact emission, navigation
+projections, snapshot invalidation and two-client headless qualification.
+
+<a id="q25p-improve-vela-authoring-syntax-and-editor-hints"></a>
+
+#### Q25p · Improve Vela authoring syntax and editor hints
+
+Accepted on 2026-11-08 under the
+[concise syntax contract](../language/surface-grammar.md#concise-authoring-syntax),
+[required-static contract](../language/surface-grammar.md#required-static-constants)
+and [authoring-hint contract](../tooling/lsp-prototype.md#authoring-hints).
+Both Menhir entries, the pure compiler and the mathematical consumer support
+inferred lambdas (`x => ...` and `(x, y) => ...`), `=>` expression bodies,
+optional trailing commas, token-shape constructor patterns (`PascalCase`
+constructors and lowercase or `_` binders after Q25ah), canonical `Unit` and
+`this` spellings, bounded `foreach`, declaration-order named arguments and typed
+required-static `const` declarations with runtime-dependency refusals.
+`vela-lsp` serves bounded `textDocument/inlayHint` inferred-local `: Type` hints
+over synchronized overlays and distinguishes immutable `let` reassignment from
+exclusive-loan write refusals.
+
+Independent syntax/span/refusal, constant-evaluation, labeled-call and
+editor-hint controls ([test_vela_authoring.py](../../tools/tests/test_vela_authoring.py),
+[test_vela_constants.py](../../tools/tests/test_vela_constants.py),
+[test_vela_const_math.py](../../tools/tests/test_vela_const_math.py),
+[test_vela_const_editor.py](../../tools/tests/test_vela_const_editor.py),
+[test_vela_lsp_hints.py](../../tools/tests/test_vela_lsp_hints.py)), two-client
+LSP qualification (`vela-lsp --qualify-clients`), and strict locked native
+generation and kernel replay (`vela-parser qualify`, `vela-parser elaborate-qualify`)
+pass locally. Hosted CI remains user-managed with no hosted pass claimed from
+local execution. The original 8 h estimate, range 6–10, is retained because
+authoring and hint intervals were shared across batches; both calibration columns
+remain `n/a`.
+
+Landed: Tier A. Full review of concise syntax productions, required-static
+constant evaluation, labeled-call checking and LSP inlay-hint projections.
+
+<a id="q25q-implement-compositional-vela-constant-functions-and-parameters"></a>
+
+#### Q25q · Implement compositional Vela constant functions and parameters
+
+Accepted on 2026-11-08 under the
+[compositional constant contract](../language/surface-grammar.md#required-static-constants).
+Both Menhir entries, the pure compiler, the mathematical elaborator and LSP
+signature/hover facts support `const` callable modifiers (preserving ordinary
+runtime calls) and `const` value parameters (checked symbolically in definitions
+and specialized on closed static arguments in declaration order).
+[examples/constants.vela](../../examples/constants.vela)
+(`d2520e3764311b74ab36185cca565d7f35af75c06b64cfdf453b7aa84f1666bb`) combines a
+static configuration with runtime data, and pure specialization bounds expanded
+terms and retained argument text before Gallina emission.
+
+Focused constant-composition and output-limit controls
+([test_vela_constants.py](../../tools/tests/test_vela_constants.py),
+[test_vela_const_math.py](../../tools/tests/test_vela_const_math.py),
+[test_vela_const_editor.py](../../tools/tests/test_vela_const_editor.py)),
+native pure and surface syntax qualification (`vela-parser qualify`), 173-fixture
+migration agreement (`vela-parser migration`), and native Rocq kernel replay of
+compositional constant functions and static parameters (`vela-parser elaborate-qualify`)
+pass locally. Hosted CI remains user-managed with no hosted pass claimed from
+local execution, and no production frontend, target representation or
+source-correspondence theorem is claimed. The original 16 h estimate, range 8–24,
+is retained because implementation intervals were shared across batches; both
+calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of `const` callable and parameter syntax, symbolic
+checking, bounded specialization, editor hover signatures and native kernel replay.
+
+<a id="q25r-add-vela-numeric-digit-separators"></a>
+
+#### Q25r · Add Vela numeric digit separators
+
+Accepted on 2026-11-08 under the
+[numeric separator contract](../tooling/authoring-tools.md#numeric-separators).
+Both pure routes support decimal `_` digit separators (`1_024`), and the surface
+entry and mathematical consumer additionally support hexadecimal (`0xFF_FFu64`)
+and binary (`0b1010_0011byte`) separators with representation suffixes, preserving
+original located spellings and byte spans in syntax while counting only actual
+digits against the 256-digit literal bound and refusing leading, trailing,
+repeated, prefix-adjacent or suffix-adjacent underscores.
+
+Independent value, span, malformed-neighbor, suffix/base boundary and digit-limit
+controls ([test_vela_separators.py](../../tools/tests/test_vela_separators.py)),
+native pure and surface qualification fixtures (`vela-parser qualify`),
+173-fixture migration agreement (`vela-parser migration`), and Rocq kernel replay
+(`vela-parser elaborate-qualify`) pass locally. Hosted CI remains user-managed
+with no hosted pass claimed from local execution; source-correspondence and
+represented-type boundaries are unchanged. The original 12 h estimate, range
+8–16, is retained because implementation intervals were shared across authoring
+batches; both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of lexer separator rules, pure and mathematical
+literal validation, digit-bound accounting and native parser/kernel qualification.
+
 <a id="q25s-attach-vela-documentation-comments-to-compiler-facts"></a>
 
 #### Q25s · Attach Vela documentation comments to compiler facts
@@ -342,6 +707,39 @@ cannot reconstruct that actual; both calibration columns remain `n/a`.
 
 Landed: Tier A. Independent full reads cover the formatter, lints, compiler and
 atomic publication paths, owner predicates and independent preservation controls.
+
+<a id="q25u-add-pure-vela-editor-formatting-and-semantic-tokens"></a>
+
+#### Q25u · Add pure Vela editor formatting and semantic tokens
+
+Accepted on 2026-11-08 under the
+[pure editor operations contract](../tooling/lsp-prototype.md#pure-editor-operations).
+`vela-lsp` ([tools/toolchain/lsp.py](../../tools/toolchain/lsp.py)) serves
+compiler-checked canonical formatting (`textDocument/formatting`) as a proposed
+whole-document edit (`[]` when already canonical) and full identifier semantic
+tokens (`textDocument/semanticTokens/full`, legend `function`/`parameter`/`variable`
+and `declaration`/`readonly`) from resolved compiler facts over synchronized
+open overlays. Independent controls in
+[test_vela_lsp_editor.py](../../tools/tests/test_vela_lsp_editor.py) cover exact
+edits and token streams, Unicode/newlines, refusal/recovery, worker isolation,
+oversized-frame correlated refusals, and a real stdio session with unsaved edits.
+
+[`vela-lsp --qualify-clients`](../../tools/toolchain/lsp_clients.py) qualifies both
+pinned Neovim `0.11.0` and Vim `9.1.2141` + `yegappan/lsp`
+(`58eac06e81bad174cfa897614ae01adf0d31d10a`) clients applying the canonical
+formatting edit, verifying formatting idempotence (`[]` on canonical source), and
+checking exact 115-integer (`23` occurrences) semantic-token streams across
+initial, formatted, incrementally renamed, broken (`[]`) and recovered overlays
+in [test_vela_lsp_clients.py](../../tools/tests/test_vela_lsp_clients.py) on
+Windows and Ubuntu. Hosted CI remains user-managed with no hosted pass claimed
+from local execution, and this increment grants no wider-language or production
+qualification. The original 12 h estimate, range 8–16, is retained because
+implementation and client-qualification intervals were shared across the LSP
+batch; both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of isolated formatting proposals, relative UTF-16
+semantic-token encoding, overlay invalidation and two-client headless
+qualification.
 
 <a id="q25v-settle-the-bounded-vela-release-and-practical-language-contracts"></a>
 
@@ -500,6 +898,146 @@ Landed: Tier A. Full source, contract, theorem-subject, invalid-neighbor and
 foundation-reuse review, plus local `test_vela_first_slice`, `vela-parser first-slice`,
 `typecheck` and corpus validation.
 
+<a id="q25x-qualify-generated-tests-for-existing-vela-development-tools"></a>
+
+#### Q25x · Qualify generated tests for existing Vela development tools
+
+Accepted on 2026-11-08 under the
+[generated-development-test contract](../tooling/tooling-protocols.md#generated-development-tests).
+[`vela generated-tests`](../../tools/toolchain/generated_tests.py) qualifies
+`hypothesis==6.170.14` and `sortedcontainers==2.4.0` under the
+`2026-10-31T07:17:33Z` dependency cooldown recorded in
+[THIRD-PARTY.md](../../THIRD-PARTY.md) inside an isolated Python 3.14 environment
+on both Windows ARM64 (Python `3.14.10`, `_native` SHA-256
+`b7722a385d97a5ce0e0a5800770516ce5557f4abed4503b12b7f8e6c6a202c3b`) and Ubuntu
+ARM64 (Python `3.14.7`, `_native` SHA-256
+`1a25e29e9b879fb3de4bdd805e11d416dc8a4fc62d2f81472095fbfa8630ea61`).
+
+Under deterministic seed `20261107` (`max_examples=64`, `stateful_step_count=32`,
+`max_document_bytes=4096`, `timeout_seconds=60`, `database=None`,
+`derandomize=True`), the campaign passes all four subjects (`source_coordinates`:
+848 examples; `synchronous_overlays` and `supported_requests`: 3,224 steps;
+`pure_formatting`: 64 examples) against the independent
+[`OracleTextModel`](../../tools/toolchain/generated_tests.py),
+[`OracleOverlayModel`](../../tools/toolchain/generated_tests.py) and
+[`FormatTemplate`](../../tools/toolchain/generated_tests.py) oracles, kills all
+three executable seeded defects (`utf16-codepoint-confusion`,
+`edit-against-original-document`, and held-out
+`publish-early-edit-before-rollback`), and shrinks nonminimal failing traces
+(`21 -> 10` coordinate units and `8 -> 2` overlay steps) into explicit
+JSON-serializable replays verified by
+[test_vela_generated_tests.py](../../tools/tests/test_vela_generated_tests.py)
+under the existing `Case` runner. Compared with the frozen manual baseline
+([test_vela_lsp.py](../../tools/tests/test_vela_lsp.py),
+[test_vela_lsp_services.py](../../tools/tests/test_vela_lsp_services.py),
+[test_vela_format.py](../../tools/tests/test_vela_format.py)), the state-machine
+rules and structural shrinker replace handwritten multi-step sequence
+construction and reduce 8-step failing traces to 2-step replays automatically;
+because `hypothesis==6.170.14` is `MPL-2.0` and ships a compiled 14-crate
+Rust/PyO3 `_native` extension whose wheel metadata omits separate crate license
+texts, `hypothesis` is kept outside
+[tools/pyproject.toml](../../tools/pyproject.toml) and
+[tools/uv.lock](../../tools/uv.lock) as an isolated on-demand instrument while
+the independent models and shrunk explicit regressions remain in the Apache-2.0
+test suite. Hosted CI remains user-managed with no hosted pass claimed from local
+execution. The original 6 h estimate, range 4–8, is retained because
+qualification intervals were shared across the tooling batch; both calibration
+columns remain `n/a`.
+
+Landed: Tier A. Full review of the independent coordinate/overlay/format models,
+seeded-fault kills, shrunk JSON replay fixtures and third-party licensing
+disposition.
+
+<a id="q25y-qualify-menhir-generated-syntax-campaigns"></a>
+
+#### Q25y · Qualify Menhir-generated syntax campaigns
+
+Accepted on 2026-11-08 under the
+[generated-syntax campaign contract](../tooling/parser.md#generated-syntax-campaigns).
+[`vela-parser syntax-campaigns`](../../tools/toolchain/syntax_campaigns.py)
+qualifies Menhir `20260209`'s `--random-seed`, `--random-sentence-length`,
+`--random-sentence` and `--interpret --interpret-show-cst` facilities in
+`verifiedos-sail-0.20.3-ocaml-5.4.1` (`menhir` SHA-256
+`290c659064d26cb1c51b743ec6a414ed4269e7f686821637656d526333c6c7a2`, `ocamlc 5.4.1`
+SHA-256 `454b023dfdebe17bd760300da10dd5b97833a11597cc5f2287444d0ed428a9fc`)
+against the `file` entry of [`parser.mly`](../../tools/toolchain/parser/parser.mly)
+(`c249a367a6c7cadae2caf42d613afccb54173270ed453d97593c301c561373d2`) under the
+[output reading](../../THIRD-PARTY.md#vela-development-and-proof-reuse-candidates).
+
+Freezing the `multi-declaration-precedence-trailing-comma-and-trivia-boundaries`
+interaction across seeds `20261108..20261171` (`64` sentences, `goal_length=36`,
+`max_sentence_tokens=512`, `max_rendered_source_bytes=65536`,
+`max_interpreter_output_bytes=4194304`, `max_campaign_seconds=60`,
+`max_memory_bytes=536870912`), [`qualify_renderer`](../../tools/toolchain/syntax_campaigns.py)
+first qualifies all `37` pure terminals across `canonical`
+(`2cd098a78292d4714a11705ce547b266d5c9774b700121ce432d09113693237e`),
+`utf8_comments_crlf`
+(`08dbc326b3ff684f1c2e979221498db6e80a2dac6599e9b9d4d7a0f0e2ff8587`) and
+`bare_cr_separators`
+(`a66574b5431441dcc59ea87f609c2487b616d88122e28eb3768c49aa90fb3174`) plus six
+negative controls (`empty-sentence`, `missing-eof`, `premature-eof`,
+`surface-only-terminal`, `unknown-terminal`, `exceeds-token-budget`). Batch
+`--interpret --interpret-show-cst` accepts all `64` generated sentences (`3`
+malformed negative controls rejected) and
+[`IndependentPureAstOracle`](../../tools/toolchain/syntax_campaigns.py) verifies
+all `192` rendered trivia/payload checks against the native `vela-parser`
+executable (`63` accepted ASTs and `1` automaton-accepted /
+semantic-action-refused bare-typed local sentence at seed `20261116`), kills all
+three semantic-action/span faults that `--interpret` alone accepts
+(`right-associative-subtraction-or-division-action`: `35 -> 16` tokens;
+`trailing-comma-span-or-arity-corruption`: `34 -> 15` tokens; held-out
+`expression-body-excludes-arrow-or-semicolon-span`: `29 -> 14` tokens), and
+verifies deterministic JSON replay in
+[test_vela_syntax_campaigns.py](../../tools/tests/test_vela_syntax_campaigns.py)
+without random generation, a second grammar, `menhirLib` runtime linking or
+unbounded `--list-errors` enumeration. Hosted CI remains user-managed with no
+hosted pass claimed from local execution. The original 4.5 h estimate, range 3–6,
+is retained because campaign qualification intervals were shared across the
+tooling batch; both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of the payload renderer, `IndependentPureAstOracle`,
+automaton-vs-action refusal detection, seeded-fault shrinking and deterministic
+replay fixtures.
+
+<a id="q25z-qualify-the-familiar-vela-authoring-surface"></a>
+
+#### Q25z · Qualify the familiar Vela authoring surface
+
+Accepted on 2026-11-08 under the
+[familiar authoring migration](../language/surface-grammar.md#familiar-authoring-migration)
+and [ergonomic syntax contract](../language/surface-grammar.md#ergonomic-authoring-and-bounded-collection-iteration).
+The single Menhir grammar (using an internal token-only generic-call probe over
+the shared generic-argument productions) and the supported consumers implement
+canonical `let`/`var` local bindings (`VELA104` and `--preview-bindings` retired
+at Q25ah once `let`/`var` became mandatory), imported `Vela.Numerics` aliases,
+fat-arrow `match` arms, mathematical `=>` expression bodies, ordinary `F<T>(...)`
+generic calls alongside explicit `::<...>` applications, `if (cond) a else b`
+expressions, declaration-order `label: pattern` constructor fields, postfix
+`with { ... }` record/model updates, `let Pattern = expr else { ... }` and
+flow-refined `if (x is Pattern)` guards, total read-only `property` declarations,
+bounded collection-loop syntax (`foreach (let | in | ref x in coll)`),
+multi-quote raw string literals (`"""..."""`), allocation-free interpolated
+format templates (`$"..."` with `Format.Write(ref builder, $"...")`), and
+compiler-verified [assist-don't-coerce](../tooling/authoring-tools.md#compiler-verified-assist-dont-coerce-tooling)
+helpers.
+
+Independent syntax, ambiguous-token, probe-budget, pure-route and mathematical
+controls ([test_vela_bindings.py](../../tools/tests/test_vela_bindings.py),
+[test_vela_surface.py](../../tools/tests/test_vela_surface.py)), strict locked
+native generation (`vela-parser qualify`), 173-fixture migration agreement
+(`vela-parser migration`), and 142-case native Rocq kernel replay
+(`vela-parser elaborate-qualify`) pass locally. Represented runtime lowering,
+general `IBoundedIterable<T>` iterator laws and wider borrow/editor projections
+retain their [remaining ergonomics owners](../../PLAN.md#remaining-vela-ergonomics)
+after the accepted first slice, and hosted CI remains user-managed. The original
+32 h estimate, range 24–40, is retained because ergonomic syntax and consumer
+migrations were shared across multiple batches; both calibration columns remain
+`n/a`.
+
+Landed: Tier A. Full review of the generic-call probe, familiar authoring
+productions, pure and mathematical consumer migrations, assist helpers and native
+parser/kernel replay.
+
 <a id="q25aa-build-a-local-vela-browser-playground"></a>
 
 #### Q25aa · Build a local Vela browser playground
@@ -580,6 +1118,100 @@ not captured; both calibration columns remain `n/a`.
 
 Landed: Tier A. Full contract/source review, independent review and focused
 compiler/protocol/browser evidence accept this bounded local increment.
+
+<a id="q25ac-extend-pure-vela-expressions-and-playground-examples"></a>
+
+#### Q25ac · Extend pure Vela expressions and playground examples
+
+Accepted on 2026-11-08 under the
+[extended pure expression contract](../tooling/pure-prototype.md#extended-pure-expressions)
+and [playground expression examples](../tooling/playground.md#extended-expression-examples).
+Both pure syntax routes (`vela-checked-parser` and `vela-parser`) accept Boolean
+negation (`!`), short-circuit conjunction/disjunction (`&&`, `||`), non-chaining
+comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`) and saturating natural subtraction
+(`-`), with exact-source native decoding, once-only left-to-right operand
+evaluation, bounded short-circuit static evaluation, canonical formatting and
+runnable playground examples
+([examples/expressions.vela](../../examples/expressions.vela),
+`b9558ad1e09009a433decd3b786e228feb14ed8f25df1e2d2b10b074d3836ae8`).
+
+Independent operator, precedence, AST/span, short-circuit limit and refusal
+controls ([test_vela_expressions.py](../../tools/tests/test_vela_expressions.py)),
+focused HTTP/editor tests, native syntax qualification (`vela-parser qualify`),
+173-fixture migration agreement (`vela-parser migration`), headless Edge
+verification in Monaco and plain-text fallback, and native Rocq kernel replay of
+emitted runtime functions and evaluated constants (`vela-parser elaborate-qualify`)
+pass locally. Hosted CI remains user-managed with no hosted pass claimed from
+local execution. The original 8 h estimate, range 6–10, is retained because
+expression and playground intervals were shared across batches; both calibration
+columns remain `n/a`.
+
+Landed: Tier A. Full review of pure operator precedence, short-circuit emission
+and evaluation, formatter/LSP preservation, playground examples and native kernel
+replay.
+
+<a id="q25ad-add-natural-division-and-remainder-to-vela-and-its-playground"></a>
+
+#### Q25ad · Add natural division and remainder to Vela and its playground
+
+Accepted on 2026-11-08 under the
+[natural division and remainder contract](../tooling/pure-prototype.md#natural-division-and-remainder)
+and [playground division examples](../tooling/playground.md#division-and-remainder-examples).
+Both pure syntax routes support binary `/` and `%` at multiplication's
+left-associative precedence, denoting `Corelib.Init.Nat.div` and `.modulo` with
+total mathematical zero-divisor semantics (`n / 0 == 0` and `n % 0 == n`),
+exact-source native AST decoding, once-only left-to-right static evaluation,
+canonical formatting and runnable playground examples.
+
+Independent value, term, precedence, zero-divisor, static-dependency, limit and
+AST controls ([test_vela_division.py](../../tools/tests/test_vela_division.py)),
+real HTTP/LSP integration, native syntax qualification (`vela-parser qualify`),
+173-fixture migration agreement (`vela-parser migration`), headless Edge
+verification in Monaco and plain-text fallback, and native Rocq kernel replay of
+runtime and constant quotient/remainder observations
+(`vela-parser elaborate-qualify`) pass locally. Hosted CI remains user-managed
+with no hosted pass claimed from local execution, and represented first-release
+integer division retains its nonzero-divisor obligation in
+[first-release.md](../language/first-release.md#primitive-semantics). The original
+6 h estimate, range 4–8, is retained because implementation intervals were shared
+across batches; both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of `/` and `%` grammar productions, total `Nat`
+emission and static evaluation, playground integration and native kernel replay.
+
+<a id="q25ae-bring-dependent-vela-mathematics-into-the-playground"></a>
+
+#### Q25ae · Bring dependent Vela mathematics into the playground
+
+Accepted on 2026-11-08 under the
+[dependent playground contract](../tooling/playground.md#dependent-mathematics-increment)
+and [generic naming lint](../tooling/authoring-tools.md#generic-type-parameter-naming).
+The single native-backed `vela-playground` launch
+([tools/toolchain/playground.py](../../tools/toolchain/playground.py),
+[playground_worker.py](../../tools/toolchain/playground_worker.py))
+automatically selects the pure or mathematical compiler from the source in its
+bounded isolated worker, providing actual Gallina elaboration, bounded
+closed-expression reduction (`evaluate_mathematical`) through the existing
+schema-2 surface parser and reducer, automatic `editorServices` switching, and
+source-bound `VELA105` generic type-parameter naming warnings (`--allow VELA105`
+and `--deny VELA105` on `vela-parser elaborate`, with `VELA106` retired at Q25ah).
+
+Generic/higher-order, finite-index `Vec`/`Fin`, record/property/guard, raw-string
+formatting and dependent-function examples return independently expected values,
+while mismatched lengths, out-of-range indices, false proofs and declaration
+injection refuse. Independent evaluator, HTTP, lint and CLI controls
+([test_vela_playground_math.py](../../tools/tests/test_vela_playground_math.py),
+[test_vela_generic_naming.py](../../tools/tests/test_vela_generic_naming.py),
+[test_vela_naming_cli.py](../../tools/tests/test_vela_naming_cli.py)), locked
+native parser/elaborator replay (`vela-parser elaborate-qualify`), and headless
+Edge verification across Monaco and plain-text fallback pass locally. Hosted CI
+remains user-managed with no hosted pass claimed from local execution. The
+original 16 h estimate, range 12–20, is retained because playground and lint
+intervals were shared across batches; both calibration columns remain `n/a`.
+
+Landed: Tier A. Full review of automatic compiler selection, closed mathematical
+expression reduction, `VELA105` generic naming checks, browser transport and
+native replay.
 
 <a id="q25af-make-vela-elaboration-evidence-kernel-honest"></a>
 

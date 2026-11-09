@@ -297,9 +297,8 @@ only using hand-authored syntax fixtures.
 Require focused tests, Python type/lint checks, the consistency checker, Host CI
 on Windows and Ubuntu, and dispatch of every Guest CI lane at the settled
 revision. Native acceptance remains pending until its exact-revision hosted
-verdict exists. Finish without waiting for Guest CI. Keep Q25k open while that
-predicate is outstanding, and report the supported fragment and remaining
-production obligations in the command guide.
+verdict exists. Finish without waiting for Guest CI, and report the supported
+fragment and remaining production obligations in the command guide.
 
 ## Try the mathematical fragment
 

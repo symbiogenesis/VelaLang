@@ -156,8 +156,8 @@ These are host parser limits, not target resource bounds or integer widths.
 ## Extended pure expressions
 
 Q25ac in [the plan](../../PLAN.md#q-assessment-actions) commissions an
-expression increment over the source fragment above. Both the Python route and
-the native pure entry accept `!`, `&&`, `||`, `!=`, `<`, `>`, `>=` and binary
+expression increment over the source fragment above. Both the checked pure route
+and the development pure entry accept `!`, `&&`, `||`, `!=`, `<`, `>`, `>=` and binary
 `-`, using the existing wider surface's spellings and precedence. From weakest
 to strongest, precedence is `||`, `&&`, a single comparison (`==`, `!=`, `<`,
 `<=`, `>`, `>=`), left-associative `+`/`-`, left-associative `*`, prefix `!`,

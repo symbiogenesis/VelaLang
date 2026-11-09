@@ -72,10 +72,10 @@ Vela is under active development. The repository is split into working developme
 
 | Area | Current status | Where to look |
 | --- | --- | --- |
-| **Pure compiler & IDE tools** | Runs on Windows and Linux. Typechecks pure `Nat` and `bool` modules, formats source code, runs style lints (`VELA101`–`VELA105`), emits Gallina, and serves IDE features over stdio (`vela-lsp`). | [docs/tooling/pure-prototype.md](docs/tooling/pure-prototype.md), [docs/tooling/lsp-prototype.md](docs/tooling/lsp-prototype.md) |
+| **Pure compiler & IDE tools** | Runs on Windows and Linux. Typechecks pure `Nat` and `bool` modules through the Rocq-extracted `vela-checked-parser`, formats source code, runs style lints (`VELA100`–`VELA105`), emits Gallina, and serves IDE features over stdio (`vela-lsp`). | [docs/tooling/pure-prototype.md](docs/tooling/pure-prototype.md), [docs/tooling/lsp-prototype.md](docs/tooling/lsp-prototype.md) |
 | **Surface parser & math elaborator** | Runs on Linux / WSL. Parses the wider Vela grammar with Menhir and elaborates generics, length-checked vectors (`Vec<T, length>`, `Fin<length>`), fixed-width integers, records with lifted invariants, `out` loans, interfaces, bounded loops, and proofs into Gallina for Rocq kernel replay. | [docs/tooling/parser.md](docs/tooling/parser.md), [docs/tooling/elaboration-prototype.md](docs/tooling/elaboration-prototype.md) |
 | **Interactive playground** | Runs in the browser on [GitHub Pages](https://symbiogenesis.github.io/VelaLang/) or locally via `vela-playground`. Includes a Monaco editor, live diagnostics, a compile-time expression evaluator, Gallina output preview, and guided examples. | [docs/tooling/playground.md](docs/tooling/playground.md), [docs/index.html](docs/index.html) |
-| **First-release delivery** | In progress. Tracks the remaining work to qualify checked parsing, editor clients, standard libraries, and the machine-level compiler route ([examples/first_slice.vela](examples/first_slice.vela)). | [PLAN.md](PLAN.md), [docs/language/first-release.md](docs/language/first-release.md) |
+| **First-release delivery** | In progress. Tracks the remaining work for standard libraries, checked source correspondence, and the machine-level compiler route ([examples/first_slice.vela](examples/first_slice.vela)). | [PLAN.md](PLAN.md), [docs/language/first-release.md](docs/language/first-release.md) |
 
 <a id="commands"></a>
 

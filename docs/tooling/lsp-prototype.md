@@ -329,7 +329,7 @@ pinned independent editor clients recorded in
 incremental sync) — against `vela-lsp --transcript`, verifying bidirectional
 wire transcripts and client observations against independent expected oracles in
 [`test_vela_lsp_clients.py`](../../tools/tests/test_vela_lsp_clients.py).
-User-managed Host CI and Guest CI verdicts remain required before closing Q25n,
-Q25o, and Q25u. Broader asynchronous services require explicit cancellation and
-deliberately late-result controls before advertising them. DAP and DWARF
-implementation remain separately unpriced.
+User-managed Host CI and Guest CI verdicts remain separate from local client
+qualification for Q25n, Q25o, and Q25u. Broader asynchronous services require
+explicit cancellation and deliberately late-result controls before advertising
+them. DAP and DWARF implementation remain separately unpriced.
