@@ -597,6 +597,49 @@ public lemma StepTwiceCheck()
     ensures StepTwice(5) == 7
     proof { assert StepTwice(5) == 7; }
 """),
+        ("source-bound-borrows-disjoint-fields-and-mutation-invalidation", """module SourceBoundBorrowsReplay;
+public record Window(u32 Low, u32 High)
+    invariant Ordered: Low <= High
+{
+}
+public u32 RestoreAfterLastUse()
+    ensures result == 6u32
+{
+    var x = 5u32;
+    let r = in x;
+    let snap = r;
+    x = snap + 1u32;
+    assert snap == 5u32 && x == 6u32;
+    return x;
+}
+public u32 DisjointFieldBorrowAndWrite()
+    ensures result == 12u32
+{
+    var w = Window(2u32, 8u32);
+    let low = in w.Low;
+    w.High = 10u32;
+    return low + w.High;
+}
+public Window MutateThroughExclusiveFieldBorrows()
+    ensures result.Low == 3u32 && result.High == 9u32
+{
+    var w = Window(1u32, 8u32);
+    let low = ref w.Low;
+    let high = ref w.High;
+    low = 3u32;
+    high = 9u32;
+    return w;
+}
+public u32 ReborrowAndMutate()
+    ensures result == 9u32
+{
+    var x = 4u32;
+    let r1 = ref x;
+    let r2 = ref r1;
+    r2 = 9u32;
+    return x;
+}
+"""),
     )
     negatives = (
         ("static-parameter-runtime-input", "Nat F(const Nat value) => value; Nat Wrong(Nat runtime) => F(runtime);", "type"),
@@ -791,6 +834,29 @@ public lemma StepTwiceCheck()
          "public interface Steppable<T> { T Step(T x); } "
          "public definition T UseStep<T>(T x) where Steppable(type T) => Steppable.Step(x); "
          "public definition bool Wrong() => UseStep(true);", "type"),
+        ("borrow-mutate-owner-while-shared-live",
+         "public u32 Wrong() { var x = 5u32; let r = in x; x = 6u32; return r; }", "type"),
+        ("borrow-read-owner-while-exclusive-live",
+         "public u32 Wrong() { var x = 5u32; let r = ref x; let y = x; r = 6u32; return y; }", "type"),
+        ("borrow-competing-exclusive-loans",
+         "public u32 Wrong() { var x = 5u32; let r1 = ref x; let r2 = ref x; r1 = 6u32; return r2; }", "type"),
+        ("borrow-conflicting-same-field-write",
+         "public record Pair(u32 Low, u32 High); "
+         "public u32 Wrong() { var p = Pair(1u32, 2u32); let low = in p.Low; p.Low = 9u32; return low; }", "type"),
+        ("borrow-ref-from-immutable-let",
+         "public u32 Wrong() { let x = 5u32; let r = ref x; return r; }", "type"),
+        ("borrow-ref-from-shared-in",
+         "public u32 Wrong() { var x = 5u32; let s = in x; let r = ref s; return r; }", "type"),
+        ("borrow-write-through-shared",
+         "public u32 Wrong() { var x = 5u32; let r = in x; r = 6u32; return x; }", "type"),
+        ("borrow-local-loan-escape",
+         "public in u32 Wrong() { var x = 5u32; let r = in x; return r; }", "type"),
+        ("borrow-exclusive-loan-escape",
+         "public ref u32 Wrong(ref u32 x) { let r = ref x; return r; }", "type"),
+        ("mutation-invalidates-prewrite-fact",
+         "public u32 Wrong() { var x = 5u32; assert x == 5u32; x = 6u32; assert x == 5u32; return x; }", "type"),
+        ("mutation-invalidates-shortened-span-length",
+         "public byte Wrong() { var s = Span.AllocZeroed(4usize); s = Span.Slice(s, 0usize, 1usize); return s[2usize]; }", "type"),
     )
     pure = Fixture("pure-expression-operators", b"""module PureExpressions;
 public Nat Difference(Nat left, Nat right) => left - right;
@@ -992,6 +1058,7 @@ def _inputs(root: Path) -> dict[str, str]:
         "tools/toolchain/elaborate_solver.py",
         "tools/toolchain/elaborate_intrinsics.py",
         "tools/toolchain/elaborate_declarations.py",
+        "tools/toolchain/loans.py",
         "tools/toolchain/authoring.py",
         "tools/toolchain/ast.py",
         "tools/toolchain/__init__.py",

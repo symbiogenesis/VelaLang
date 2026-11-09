@@ -5511,6 +5511,235 @@ def _multi_module_imports_and_visibility() -> None:
         raise AssertionError("accepted circular module imports")
 
 
+def _in_arg(value: Form) -> Form:
+    def form(fixture: _Fixture) -> Node:
+        start = fixture.offset
+        op = fixture.name("in")
+        fixture.write(" ")
+        inner = value(fixture)
+        return fixture.node("unary", start, operator=op, value=inner)
+
+    return form
+
+
+def _source_bound_borrows_and_constructive_postconditions() -> None:
+    fixture = _Fixture("SourceBoundBorrows")
+    fixture.record("Pair", (("Left", _type("u32")), ("Right", _type("u32"))))
+    fixture.function(
+        "RestoreAfterLastUse",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("shared", _in_arg(_variable("x"))),
+            _let_stmt("observed", _variable("shared")),
+            _assign_stmt(_variable("x"), "=", _binary("+", _variable("observed"), _int_lit("5", "u32"))),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+        contracts=(_contract("ensures", _binary("==", _variable("result"), _int_lit("15", "u32"))),),
+    )
+    fixture.function(
+        "DisjointFieldBorrowAndWrite",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("p", _call("Pair", _int_lit("3", "u32"), _int_lit("4", "u32"))),
+            _let_stmt("left_view", _in_arg(_member(_variable("p"), "Left"))),
+            _assign_stmt(_member(_variable("p"), "Right"), "=", _binary("+", _variable("left_view"), _int_lit("10", "u32"))),
+            _return_stmt(_binary("+", _variable("left_view"), _member(_variable("p"), "Right"))),
+        ),
+        block=True,
+        contracts=(_contract("ensures", _binary("==", _variable("result"), _int_lit("16", "u32"))),),
+    )
+    fixture.function(
+        "MutateThroughExclusiveFieldBorrows",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("p", _call("Pair", _int_lit("2", "u32"), _int_lit("5", "u32"))),
+            _let_stmt("left_mut", _ref_arg(_member(_variable("p"), "Left"))),
+            _let_stmt("right_mut", _ref_arg(_member(_variable("p"), "Right"))),
+            _assign_stmt(_variable("left_mut"), "+=", _int_lit("3", "u32")),
+            _assign_stmt(_variable("right_mut"), "=", _binary("+", _variable("left_mut"), _int_lit("4", "u32"))),
+            _return_stmt(_binary("+", _member(_variable("p"), "Left"), _member(_variable("p"), "Right"))),
+        ),
+        block=True,
+        contracts=(_contract("ensures", _binary("==", _variable("result"), _int_lit("14", "u32"))),),
+    )
+    fixture.function(
+        "ReborrowAndMutate",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("8", "u32")),
+            _let_stmt("m1", _ref_arg(_variable("x"))),
+            _let_stmt("m2", _ref_arg(_variable("m1"))),
+            _assign_stmt(_variable("m2"), "+=", _int_lit("4", "u32")),
+            _assign_stmt(_variable("m1"), "+=", _int_lit("2", "u32")),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+        contracts=(_contract("ensures", _binary("==", _variable("result"), _int_lit("14", "u32"))),),
+    )
+    source, response = fixture.response()
+    emitted = elaborate(source, response).gallina
+    ensure("Axiom vela_solver_" not in emitted, f"unexpected solver axiom in emitted Gallina:\n{emitted}")
+
+    mutate_while_shared = _Fixture("BorrowMutateWhileShared")
+    mutate_while_shared.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("r", _in_arg(_variable("x"))),
+            _assign_stmt(_variable("x"), "=", _int_lit("20", "u32")),
+            _return_stmt(_variable("r")),
+        ),
+        block=True,
+    )
+    _refuses(mutate_while_shared, "type", "suspended-parent")
+
+    read_while_exclusive = _Fixture("BorrowReadWhileExclusive")
+    read_while_exclusive.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("m", _ref_arg(_variable("x"))),
+            _let_stmt("y", _variable("x")),
+            _assign_stmt(_variable("m"), "=", _binary("+", _variable("y"), _int_lit("1", "u32"))),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+    )
+    _refuses(read_while_exclusive, "type", "suspended-parent")
+
+    same_field_conflict = _Fixture("BorrowSameFieldConflict")
+    same_field_conflict.record("Pair", (("Left", _type("u32")), ("Right", _type("u32"))))
+    same_field_conflict.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("p", _call("Pair", _int_lit("1", "u32"), _int_lit("2", "u32"))),
+            _let_stmt("l", _in_arg(_member(_variable("p"), "Left"))),
+            _assign_stmt(_member(_variable("p"), "Left"), "=", _int_lit("9", "u32")),
+            _return_stmt(_variable("l")),
+        ),
+        block=True,
+    )
+    _refuses(same_field_conflict, "type", "suspended-parent")
+
+    competing_ref = _Fixture("BorrowCompetingExclusive")
+    competing_ref.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("m1", _ref_arg(_variable("x"))),
+            _let_stmt("m2", _ref_arg(_variable("x"))),
+            _assign_stmt(_variable("m1"), "=", _int_lit("1", "u32")),
+            _assign_stmt(_variable("m2"), "=", _int_lit("2", "u32")),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+    )
+    _refuses(competing_ref, "type", "competing-loans")
+
+    ref_from_let = _Fixture("BorrowRefFromImmutableLet")
+    ref_from_let.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _let_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("m", _ref_arg(_variable("x"))),
+            _assign_stmt(_variable("m"), "=", _int_lit("11", "u32")),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+    )
+    _refuses(ref_from_let, "type", "cannot take exclusive 'ref' borrow of immutable binding 'x'")
+
+    ref_from_in = _Fixture("BorrowRefFromSharedIn")
+    ref_from_in.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("r", _in_arg(_variable("x"))),
+            _let_stmt("m", _ref_arg(_variable("r"))),
+            _assign_stmt(_variable("m"), "=", _int_lit("11", "u32")),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+    )
+    _refuses(ref_from_in, "type", "exclusive-from-shared")
+
+    write_through_in = _Fixture("BorrowWriteThroughShared")
+    write_through_in.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("r", _in_arg(_variable("x"))),
+            _assign_stmt(_variable("r"), "=", _int_lit("11", "u32")),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+    )
+    _refuses(write_through_in, "type", "write-through-shared")
+
+    local_escape = _Fixture("BorrowLocalLoanEscape")
+    local_escape.function(
+        "Bad",
+        _modified("in", _type("u32")),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("10", "u32")),
+            _let_stmt("r", _in_arg(_variable("x"))),
+            _return_stmt(_variable("r")),
+        ),
+        block=True,
+    )
+    _refuses(local_escape, "type", "local-loan-escape")
+
+    exclusive_escape = _Fixture("BorrowExclusiveLoanEscape")
+    exclusive_escape.function(
+        "Bad",
+        _modified("ref", _type("u32")),
+        (("x", _modified("ref", _type("u32"))),),
+        _block_stmts(
+            _let_stmt("m", _ref_arg(_variable("x"))),
+            _return_stmt(_variable("m")),
+        ),
+        block=True,
+    )
+    _refuses(exclusive_escape, "type", "exclusive-loan-escape")
+
+    stale_prewrite = _Fixture("MutationInvalidatesPrewriteFact")
+    stale_prewrite.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("x", _int_lit("5", "u32")),
+            _assert(_binary("==", _variable("x"), _int_lit("5", "u32"))),
+            _assign_stmt(_variable("x"), "=", _int_lit("6", "u32")),
+            _assert(_binary("==", _variable("x"), _int_lit("5", "u32"))),
+            _return_stmt(_variable("x")),
+        ),
+        block=True,
+    )
+    _refuses(stale_prewrite, "type", "assert")
+
+
 def cases() -> list[Case]:
     return [Case("fresh-polymorphism-and-higher-order-inference", _polymorphism_and_higher_order),
             Case("familiar-generic-markers-and-mathematical-body-source-binding", _familiar_generic_spellings),
@@ -5557,4 +5786,5 @@ def cases() -> list[Case]:
             Case("record-member-methods-and-contracts", _record_member_methods_and_contracts),
             Case("out-loan-parameters-and-initialization-tracking", _out_loan_parameters_and_initialization_tracking),
             Case("interfaces-nonoverlapping-impls-and-where-constraints", _interfaces_nonoverlapping_impls_and_where_constraints),
-            Case("multi-module-imports-and-visibility", _multi_module_imports_and_visibility)]
+            Case("multi-module-imports-and-visibility", _multi_module_imports_and_visibility),
+            Case("source-bound-borrows-and-constructive-postconditions", _source_bound_borrows_and_constructive_postconditions)]
