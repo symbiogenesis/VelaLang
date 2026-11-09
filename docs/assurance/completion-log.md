@@ -1409,3 +1409,51 @@ Accepted on 2026-11-08 under the [playground architecture contract](../tooling/p
 The original 8 h estimate, range 6–12, is retained with `n/a` calibration columns.
 
 Landed: Tier A. Full review of the unified `docs/` asset root, single-pass worker evaluation, and differential `browserApi` / `playground_worker` parity.
+
+<a id="q25ak-close-remaining-elaboration-solver-axioms-and-promote-source-bound-borrow-and-mutation-invalidation-checking"></a>
+
+#### Q25ak · Close remaining elaboration solver axioms and promote source-bound borrow and mutation-invalidation checking
+
+Accepted on 2026-11-09 under the [mathematical elaboration contract](../tooling/elaboration-prototype.md) and [borrow-analysis promotion joins](../language/core-design.md#borrow-analysis-promotion):
+
+1. **Zero-axiom constructive Rocq proofs across all positive elaboration fixtures:**
+   [elaborate_statements.py](../../tools/toolchain/elaborate_statements.py) and
+   [elaborate_proofs.py](../../tools/toolchain/elaborate_proofs.py) synthesize
+   constructive Rocq 9.3.0 proof terms for unit-step counter `while` loop exit
+   states (`CountUpTo_ensures_0`, `SumPrefix_ensures_0`), sequential `out`
+   parameter linear arithmetic chains (`InitBounds_ensures_1`, `InitPair_ensures_1`)
+   and branching `out` parameter relational postconditions (`InitBranch_ensures_0`)
+   via `vela_nat_add_assoc3`, `vela_nat_lt_add_pos_r` and bit-vector roundtrip
+   lemmas (`vela_bits_from_to_nat_roundtrip` and `vela_int_chk_add_val`).
+   [elaboration_check.py](../../tools/toolchain/elaboration_check.py) enforces
+   `solver_trusted == []` (`Closed under the global context` via `Print Assumptions`
+   and recursive `rocqchk`) across all `28` accepted elaboration libraries (`156`
+   total replay fixtures).
+2. **Schema-2 AST loan lowering and source-site mapping:**
+   [loans.py](../../tools/toolchain/loans.py) extends `_FunctionLowerer` and
+   `LoweredFunction` across `vela_parser` schema-2 AST node shapes (`module`,
+   `record`, `modified_type`, `name` expressions, `unary` `in`/`ref`/`out`/`move`
+   borrows, `assignment` and `expression_statement` nodes, `if`/`if_expression`
+   `then`/`else` keys, `match` `cases`, and temporary rvalue borrow targets),
+   records `node_sites` mapping CFG node IDs to originating AST spans, and allows
+   concurrent owner reads under shared `in` borrows while suspending owner writes
+   and exclusive borrows.
+3. **Source-bound local borrows, loan CFG checking, and mutation invalidation:**
+   [elaborate_patterns.py](../../tools/toolchain/elaborate_patterns.py),
+   [elaborate_intrinsics.py](../../tools/toolchain/elaborate_intrinsics.py),
+   [elaborate_statements.py](../../tools/toolchain/elaborate_statements.py), and
+   [elaborate_declarations.py](../../tools/toolchain/elaborate_declarations.py)
+   support local `in` and `ref` borrow bindings (including field projections
+   `in r.Field` / `ref r.Field`, reborrows, and functional write-back of mutations
+   through exclusive `ref` borrows to their root/field owner), invoke
+   `loans.analyze` over every block-bodied function and theorem to surface
+   path-sensitive loan conflicts (`suspended-parent`, `competing-loans`,
+   `exclusive-from-shared`, `write-through-shared`, `local-loan-escape`,
+   `exclusive-loan-escape`, `scoped-loan-escape`, `unclosed-invariant`) at the
+   offending AST span, and invalidate mutable-target propositions and local
+   aliases across direct, compound, indexed, exclusive-borrow, and `ref`/`out`
+   call mutations while preserving entry `old(...)` facts.
+
+The original 16 h estimate, range 12–20, is retained with `n/a` calibration columns.
+
+Landed: Tier A. Full review of constructive Rocq postcondition synthesis, schema-2 loan lowering, source-bound borrow/mutation-invalidation checking, and 156-fixture zero-axiom Rocq kernel replay.
