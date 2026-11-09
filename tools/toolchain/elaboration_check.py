@@ -1232,6 +1232,7 @@ def _inputs(root: Path) -> dict[str, str]:
         "tools/toolchain/elaborate_declarations.py",
         "tools/toolchain/loans.py",
         "tools/toolchain/authoring.py",
+        "tools/toolchain/compiler_trace.py",
         "tools/toolchain/ast.py",
         "tools/toolchain/documentation.py",
         "tools/toolchain/facts.py",
