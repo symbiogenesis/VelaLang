@@ -822,32 +822,10 @@ class _ProofsMixin:
             for fact in reversed(all_facts):
                 if self._try_unify(fact.type, goal):
                     return fact.term
-            saved_ex = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-            ex_layers: list[tuple[_Term, _Term, _Term]] = []
-            curr_ex = goal_whnf
-            while curr_ex.kind == "ex":
-                ex_dom = curr_ex.args[0]
-                ex_lam = curr_ex.args[1]
-                w_meta = self.meta(ex_dom, environment)
-                ex_layers.append((ex_dom, ex_lam, w_meta))
-                curr_ex = self.whnf(self.substitute(ex_lam.args[1], cast("int", ex_lam.value), w_meta))
             for fact in reversed(all_facts):
-                attempt_saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                if self._match_meta_pattern(curr_ex, fact.type) and all(
-                    self.resolve(wm).kind != "meta" for _, _, wm in ex_layers
-                ):
-                    acc_proof = fact.term
-                    for k_ex in range(len(ex_layers) - 1, -1, -1):
-                        dom_k, lam_k, wm_k = ex_layers[k_ex]
-                        for j_ex in range(k_ex):
-                            prev_var_id = cast("int", ex_layers[j_ex][1].value)
-                            prev_val = self.resolve(ex_layers[j_ex][2])
-                            dom_k = self.substitute(dom_k, prev_var_id, prev_val)
-                            lam_k = self.substitute(lam_k, prev_var_id, prev_val)
-                        acc_proof = _term("ex_intro", dom_k, lam_k, self.resolve(wm_k), acc_proof)
-                    return acc_proof
-                self.metas = attempt_saved
-            self.metas = saved_ex
+                inst = self._try_instantiate_existential(goal_whnf, fact.term, fact.type, environment)
+                if inst is not None:
+                    return inst
 
         goal_eq = self._extract_equality(goal)
         if goal_eq is not None:
@@ -896,26 +874,6 @@ class _ProofsMixin:
                     if hw == _constant("&&") and len(aw) == 2:
                         lhs_head, lhs_args = hw, aw
                 if lhs_head == _constant("&&") and len(lhs_args) == 2:
-                    if allow_refl:
-                        pa = self._prove_proposition(
-                            _apps(_constant("Eq"), _BOOL, lhs_args[0], _term("bool", value=1)),
-                            environment,
-                            facts,
-                            node,
-                            allow_refl=allow_refl,
-                            include_env=include_env,
-                            split_depth=split_depth,
-                        )
-                        pb = self._prove_proposition(
-                            _apps(_constant("Eq"), _BOOL, lhs_args[1], _term("bool", value=1)),
-                            environment,
-                            facts,
-                            node,
-                            allow_refl=allow_refl,
-                            include_env=include_env,
-                            split_depth=split_depth,
-                        )
-                        return _apps(_constant("vela_and_intro"), lhs_args[0], lhs_args[1], pa, pb)
                     saved_and = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
                     try:
                         pa = self._prove_proposition(
@@ -939,6 +897,8 @@ class _ProofsMixin:
                         return _apps(_constant("vela_and_intro"), lhs_args[0], lhs_args[1], pa, pb)
                     except VelaError:
                         self.metas = saved_and
+                        if allow_refl:
+                            raise
                 cmp_head, cmp_args = self.spine(lhs_r)
                 if not (
                     cmp_head.kind == "const"
@@ -1330,18 +1290,7 @@ class _ProofsMixin:
         raw_cond = self._find_if_condition(goal)
         if raw_cond is None:
             return None
-        raw_cond_w = self.whnf(raw_cond)
-        cond_head, cond_args = self.spine(raw_cond_w)
-        if (
-            cond_head.kind == "const"
-            and isinstance(cond_head.value, str)
-            and cond_head.value.startswith("int_ne_")
-            and len(cond_args) == 2
-        ):
-            eq_name = "int_eq_" + cond_head.value[len("int_ne_") :]
-            cond = _apps(_constant(eq_name), cond_args[0], cond_args[1])
-        else:
-            cond = raw_cond_w
+        cond = self._normalize_if_cond(raw_cond)
         b_var = self.fresh(_BOOL)
         b_id = cast("int", b_var.value)
         goal_b, did_rep = self._expose_and_replace_if(goal, cond, b_var)
@@ -1425,18 +1374,7 @@ class _ProofsMixin:
                 raw_cond = self._find_if_condition(rhs)
         if raw_cond is None:
             return None
-        raw_cond_w = self.whnf(raw_cond)
-        cond_head, cond_args = self.spine(raw_cond_w)
-        if (
-            cond_head.kind == "const"
-            and isinstance(cond_head.value, str)
-            and cond_head.value.startswith("int_ne_")
-            and len(cond_args) == 2
-        ):
-            eq_name = "int_eq_" + cond_head.value[len("int_ne_") :]
-            cond = _apps(_constant(eq_name), cond_args[0], cond_args[1])
-        else:
-            cond = raw_cond_w
+        cond = self._normalize_if_cond(raw_cond)
         b_var = self.fresh(_BOOL)
         b_id = cast("int", b_var.value)
         lhs_b, rep_l = self._expose_and_replace_if(lhs, cond, b_var)
@@ -1559,29 +1497,11 @@ class _ProofsMixin:
         if goal_whnf.kind == "ex":
             if self._try_unify(justification.type, goal):
                 return justification.term
-            saved_ex = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-            ex_layers: list[tuple[_Term, _Term, _Term]] = []
-            curr_ex = goal_whnf
-            while curr_ex.kind == "ex":
-                ex_dom = curr_ex.args[0]
-                ex_lam = curr_ex.args[1]
-                w_meta = self.meta(ex_dom, environment)
-                ex_layers.append((ex_dom, ex_lam, w_meta))
-                curr_ex = self.whnf(self.substitute(ex_lam.args[1], cast("int", ex_lam.value), w_meta))
-            if self._match_meta_pattern(curr_ex, justification.type) and all(
-                self.resolve(wm).kind != "meta" for _, _, wm in ex_layers
-            ):
-                acc_proof = justification.term
-                for k_ex in range(len(ex_layers) - 1, -1, -1):
-                    dom_k, lam_k, wm_k = ex_layers[k_ex]
-                    for j_ex in range(k_ex):
-                        prev_var_id = cast("int", ex_layers[j_ex][1].value)
-                        prev_val = self.resolve(ex_layers[j_ex][2])
-                        dom_k = self.substitute(dom_k, prev_var_id, prev_val)
-                        lam_k = self.substitute(lam_k, prev_var_id, prev_val)
-                    acc_proof = _term("ex_intro", dom_k, lam_k, self.resolve(wm_k), acc_proof)
-                return acc_proof
-            self.metas = saved_ex
+            inst = self._try_instantiate_existential(
+                goal_whnf, justification.term, justification.type, environment
+            )
+            if inst is not None:
+                return inst
         goal_eq = self._extract_equality(goal)
         just_eq = self._extract_equality(justification.type)
         if goal_eq is not None and just_eq is not None:
@@ -1675,12 +1595,7 @@ class _ProofsMixin:
             self.site = statement
             kind = statement["kind"]
             if kind in {"let", "typed_local", "let_pattern", "constant_local"}:
-                previous_keys = set(child_env)
-                child_env = self.local(statement, child_env)
-                for new_key in set(child_env) - previous_keys:
-                    bound = child_env[new_key]
-                    if self._is_prop_type(bound.type):
-                        child_facts.append(bound)
+                child_env = self._local_with_facts(statement, child_env, child_facts)
                 continue
             if kind == "assert":
                 fact = self._elaborate_assert(statement, child_env, (*active_facts, *child_facts))
@@ -1736,33 +1651,11 @@ class _ProofsMixin:
         environment: dict[str, _Binding],
         facts: tuple[_Binding, ...],
     ) -> _Binding | None:
-        extracted = self._extract_equality(goal)
-        if extracted is not None:
-            eq_ty, lhs_t, rhs_t = extracted
-            eq_ty_w = self.whnf(eq_ty)
-            if (
-                eq_ty_w == _BOOL
-                and self.whnf(rhs_t) == _term("bool", value=1)
-                and self._prove_bool_precondition(lhs_t, environment)
-            ):
-                self.used_domain_solver_in_proof = True
-                return _Binding(_apps(_constant("Refl"), _BOOL, _term("bool", value=1)), goal)
-            if eq_ty_w == _NAT or self._int_spec(eq_ty_w) is not None:
-                spec = self._int_spec(eq_ty_w)
-                bool_facts = self._expand_bool_facts(
-                    [*self.active_facts, *self._fact_bool_terms(facts, environment)]
-                )
-                if self._prove_comparison("eq", spec, lhs_t, rhs_t, bool_facts):
-                    self.used_domain_solver_in_proof = True
-                    return _Binding(_apps(_constant("Refl"), _BOOL, _term("bool", value=1)), goal)
-        saved_assert_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-        try:
-            val_b = self.expression(self.node(node["value"]), environment)
-            if self.whnf(val_b.type) == _BOOL and self._prove_bool_precondition(val_b.term, environment):
-                self.used_domain_solver_in_proof = True
-                return _Binding(_apps(_constant("Refl"), _BOOL, _term("bool", value=1)), goal)
-        except VelaError:
-            self.metas = saved_assert_m
+        if self._prove_extracted_equality_with_domain_solver(
+            goal, environment, facts
+        ) or self._prove_bool_expr_with_domain_solver(self.node(node["value"]), environment):
+            self.used_domain_solver_in_proof = True
+            return _Binding(_apps(_constant("Refl"), _BOOL, _term("bool", value=1)), goal)
         return None
 
     def _elaborate_assert(
@@ -1814,12 +1707,7 @@ class _ProofsMixin:
             self.site = statement
             kind = statement["kind"]
             if kind in {"let", "typed_local", "let_pattern", "constant_local"}:
-                previous_keys = set(extended)
-                extended = self.local(statement, extended)
-                for new_key in set(extended) - previous_keys:
-                    bound = extended[new_key]
-                    if self._is_prop_type(bound.type):
-                        new_facts.append(bound)
+                extended = self._local_with_facts(statement, extended, new_facts)
                 continue
             if kind == "assert":
                 new_facts.append(self._elaborate_assert(statement, extended, (*facts, *new_facts)))
@@ -1856,12 +1744,7 @@ class _ProofsMixin:
             self.site = statement
             kind = statement["kind"]
             if kind in {"let", "typed_local", "let_pattern", "constant_local"}:
-                previous_keys = set(extended)
-                extended = self.local(statement, extended)
-                for new_key in set(extended) - previous_keys:
-                    bound = extended[new_key]
-                    if self._is_prop_type(bound.type):
-                        new_facts.append(bound)
+                extended = self._local_with_facts(statement, extended, new_facts)
                 continue
             if kind != "assert":
                 raise self.fail(
@@ -1903,3 +1786,66 @@ class _ProofsMixin:
         if chain_proof is None:
             raise self.fail("type", "calc block requires at least one equality step", body_node)
         return new_facts
+
+    def _try_instantiate_existential(
+        self: _Elaborator,
+        goal_whnf: _Term,
+        fact_term: _Term,
+        fact_type: _Term,
+        environment: dict[str, _Binding],
+    ) -> _Term | None:
+        saved_ex = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+        ex_layers: list[tuple[_Term, _Term, _Term]] = []
+        curr_ex = goal_whnf
+        while curr_ex.kind == "ex":
+            ex_dom = curr_ex.args[0]
+            ex_lam = curr_ex.args[1]
+            w_meta = self.meta(ex_dom, environment)
+            ex_layers.append((ex_dom, ex_lam, w_meta))
+            curr_ex = self.whnf(self.substitute(ex_lam.args[1], cast("int", ex_lam.value), w_meta))
+        if self._match_meta_pattern(curr_ex, fact_type) and all(
+            self.resolve(wm).kind != "meta" for _, _, wm in ex_layers
+        ):
+            acc_proof = fact_term
+            for k_ex in range(len(ex_layers) - 1, -1, -1):
+                dom_k, lam_k, wm_k = ex_layers[k_ex]
+                for j_ex in range(k_ex):
+                    prev_var_id = cast("int", ex_layers[j_ex][1].value)
+                    prev_val = self.resolve(ex_layers[j_ex][2])
+                    dom_k = self.substitute(dom_k, prev_var_id, prev_val)
+                    lam_k = self.substitute(lam_k, prev_var_id, prev_val)
+                acc_proof = _term("ex_intro", dom_k, lam_k, self.resolve(wm_k), acc_proof)
+            return acc_proof
+        self.metas = saved_ex
+        return None
+
+    def _normalize_if_cond(self: _Elaborator, raw_cond: _Term) -> _Term:
+        raw_cond_w = self.whnf(raw_cond)
+        cond_head, cond_args = self.spine(raw_cond_w)
+        if (
+            cond_head.kind == "const"
+            and isinstance(cond_head.value, str)
+            and cond_head.value.startswith("int_ne_")
+            and len(cond_args) == 2
+        ):
+            eq_name = "int_eq_" + cond_head.value[len("int_ne_") :]
+            return _apps(_constant(eq_name), cond_args[0], cond_args[1])
+        return raw_cond_w
+
+    def _local_with_facts(
+        self: _Elaborator,
+        statement: Node,
+        environment: dict[str, _Binding],
+        facts_list: list[_Binding],
+        *,
+        record_active: bool = False,
+    ) -> dict[str, _Binding]:
+        previous_keys = set(environment)
+        extended = self.local(statement, environment)
+        for new_key in set(extended) - previous_keys:
+            bound = extended[new_key]
+            if self._is_prop_type(bound.type):
+                facts_list.append(bound)
+                if record_active:
+                    self.active_facts.extend(self._fact_bool_terms((bound,), extended))
+        return extended

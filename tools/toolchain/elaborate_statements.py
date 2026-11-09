@@ -567,17 +567,7 @@ class _StatementsMixin:
             if head == _constant("Seq") and len(type_args) == 1:
                 elem_t = type_args[0]
                 cnt_t = _apps(_constant("Seq_Count"), elem_t, cur_b.term)
-                if self._is_unsuffixed_int_expr(idx_node):
-                    idx_nat = self.check(idx_node, _NAT, updated)
-                else:
-                    idx_b = self.expression(idx_node, updated)
-                    idx_w = self.whnf(idx_b.type)
-                    if idx_w == _NAT:
-                        idx_nat = idx_b.term
-                    elif idx_w == _USIZE:
-                        idx_nat = _app(_constant("int_to_nat_usize"), idx_b.term)
-                    else:
-                        raise self.fail("type", "Seq index must have type Nat or usize", idx_node)
+                idx_nat = self._nat_or_usize_index(idx_node, updated, "Seq")
                 rhs_t = self.check(rhs_expr, elem_t, updated)
                 in_bounds = _apps(_constant("<"), idx_nat, cnt_t)
                 if not self._prove_bool_precondition(in_bounds, updated):
@@ -592,17 +582,7 @@ class _StatementsMixin:
                 return updated
             if head == _constant("Vec") and len(type_args) == 2:
                 elem_t, len_t = type_args[0], type_args[1]
-                if self._is_unsuffixed_int_expr(idx_node):
-                    idx_nat = self.check(idx_node, _NAT, updated)
-                else:
-                    idx_b = self.expression(idx_node, updated)
-                    idx_w = self.whnf(idx_b.type)
-                    if idx_w == _NAT:
-                        idx_nat = idx_b.term
-                    elif idx_w == _USIZE:
-                        idx_nat = _app(_constant("int_to_nat_usize"), idx_b.term)
-                    else:
-                        raise self.fail("type", "Vec index must have type Nat or usize", idx_node)
+                idx_nat = self._nat_or_usize_index(idx_node, updated, "Vec")
                 rhs_t = self.check(rhs_expr, elem_t, updated)
                 in_bounds = _apps(_constant("<"), idx_nat, len_t)
                 if not self._prove_bool_precondition(in_bounds, updated):
@@ -1117,13 +1097,9 @@ class _StatementsMixin:
                 self.site = statement
                 kind = cast("str", statement["kind"])
                 if kind in {"let", "typed_local", "let_pattern", "constant_local", "var", "var_pattern"}:
-                    previous_keys = set(extended)
-                    extended = self.local(statement, extended)
-                    for new_key in set(extended) - previous_keys:
-                        bound = extended[new_key]
-                        if self._is_prop_type(bound.type):
-                            statement_facts.append(bound)
-                            self.active_facts.extend(self._fact_bool_terms((bound,), extended))
+                    extended = self._local_with_facts(
+                        statement, extended, statement_facts, record_active=True
+                    )
                     continue
                 if kind in {"let_else", "var_else"}:
                     scrut = self.expression(self.node(statement["value"]), extended)
@@ -2055,13 +2031,9 @@ class _StatementsMixin:
                         lifted = lift_stmt_propagate(statement, "value", index)
                         if lifted is not None:
                             return lifted
-                    previous_keys = set(extended)
-                    extended = self.local(statement, extended)
-                    for new_key in set(extended) - previous_keys:
-                        bound = extended[new_key]
-                        if self._is_prop_type(bound.type):
-                            statement_facts.append(bound)
-                            self.active_facts.extend(self._fact_bool_terms((bound,), extended))
+                    extended = self._local_with_facts(
+                        statement, extended, statement_facts, record_active=True
+                    )
                     continue
                 if kind == "assignment":
                     lifted = lift_stmt_propagate(statement, "value", index)
@@ -2097,68 +2069,20 @@ class _StatementsMixin:
                     continue
                 if kind in {"break", "continue"}:
                     raise self.fail("type", f"'{kind}' statement is only permitted inside a loop", statement)
-                if kind == "assert":
-                    fact = self._elaborate_assert(statement, extended, (*active_facts, *statement_facts))
-                    statement_facts.append(fact)
-                    self.active_facts.extend(self._fact_bool_terms((fact,), extended))
-                    if index == len(statements) - 1:
-                        self.final_ref_bindings = dict(extended)
-                        self.final_return_facts = list(self.active_facts[saved_active_len:])
-                        self.final_theorem_facts = tuple(statement_facts)
-                        if self.in_post_env_theorem and expected is None:
-                            return finish(statement_facts[-1])
-                        if expected is not None and self._is_prop_type(expected):
-                            try:
-                                term = self._prove_proposition(
-                                    expected,
-                                    extended,
-                                    tuple(statement_facts),
-                                    statement,
-                                    allow_refl=False,
-                                    include_env=False,
-                                )
-                                return finish(_Binding(term, expected))
-                            except VelaError:
-                                if self._entailed_by_theorem_facts(expected, extended):
-                                    self.used_domain_solver_in_proof = True
-                                    return finish(_Binding(_apps(_constant("Refl"), _BOOL, _term("bool", value=1)), expected))
-                                raise
-                    continue
-                if kind == "proof":
-                    sub_facts = self._elaborate_proof_statement(
-                        self.node(statement["body"], "block"), extended, (*active_facts, *statement_facts)
-                    )
-                    statement_facts.extend(sub_facts)
-                    self.active_facts.extend(self._fact_bool_terms(sub_facts, extended))
-                    if index == len(statements) - 1:
-                        self.final_ref_bindings = dict(extended)
-                        self.final_return_facts = list(self.active_facts[saved_active_len:])
-                        self.final_theorem_facts = tuple(statement_facts)
-                        if self.in_post_env_theorem and expected is None:
-                            return finish(statement_facts[-1] if statement_facts else _Binding(_constant("Tt"), _UNIT))
-                        if expected is not None and self._is_prop_type(expected):
-                            try:
-                                term = self._prove_proposition(
-                                    expected,
-                                    extended,
-                                    tuple(statement_facts),
-                                    statement,
-                                    allow_refl=False,
-                                    include_env=False,
-                                )
-                                return finish(_Binding(term, expected))
-                            except VelaError:
-                                if self._entailed_by_theorem_facts(expected, extended):
-                                    self.used_domain_solver_in_proof = True
-                                    return finish(_Binding(_apps(_constant("Refl"), _BOOL, _term("bool", value=1)), expected))
-                                raise
-                    continue
-                if kind == "calc":
-                    sub_facts = self._elaborate_calc_statement(
-                        self.node(statement["body"], "block"), extended, (*active_facts, *statement_facts)
-                    )
-                    statement_facts.extend(sub_facts)
-                    self.active_facts.extend(self._fact_bool_terms(sub_facts, extended))
+                if kind in {"assert", "proof", "calc"}:
+                    cur_facts = (*active_facts, *statement_facts)
+                    if kind == "assert":
+                        step_facts = [self._elaborate_assert(statement, extended, cur_facts)]
+                    elif kind == "proof":
+                        step_facts = self._elaborate_proof_statement(
+                            self.node(statement["body"], "block"), extended, cur_facts
+                        )
+                    else:
+                        step_facts = self._elaborate_calc_statement(
+                            self.node(statement["body"], "block"), extended, cur_facts
+                        )
+                    statement_facts.extend(step_facts)
+                    self.active_facts.extend(self._fact_bool_terms(tuple(step_facts), extended))
                     if index == len(statements) - 1:
                         self.final_ref_bindings = dict(extended)
                         self.final_return_facts = list(self.active_facts[saved_active_len:])
@@ -2788,3 +2712,16 @@ class _StatementsMixin:
             record_info, type_args, result_term, environment, node, exclude_clauses=excluded
         )
         return _Binding(result_term, result_type)
+
+    def _nat_or_usize_index(
+        self: _Elaborator, idx_node: Node, environment: dict[str, _Binding], container_name: str
+    ) -> _Term:
+        if self._is_unsuffixed_int_expr(idx_node):
+            return self.check(idx_node, _NAT, environment)
+        idx_b = self.expression(idx_node, environment)
+        idx_w = self.whnf(idx_b.type)
+        if idx_w == _NAT:
+            return idx_b.term
+        if idx_w == _USIZE:
+            return _app(_constant("int_to_nat_usize"), idx_b.term)
+        raise self.fail("type", f"{container_name} index must have type Nat or usize", idx_node)

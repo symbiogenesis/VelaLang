@@ -675,34 +675,10 @@ class _DeclarationsMixin:
                     try:
                         ens_proof = self._prove_proposition(ens_prop, post_env, (), ens_contract)
                     except VelaError:
-                        extracted = self._extract_equality(ens_prop)
-                        proved_alt = False
-                        if extracted is not None:
-                            eq_ty_w = self.whnf(extracted[0])
-                            if (
-                                eq_ty_w == _BOOL
-                                and self.whnf(extracted[2]) == _term("bool", value=1)
-                                and self._prove_bool_precondition(extracted[1], post_env)
-                            ):
-                                proved_alt = True
-                            elif eq_ty_w == _NAT or self._int_spec(eq_ty_w) is not None:
-                                spec = self._int_spec(eq_ty_w)
-                                bool_facts = self._expand_bool_facts(
-                                    [*self.active_facts, *self._fact_bool_terms((), post_env)]
-                                )
-                                if self._prove_comparison("eq", spec, extracted[1], extracted[2], bool_facts):
-                                    proved_alt = True
-                        if not proved_alt:
-                            saved_ens_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                            try:
-                                ens_b = self.expression(ens_val_node, post_env)
-                                if self.whnf(ens_b.type) == _BOOL and self._prove_bool_precondition(
-                                    ens_b.term, post_env
-                                ):
-                                    proved_alt = True
-                            except VelaError:
-                                self.metas = saved_ens_m
-                        if not proved_alt:
+                        if not (
+                            self._prove_extracted_equality_with_domain_solver(ens_prop, post_env)
+                            or self._prove_bool_expr_with_domain_solver(ens_val_node, post_env)
+                        ):
                             raise
                         ens_proof = None
                     self._emit_obligation(
@@ -2951,24 +2927,10 @@ class _DeclarationsMixin:
                             try:
                                 rest_proof = self._prove_proposition(rest_prop, post_env, post_req_facts, rest_contract)
                             except VelaError:
-                                extracted = self._extract_equality(rest_prop)
-                                proved_rest = False
-                                if (
-                                    extracted is not None
-                                    and self.whnf(extracted[0]) == _BOOL
-                                    and self.whnf(extracted[2]) == _term("bool", value=1)
-                                    and self._prove_bool_precondition(extracted[1], post_env)
+                                if not (
+                                    self._prove_extracted_equality_with_domain_solver(rest_prop, post_env)
+                                    or self._prove_bool_expr_with_domain_solver(rest_val_node, post_env)
                                 ):
-                                    proved_rest = True
-                                if not proved_rest:
-                                    saved_rest_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                                    try:
-                                        rest_b = self.expression(rest_val_node, post_env)
-                                        if self.whnf(rest_b.type) == _BOOL and self._prove_bool_precondition(rest_b.term, post_env):
-                                            proved_rest = True
-                                    except VelaError:
-                                        self.metas = saved_rest_m
-                                if not proved_rest:
                                     raise
                                 rest_proof = None
                             self._emit_obligation(
@@ -3046,35 +3008,15 @@ class _DeclarationsMixin:
                                 peeled_prop = self.substitute(pw.args[1], pid, pvar)
                             self.active_facts.extend(peeled_facts)
                             try:
-                                extracted = self._extract_equality(peeled_prop)
-                                proved_alt = False
-                                if extracted is not None:
-                                    eq_ty_w = self.whnf(extracted[0])
-                                    if (
-                                        eq_ty_w == _BOOL
-                                        and self.whnf(extracted[2]) == _term("bool", value=1)
-                                        and self._prove_bool_precondition(extracted[1], peeled_env)
-                                    ):
-                                        proved_alt = True
-                                    elif eq_ty_w == _NAT or self._int_spec(eq_ty_w) is not None:
-                                        spec = self._int_spec(eq_ty_w)
-                                        bool_facts = self._expand_bool_facts(
-                                            [*self.active_facts, *self._fact_bool_terms((), peeled_env)]
-                                        )
-                                        if self._prove_comparison("eq", spec, extracted[1], extracted[2], bool_facts):
-                                            proved_alt = True
+                                proved_alt = self._prove_extracted_equality_with_domain_solver(
+                                    peeled_prop, peeled_env
+                                )
                             finally:
                                 for _ in peeled_facts:
                                     self.active_facts.pop()
                             if not proved_alt:
                                 self.reset_budget()
-                                saved_ens_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                                try:
-                                    ens_b = self.expression(ens_val_node, post_env)
-                                    if self.whnf(ens_b.type) == _BOOL and self._prove_bool_precondition(ens_b.term, post_env):
-                                        proved_alt = True
-                                except VelaError:
-                                    self.metas = saved_ens_m
+                                proved_alt = self._prove_bool_expr_with_domain_solver(ens_val_node, post_env)
                             if not proved_alt:
                                 raise
                             ens_proof = None
@@ -3487,4 +3429,40 @@ class _DeclarationsMixin:
                     return True
             if match_eq(e_u, e_v):
                 return True
+        return False
+
+    def _prove_extracted_equality_with_domain_solver(
+        self: _Elaborator,
+        prop: _Term,
+        env: dict[str, _Binding],
+        facts: tuple[_Binding, ...] = (),
+    ) -> bool:
+        extracted = self._extract_equality(prop)
+        if extracted is None:
+            return False
+        eq_ty_w = self.whnf(extracted[0])
+        if (
+            eq_ty_w == _BOOL
+            and self.whnf(extracted[2]) == _term("bool", value=1)
+            and self._prove_bool_precondition(extracted[1], env)
+        ):
+            return True
+        if eq_ty_w == _NAT or self._int_spec(eq_ty_w) is not None:
+            spec = self._int_spec(eq_ty_w)
+            bool_facts = self._expand_bool_facts(
+                [*self.active_facts, *self._fact_bool_terms(facts, env)]
+            )
+            return self._prove_comparison("eq", spec, extracted[1], extracted[2], bool_facts)
+        return False
+
+    def _prove_bool_expr_with_domain_solver(
+        self: _Elaborator, val_node: Node, env: dict[str, _Binding]
+    ) -> bool:
+        saved_metas = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+        try:
+            expr_b = self.expression(val_node, env)
+            if self.whnf(expr_b.type) == _BOOL and self._prove_bool_precondition(expr_b.term, env):
+                return True
+        except VelaError:
+            self.metas = saved_metas
         return False
