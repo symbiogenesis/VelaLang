@@ -450,6 +450,12 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
                                               "VelaFirstSlice", "FirstSliceAssumptions.v"]),
         "FirstSlice.kernel.log": _opam(["rocqchk", "-R", str(directory), "VelaFirstSlice",
                                          "VelaFirstSlice.FirstSlice"]),
+        "CapSmall.compile.log": _opam(["rocq", "c", "-q", "-R", str(directory),
+                                        "VelaFirstSlice", "CapSmall.v"]),
+        "CapLarge.compile.log": _opam(["rocq", "c", "-q", "-R", str(directory),
+                                        "VelaFirstSlice", "CapLarge.v"]),
+        "CapGate.kernel.log": _opam(["rocqchk", "-R", str(directory), "VelaFirstSlice",
+                                      "VelaFirstSlice.CapSmall", "VelaFirstSlice.CapLarge"]),
         "FirstSliceCorrupted.compile.log": _opam(["rocq", "c", "-q", "-R", str(directory),
                                                    "VelaFirstSlice", "FirstSliceCorrupted.v"]),
     }
@@ -487,6 +493,49 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
     if covered.keys() != required.keys() or report.get("proof_corruption_refused") is not True:
         raise ValueError("first-slice receipt omits required local proof or corruption coverage")
     return covered["FirstSlice.assumptions.log"].decode("utf-8")
+
+
+def _retained_controls(report: dict[str, object], directory: Path,
+                       artifacts: dict[str, object]) -> None:
+    """Require the declared capacity and semantic-refusal coverage without replay."""
+    capacity = report.get("capacity_invariance")
+    fields = {"small_capacity", "large_capacity", "obligation_count", "work_steps",
+              "reduction_steps", "gallina_bytes", "kernel_checked"}
+    if (not isinstance(capacity, dict) or capacity.keys() != fields
+            or capacity.get("small_capacity") != "8usize"
+            or capacity.get("large_capacity") != "1_000_000_000usize"
+            or capacity.get("kernel_checked") is not True):
+        raise ValueError("first-slice receipt capacity coverage is missing or malformed")
+    for field in ("obligation_count", "work_steps", "reduction_steps", "gallina_bytes"):
+        count = capacity.get(field)
+        if type(count) is not int or count < (0 if field == "reduction_steps" else 1):
+            raise ValueError("first-slice receipt capacity metrics are malformed")
+    for stem in ("CapSmall", "CapLarge"):
+        for extension in ("v", "vo"):
+            if str(directory / f"{stem}.{extension}") not in artifacts:
+                raise ValueError("first-slice receipt omits a required capacity proof artifact")
+        if len((directory / f"{stem}.v").read_bytes()) != capacity["gallina_bytes"]:
+            raise ValueError("first-slice receipt capacity size differs from retained Gallina")
+    controls = report.get("negative_controls")
+    if (not isinstance(controls, list) or len(controls) != len(NEGATIVE_CONTROLS)
+            or type(report.get("negative_controls_count")) is not int
+            or report["negative_controls_count"] != len(NEGATIVE_CONTROLS)):
+        raise ValueError("first-slice receipt semantic-refusal coverage is incomplete")
+    expected = {control.name: control for control in NEGATIVE_CONTROLS}
+    seen: set[str] = set()
+    for row in controls:
+        if not isinstance(row, dict) or not isinstance(row.get("name"), str):
+            raise TypeError("first-slice receipt semantic-refusal observation is malformed")
+        name = row["name"]
+        control = expected.get(name)
+        if (control is None or name in seen or row.get("parsed_surface") is not True
+                or row.get("category") != control.expected_kind
+                or not isinstance(row.get("message"), str)
+                or control.expected_substring not in row["message"]
+                or type(row.get("line")) is not int or row["line"] < 1
+                or type(row.get("column")) is not int or row["column"] < 1):
+            raise ValueError("first-slice receipt semantic-refusal subject or verdict changed")
+        seen.add(name)
 
 
 def _retained_proof(root: Path, report: dict[str, object], directory: Path,
@@ -1983,6 +2032,7 @@ def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
     if _artifacts(output_directory) != artifacts:
         raise ValueError("first-slice receipt outputs changed")
     _retained_proof(root, receipt, output_directory, artifacts)
+    _retained_controls(receipt, output_directory, artifacts)
     with tempfile.TemporaryDirectory(prefix="bindings-", dir=_work_root(root)) as temporary:
         steps: list[dict[str, object]] = []
         if (replay._toolchain(root, Path(temporary), steps) != receipt.get("toolchain")

@@ -51,6 +51,10 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
     (outputs / "FirstSlice.assumptions.log").write_bytes(assumption_stdout + assumption_stderr)
     for name in ("FirstSlice.vo", "FirstSliceAssumptions.vo", "first_slice.c"):
         (outputs / name).write_bytes(f"retained {name}".encode())
+    capacity_gallina = b"Definition capacity_fixture : True := I.\n"
+    for stem in ("CapSmall", "CapLarge"):
+        (outputs / f"{stem}.v").write_bytes(capacity_gallina)
+        (outputs / f"{stem}.vo").write_bytes(b"retained capacity proof")
     source = root / slice_harness.EXAMPLE
     source.parent.mkdir(parents=True, exist_ok=True)
     source.write_bytes(b"module Vela.FirstSlice;")
@@ -58,6 +62,10 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
         "FirstSlice.compile.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "FirstSlice.v"],
         "FirstSlice.assumptions.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "FirstSliceAssumptions.v"],
         "FirstSlice.kernel.log": ["rocqchk", "-R", str(outputs), "VelaFirstSlice", "VelaFirstSlice.FirstSlice"],
+        "CapSmall.compile.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "CapSmall.v"],
+        "CapLarge.compile.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "CapLarge.v"],
+        "CapGate.kernel.log": ["rocqchk", "-R", str(outputs), "VelaFirstSlice",
+                               "VelaFirstSlice.CapSmall", "VelaFirstSlice.CapLarge"],
         "FirstSliceCorrupted.compile.log": ["rocq", "c", "-q", "-R", str(outputs), "VelaFirstSlice", "FirstSliceCorrupted.v"],
     }
     steps: list[dict[str, object]] = []
@@ -80,6 +88,14 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
         steps.append(row)
     report: dict[str, object] = {
         "steps": steps, "accepted": not trusted, "kernel_checked": not trusted,
+        "capacity_invariance": {"small_capacity": "8usize", "large_capacity": "1_000_000_000usize",
+                                "obligation_count": 9, "work_steps": 14, "reduction_steps": 0,
+                                "gallina_bytes": len(capacity_gallina), "kernel_checked": True},
+        "negative_controls_count": len(slice_harness.NEGATIVE_CONTROLS),
+        "negative_controls": [
+            {"name": control.name, "parsed_surface": True, "category": control.expected_kind,
+             "line": 2, "column": 1, "message": control.expected_substring}
+            for control in slice_harness.NEGATIVE_CONTROLS],
         "proof_corruption_refused": True, "assumption_exports_count": len(names),
         "solver_trusted_count": int(trusted),
         "solver_trusted_axioms": [f"{module}.{axiom}"] if trusted else [],
@@ -265,6 +281,8 @@ def _binding_checks() -> None:
                                ("steps", [None]), ("accepted", False), ("kernel_checked", False),
                                ("solver_trusted_count", True), ("solver_trusted_axioms", ["invented"]),
                                ("assumption_exports_count", 0), ("inventory", {}),
+                               ("capacity_invariance", {}), ("negative_controls", []),
+                               ("negative_controls_count", 0),
                                ("proof_corruption_refused", False)):
             damaged = copy.deepcopy(report)
             damaged[field] = changed
@@ -452,6 +470,74 @@ def _process_streams() -> None:
                 raise AssertionError(f"malformed replay-probe {field} was accepted")
 
 
+def _control_coverage() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-control-coverage-") as temporary:
+        root = Path(temporary)
+        outputs = root / "slice-fixture"
+        outputs.mkdir()
+        for mutation in ("none", "missing-capacity", "small-capacity", "large-capacity", "unchecked",
+                         "boolean-metric", "negative-metric", "zero-obligations", "wrong-size",
+                         "missing-capacity-object", "missing-capacity-source", "changed-capacity-source",
+                         "missing-controls", "count", "boolean-count", "duplicate", "unknown",
+                         "unparsed", "syntax-refusal", "wrong-reason", "bad-line", "bad-column"):
+            report = _proof_fixture(root, outputs)
+            capacity = cast("dict[str, object]", report["capacity_invariance"])
+            rows = cast("list[dict[str, object]]", report["negative_controls"])
+            if mutation == "missing-capacity":
+                del report["capacity_invariance"]
+            elif mutation in {"small-capacity", "large-capacity"}:
+                capacity[mutation.replace("-", "_")] = "8usize" if mutation == "large-capacity" else "9usize"
+            elif mutation == "unchecked":
+                capacity["kernel_checked"] = False
+            elif mutation in {"boolean-metric", "negative-metric", "zero-obligations"}:
+                capacity["obligation_count"] = {"boolean-metric": True, "negative-metric": -1,
+                                                "zero-obligations": 0}[mutation]
+            elif mutation == "wrong-size":
+                capacity["gallina_bytes"] = 1
+            elif mutation == "missing-capacity-object":
+                (outputs / "CapLarge.vo").unlink()
+            elif mutation == "missing-capacity-source":
+                (outputs / "CapSmall.v").unlink()
+            elif mutation == "changed-capacity-source":
+                (outputs / "CapSmall.v").write_bytes(b"another capacity subject")
+            elif mutation == "missing-controls":
+                rows.pop()
+            elif mutation in {"count", "boolean-count"}:
+                report["negative_controls_count"] = 0 if mutation == "count" else True
+            elif mutation == "duplicate":
+                rows[-1] = copy.deepcopy(rows[0])
+            elif mutation == "unknown":
+                rows[0]["name"] = "unrelated-control"
+            elif mutation == "unparsed":
+                rows[0]["parsed_surface"] = False
+            elif mutation == "syntax-refusal":
+                rows[0]["category"] = "syntax"
+            elif mutation == "wrong-reason":
+                rows[0]["message"] = "unrelated semantic refusal"
+            elif mutation == "bad-line":
+                rows[0]["line"] = True
+            elif mutation == "bad-column":
+                rows[0]["column"] = 0
+            artifacts: dict[str, object] = dict(slice_harness._artifacts(outputs))
+            try:
+                slice_harness._retained_controls(report, outputs, artifacts)
+            except ValueError as error:
+                ensure(mutation != "none", f"complete retained controls refused: {error}")
+            else:
+                ensure(mutation == "none", f"{mutation} concealed incomplete qualification coverage")
+        report = _proof_fixture(root, outputs)
+        steps = cast("list[dict[str, object]]", report["steps"])
+        for name in ("CapSmall.compile.log", "CapLarge.compile.log", "CapGate.kernel.log"):
+            damaged = copy.deepcopy(report)
+            damaged["steps"] = [step for step in steps if Path(str(step["log"])).name != name]
+            try:
+                slice_harness._retained_proof(root, damaged, outputs, dict(slice_harness._artifacts(outputs)))
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"omitted capacity process {name} was accepted")
+
+
 def _output_bounds() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-output-bounds-") as temporary:
         root = Path(temporary)
@@ -500,5 +586,6 @@ def cases() -> list[Case]:
             Case("retained first-slice identities and malformed refusals", _binding_checks),
             Case("retained proof coverage and assumption consistency", _retained_coverage),
             Case("stdout audit provenance preserves stderr diagnostics", _process_streams),
+            Case("retained capacity and semantic refusal coverage", _control_coverage),
             Case("first-slice output directory and inventory bounds", _output_bounds),
             Case("first-slice binding CLI and refusal", _cli_dispatch)]

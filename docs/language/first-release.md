@@ -524,6 +524,15 @@ not establish checked source correspondence or machine/artifact acceptance.
   omitted libraries, changed process subjects or verdicts and source-proof
   status inconsistent with the actual solver-trust ledger refuse, including
   attempts to promote a nonempty ledger by changing `accepted` or `kernel_checked`.
+  Both capacity compilation transcripts and their joint kernel-check transcript
+  are required, together with retained capacity sources and libraries. The
+  declared small/large capacities, nonnegative work metrics and retained Gallina
+  byte lengths are checked. All 17 semantic-negative observations must name each
+  current control exactly once, report successful surface parsing and the
+  expected semantic refusal with a positive source location. Omitted, duplicate,
+  syntax-only or unrelated refusals cannot preserve a matching receipt. These
+  checks establish retained coverage; they do not rerun the controls or recompute
+  elaboration work counters.
   Native proof observations bind separate UTF-8 stdout/stderr byte lengths and
   hashes within each combined retained transcript. The assumption audit consumes
   that checked stdout segment; tool diagnostics on stderr remain retained without
