@@ -458,11 +458,20 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
         if not isinstance(step, dict):
             raise TypeError("first-slice receipt process observation is malformed")
         command, log = step.get("command"), step.get("log")
-        code, refused = step.get("returncode"), step.get("expected_refusal", False)
+        native = "cwd" in step or "returncode" in step
+        if native:
+            working, code = step.get("cwd"), step.get("returncode")
+            _require(not any(key in step for key in ("directory", "exit", "status")),
+                     "first-slice receipt mixes process producer formats")
+        else:
+            working, code = step.get("directory"), step.get("exit")
+            _require(step.get("status") == "passed" and step.get("expected_refusal", False) is False,
+                     "first-slice receipt replay probe did not pass")
+        refused = step.get("expected_refusal", False)
         if (not isinstance(command, list) or not command or len(command) > 128
                 or any(not isinstance(argument, str) or not argument for argument in command)
                 or type(code) is not int or type(refused) is not bool
-                or step.get("cwd") != str(directory) or not isinstance(log, str)
+                or working != str(directory) or not isinstance(log, str)
                 or log not in artifacts or step.get("log_sha256") != artifacts[log]
                 or Path(log).parent != directory):
             raise ValueError("first-slice receipt process observation is not bound to retained output")
@@ -470,7 +479,7 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
         if refused != (name == "FirstSliceCorrupted.compile.log") or (code != 0) != refused:
             raise ValueError("first-slice receipt process verdict contradicts its declared coverage")
         if name in required:
-            if command != required[name]:
+            if not native or command != required[name]:
                 raise ValueError("first-slice receipt proof command differs from its declared subject")
             if name in covered:
                 raise ValueError("first-slice receipt repeats a required proof observation")

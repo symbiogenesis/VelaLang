@@ -427,6 +427,29 @@ def _process_streams() -> None:
                and steps[0]["stdout_sha256"] == slice_harness._sha256(stdout.encode("utf-8"))
                and steps[0]["stderr_sha256"] == slice_harness._sha256(stderr.encode("utf-8")),
                "producer stream identity uses character positions or another byte subject")
+        probe_log = outputs / "runtime-config.log"
+        probe_log.write_bytes(b"bound replay probe")
+        probe: dict[str, object] = {
+            "command": ["opam", "exec", "--switch", "fixture", "--", "rocq", "c", "-config"],
+            "directory": str(outputs), "exit": 0, "status": "passed", "seconds": 0.001,
+            "log": str(probe_log), "log_sha256": slice_harness._sha256(probe_log.read_bytes()),
+        }
+        report = _proof_fixture(root, outputs, assumption_stderr=warning)
+        rows = cast("list[dict[str, object]]", report["steps"])
+        rows.append(probe)
+        artifacts = dict(slice_harness._artifacts(outputs))
+        slice_harness._retained_proof(root, report, outputs, artifacts)
+        for field, changed in (("directory", str(root)), ("exit", True), ("exit", 1),
+                               ("status", "skipped"), ("status", "failed"),
+                               ("cwd", str(outputs)), ("returncode", 0)):
+            damaged = copy.deepcopy(report)
+            cast("list[dict[str, object]]", damaged["steps"])[-1][field] = changed
+            try:
+                slice_harness._retained_proof(root, damaged, outputs, artifacts)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"malformed replay-probe {field} was accepted")
 
 
 def _output_bounds() -> None:
