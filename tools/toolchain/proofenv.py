@@ -28,6 +28,7 @@ OCAML_VERSION = "5.4.1"
 OPAM_LOCKS = Path(__file__).resolve().parents[1] / "opam"
 
 ROCQ_VERSION = "9.3.0"
+PATH_TIMEOUT = 10
 ROCQ_SWITCH = f"verifiedos-rocq-{ROCQ_VERSION}-ocaml-{OCAML_VERSION}"
 
 ROCQ_INSTALL: tuple[tuple[str, ...], ...] = (
@@ -160,7 +161,11 @@ def git_dir(root: Path) -> Path | None:
     tool = shutil.which("wslpath")
     if tool is None:
         return None
-    done = subprocess.run([tool, "-u", target], capture_output=True, text=True, check=False)
+    try:
+        done = subprocess.run([tool, "-u", target], capture_output=True, text=True, check=False,
+                              stdin=subprocess.DEVNULL, timeout=PATH_TIMEOUT)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"WSL Git worktree path translation exceeded {PATH_TIMEOUT} seconds") from error
     translated = Path(done.stdout.strip())
     return translated if done.returncode == 0 and translated.is_dir() else None
 

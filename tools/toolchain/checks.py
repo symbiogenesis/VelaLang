@@ -973,12 +973,15 @@ def javascript_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
     return findings
 
 
-def run(root: Path) -> Reporter:
+def run(root: Path, *, loaded: corpus.Corpus | RuntimeError | None = None) -> Reporter:
     """Run all repository hygiene, licensing, source-reference, and plan-summary checks."""
     rep = Reporter()
     rep.line("=== check ===")
     try:
-        loaded = corpus.load(root)
+        if isinstance(loaded, RuntimeError):
+            raise loaded
+        if loaded is None:
+            loaded = corpus.load(root)
     except (OSError, ValueError, RuntimeError) as err:
         rep.report("corpus", "load error(s):", [f"cannot load repository corpus: {err}"])
         return rep
@@ -1036,7 +1039,11 @@ def run(root: Path) -> Reporter:
 
 def run_gate(root: Path) -> Reporter:
     """Run check, markdown, and typecheck in one unified static gate."""
-    rep = run(root)
-    rep.extend(markdown.run(root))
+    try:
+        loaded: corpus.Corpus | RuntimeError = corpus.load(root)
+    except (OSError, ValueError, RuntimeError) as error:
+        loaded = RuntimeError(str(error))
+    rep = run(root, loaded=loaded)
+    rep.extend(markdown.run(root, loaded=loaded))
     rep.extend(typecheck.run(root))
     return rep

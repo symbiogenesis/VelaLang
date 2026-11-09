@@ -163,7 +163,7 @@ def batch_findings(
     return findings
 
 
-def run(root: Path) -> Reporter:
+def run(root: Path, *, loaded: corpus.Corpus | RuntimeError | None = None) -> Reporter:
     """Validate tools/rumdl.toml, bookmark hygiene, and closed-world Markdown rules."""
     rep = Reporter()
     rep.line("=== markdown ===")
@@ -175,7 +175,10 @@ def run(root: Path) -> Reporter:
         "tools/rumdl.toml satisfies the reviewed schema and rule policy",
     )
     try:
-        loaded = corpus.load(root)
+        if isinstance(loaded, RuntimeError):
+            raise loaded
+        if loaded is None:
+            loaded = corpus.load(root)
     except (OSError, ValueError, RuntimeError) as err:
         rep.report("markdown", "corpus error(s):", [f"cannot read the indexed Markdown corpus: {err}"])
         return rep

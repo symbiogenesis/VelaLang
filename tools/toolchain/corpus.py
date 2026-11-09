@@ -121,6 +121,7 @@ UNREAD_PREFIX = "model/"
 
 # an index entry's mode, which is what tells a submodule from a file
 GITLINK_MODE = "160000"
+GIT_TIMEOUT = 30
 
 
 class Corpus:
@@ -189,10 +190,13 @@ def _git_environment(root: Path) -> dict[str, str] | None:
 
 def _git(root: Path, *args: str) -> list[str]:
     """Read a NUL-framed listing without quoting or newline translation of paths."""
-    proc = subprocess.run(
-        ["git", *args], cwd=root, capture_output=True, check=False,
-        env=_git_environment(root),
-    )
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, check=False,
+            env=_git_environment(root), stdin=subprocess.DEVNULL, timeout=GIT_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"git {' '.join(args)} exceeded {GIT_TIMEOUT} seconds") from error
     if proc.returncode != 0:
         detail = proc.stderr.decode("utf-8", errors="replace").strip()
         raise RuntimeError(f"git {' '.join(args)} failed: {detail}")
