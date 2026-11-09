@@ -121,7 +121,6 @@ _JS_MULTI_OPS = (
     "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<", ">>", "?.",
 )
 
-_PLAYGROUND_CANONICAL_ASSETS = ("docs/index.html", "docs/app.mjs", "docs/style.css")
 _HTML_ID_RE = re.compile(r'\bid="([^"]+)"')
 _HTML_TAB_RE = re.compile(r'\bdata-tab="([^"]+)"')
 _HTML_LOAD_EXAMPLE_RE = re.compile(r'\bdata-load-example="([^"]+)"')
@@ -853,13 +852,12 @@ def _extract_js_object_keys(
 
 
 def _playground_asset_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
-    findings: list[str] = []
     indexed = loaded.indexed
-    for rel in sorted(indexed):
-        if rel.startswith("tools/toolchain/playground/"):
-            findings.append(
-                f"{rel}: duplicate playground asset; docs/ is the single canonical asset directory"
-            )
+    findings: list[str] = [
+        f"{rel}: duplicate playground asset; docs/ is the single canonical asset directory"
+        for rel in sorted(indexed)
+        if rel.startswith("tools/toolchain/playground/")
+    ]
 
     app_rel = "docs/app.mjs"
     html_rel = "docs/index.html"
@@ -914,6 +912,32 @@ def _playground_asset_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
             f"{html_rel}: #examples option value={key!r} is not defined in {app_rel} EXAMPLES"
             for key in sorted(option_keys - example_keys)
         )
+
+    lexer_rel = "tools/toolchain/parser/lexer.mll"
+    if lexer_rel in indexed and "export const VELA_GRAMMAR = Object.freeze({" in app_text:
+        try:
+            lexer_source = (root / lexer_rel).read_text(encoding="utf-8")
+            ident_table = lexer_source.split("let identifier state lexbuf =", 1)[1].split("let digit_run", 1)[0]
+            lexer_active: set[str] = set()
+            lexer_retired: set[str] = set()
+            for word, action in re.findall(r'\|\s*"([A-Za-z0-9_]+)"\s*->\s*([^|\n]+)', ident_table):
+                if action.strip().startswith("refuse "):
+                    lexer_retired.add(word)
+                else:
+                    lexer_active.add(word)
+            grammar_block = app_text.split("export const VELA_GRAMMAR = Object.freeze({", 1)[1].split("});", 1)[0]
+            js_sets: dict[str, set[str]] = {}
+            for field in ("keywords", "typeKeywords", "constants", "retiredKeywords"):
+                section = grammar_block.split(f"{field}: Object.freeze([", 1)[1].split("]),", 1)[0]
+                js_sets[field] = set(re.findall(r'"([^"]+)"', section))
+            js_active = js_sets["keywords"] | js_sets["typeKeywords"] | js_sets["constants"]
+            missing_active = sorted(lexer_active - js_active)
+            if missing_active:
+                findings.append(f"{app_rel}: VELA_GRAMMAR omitted lexer keywords: {', '.join(missing_active)}")
+            if js_sets["retiredKeywords"] != lexer_retired:
+                findings.append(f"{app_rel}: VELA_GRAMMAR retiredKeywords drifted from {lexer_rel}")
+        except (OSError, UnicodeDecodeError, IndexError) as err:
+            findings.append(f"{app_rel}: cannot verify VELA_GRAMMAR against {lexer_rel}: {err}")
     return findings
 
 

@@ -547,6 +547,7 @@ for (const [stateName, rules] of Object.entries(monarch.tokenizer)) {
   }
 }
 
+const parity = {};
 for (const [key, example] of Object.entries(mod.EXAMPLES)) {
   const compiled = await mod.browserApi("/api/compile", { source: example.source });
   if (!compiled.ok || !compiled.gallina) {
@@ -560,6 +561,28 @@ for (const [key, example] of Object.entries(mod.EXAMPLES)) {
   if (!evaluated.ok) {
     throw new Error(`Example ${key} failed browserApi evaluate: ${JSON.stringify(evaluated)}`);
   }
+  parity[key] = {
+    source: example.source,
+    expression: example.expression,
+    valueType: example.valueType,
+    compiled,
+    evaluated,
+  };
+}
+
+const bareLocalMath = await mod.browserApi("/api/compile", {
+  source: [
+    "module BareLocal;",
+    "public record Box(Nat Value);",
+    "public Nat Read(Box box)",
+    "{",
+    "    Nat current = box.Value;",
+    "    return current;",
+    "}",
+  ].join("\n"),
+});
+if (bareLocalMath.ok || !bareLocalMath.error?.message.includes("require 'let' or 'var'")) {
+  throw new Error(`Expected mathematical bare local to be refused under Q25ah: ${JSON.stringify(bareLocalMath)}`);
 }
 
 class MockElement {
@@ -778,7 +801,7 @@ for (let i = 0; i < compactCodes.length; i += 1) {
 }
 
 await elementsById.get("compile-button").dispatchEvent("click");
-if (!elementsById.get("gallina-output").textContent.includes("Module Playground.")) {
+if (!elementsById.get("gallina-output").textContent.includes("Module Vela_Playground.")) {
   throw new Error(`UI compile failed: ${elementsById.get("gallina-output").textContent}`);
 }
 
@@ -788,6 +811,7 @@ const cardTexts = resultCard ? resultCard.children.map((c) => c.textContent) : [
 if (!cardTexts.includes("49")) {
   throw new Error(`UI evaluate failed: ${JSON.stringify(cardTexts)}`);
 }
+console.log(JSON.stringify(parity));
 """
 
 
@@ -823,6 +847,21 @@ def _playground_browser_runtime_and_ui_startup() -> None:
         done.returncode == 0,
         f"playground app.mjs runtime or UI startup check failed (exit {done.returncode}):\n{done.stderr or done.stdout}",
     )
+    parity = json.loads(done.stdout.strip())
+    for key, entry in parity.items():
+        if not entry["compiled"]["editorServices"]:
+            continue
+        worker_compiled = compile_request({"action": "compile", "source": entry["source"]})
+        worker_evaluated = compile_request({
+            "action": "evaluate",
+            "source": entry["source"],
+            "expression": entry["expression"],
+            "valueType": entry["valueType"],
+        })
+        ensure(entry["compiled"] == worker_compiled,
+               f"pure example {key} drifted on emitted Corelib Gallina or metadata between browserApi and playground_worker")
+        ensure(entry["evaluated"] == worker_evaluated,
+               f"pure example {key} drifted on expression evaluation between browserApi and playground_worker")
 
 
 def cases() -> list[Case]:

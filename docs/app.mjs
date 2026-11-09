@@ -478,96 +478,16 @@ public lemma GuardAndBranchRefinement()
   },
 };
 
-const SHA256_K = new Uint32Array([
-  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-]);
-
-function rotr32(value, shift) {
-  return (value >>> shift) | (value << (32 - shift));
-}
-
 const UTF8_ENCODER = new TextEncoder();
-const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
 
 function utf8Bytes(text) {
   return UTF8_ENCODER.encode(text);
 }
 
-export function sha256Hex(input) {
+export async function sha256Hex(input) {
   const bytes = typeof input === "string" ? utf8Bytes(input) : input;
-  const bitLenHi = Math.floor((bytes.length * 8) / 0x100000000);
-  const bitLenLo = (bytes.length * 8) >>> 0;
-  const paddedLength = (((bytes.length + 9 + 63) >> 6) << 6);
-  const buffer = new Uint8Array(paddedLength);
-  buffer.set(bytes);
-  buffer[bytes.length] = 0x80;
-  const view = new DataView(buffer.buffer);
-  view.setUint32(paddedLength - 8, bitLenHi, false);
-  view.setUint32(paddedLength - 4, bitLenLo, false);
-
-  let h0 = 0x6a09e667;
-  let h1 = 0xbb67ae85;
-  let h2 = 0x3c6ef372;
-  let h3 = 0xa54ff53a;
-  let h4 = 0x510e527f;
-  let h5 = 0x9b05688c;
-  let h6 = 0x1f83d9ab;
-  let h7 = 0x5be0cd19;
-  const w = new Uint32Array(64);
-
-  for (let offset = 0; offset < paddedLength; offset += 64) {
-    for (let i = 0; i < 16; i += 1) {
-      w[i] = view.getUint32(offset + i * 4, false);
-    }
-    for (let i = 16; i < 64; i += 1) {
-      const s0 = rotr32(w[i - 15], 7) ^ rotr32(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-      const s1 = rotr32(w[i - 2], 17) ^ rotr32(w[i - 2], 19) ^ (w[i - 2] >>> 10);
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
-    }
-    let a = h0;
-    let b = h1;
-    let c = h2;
-    let d = h3;
-    let e = h4;
-    let f = h5;
-    let g = h6;
-    let h = h7;
-    for (let i = 0; i < 64; i += 1) {
-      const S1 = rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25);
-      const ch = (e & f) ^ (~e & g);
-      const temp1 = (h + S1 + ch + SHA256_K[i] + w[i]) >>> 0;
-      const S0 = rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22);
-      const maj = (a & b) ^ (a & c) ^ (b & c);
-      const temp2 = (S0 + maj) >>> 0;
-      h = g;
-      g = f;
-      f = e;
-      e = (d + temp1) >>> 0;
-      d = c;
-      c = b;
-      b = a;
-      a = (temp1 + temp2) >>> 0;
-    }
-    h0 = (h0 + a) >>> 0;
-    h1 = (h1 + b) >>> 0;
-    h2 = (h2 + c) >>> 0;
-    h3 = (h3 + d) >>> 0;
-    h4 = (h4 + e) >>> 0;
-    h5 = (h5 + f) >>> 0;
-    h6 = (h6 + g) >>> 0;
-    h7 = (h7 + h) >>> 0;
-  }
-
-  return [h0, h1, h2, h3, h4, h5, h6, h7]
-    .map((word) => word.toString(16).padStart(8, "0"))
-    .join("");
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 class VelaError extends Error {
@@ -664,58 +584,6 @@ const PURE_UNSUPPORTED = new Set([
   "view",
   "union",
   "foreach",
-]);
-
-const GALLINA_RESERVED = new Set([
-  "Axiom",
-  "CoFixpoint",
-  "Definition",
-  "End",
-  "Fixpoint",
-  "From",
-  "Fun",
-  "If",
-  "Import",
-  "Inductive",
-  "Let",
-  "Match",
-  "Module",
-  "Prop",
-  "Record",
-  "Require",
-  "Return",
-  "Section",
-  "Set",
-  "Struct",
-  "Then",
-  "Theorem",
-  "Type",
-  "Variable",
-  "Where",
-  "With",
-  "as",
-  "at",
-  "bool",
-  "else",
-  "end",
-  "exists",
-  "false",
-  "fix",
-  "for",
-  "forall",
-  "fun",
-  "if",
-  "in",
-  "let",
-  "match",
-  "mod",
-  "nat",
-  "return",
-  "struct",
-  "then",
-  "true",
-  "type",
-  "with",
 ]);
 
 const PURE_TWO_CHAR_SYMBOLS = new Set(["=>", "==", "!=", "<=", ">=", "&&", "||"]);
@@ -1328,26 +1196,39 @@ function extractPureDocumentation(sourceText, declSite) {
   return pieces.join("\n");
 }
 
-function mangleGallina(prefix, name) {
-  return `${prefix}_${name.replace(/_/g, "__")}`;
-}
-
-function mangleGallinaModule(name) {
-  if (GALLINA_RESERVED.has(name) || name.startsWith("m_") || name.startsWith("v_")) {
-    return mangleGallina("m", name);
-  }
-  return name;
-}
+const GALLINA_TYPES = Object.freeze({
+  Nat: "Corelib.Init.Datatypes.nat",
+  bool: "Corelib.Init.Datatypes.bool",
+});
+const GALLINA_TRUE = "Corelib.Init.Datatypes.true";
+const GALLINA_FALSE = "Corelib.Init.Datatypes.false";
 
 function gallinaType(valueType) {
-  return valueType === "Nat" ? "nat" : "bool";
+  return GALLINA_TYPES[valueType];
 }
 
 function gallinaStaticValue(value) {
   if (typeof value === "boolean") {
-    return value ? "true" : "false";
+    return value ? GALLINA_TRUE : GALLINA_FALSE;
   }
-  return `${value.toString()}%nat`;
+  return `(${value.toString()} : ${GALLINA_TYPES.Nat})`;
+}
+
+function exprDependsOnSymbolic(expr, env) {
+  const stack = [expr];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current.kind === "name") {
+      const local = env.get(String(current.value));
+      if (local !== undefined && (local[1] === null || local[1] === undefined)) {
+        return true;
+      }
+    }
+    for (let i = current.children.length - 1; i >= 0; i -= 1) {
+      stack.push(current.children[i]);
+    }
+  }
+  return false;
 }
 
 function checkPureCallArguments(item, sig, facts) {
@@ -1451,6 +1332,7 @@ class PureStaticEvaluator {
     this.constFunctions = constFunctions;
     this.facts = facts;
     this.steps = 0;
+    this.freshArgument = 0;
   }
 
   step(site) {
@@ -1730,13 +1612,13 @@ class PureStaticEvaluator {
 
 function inferPureExpression(item, env, constants, functions, evaluator, runtimeNames, facts) {
   if (item.kind === "nat") {
-    return ["Nat", `${BigInt(String(item.value).replace(/_/g, "")).toString()}%nat`];
+    return ["Nat", `(${BigInt(String(item.value).replace(/_/g, "")).toString()} : ${GALLINA_TYPES.Nat})`];
   }
   if (item.kind === "bool") {
-    return ["bool", item.value ? "true" : "false"];
+    return ["bool", item.value ? GALLINA_TRUE : GALLINA_FALSE];
   }
   if (item.kind === "group") {
-    const [vt, rendered] = inferPureExpression(
+    return inferPureExpression(
       item.children[0],
       env,
       constants,
@@ -1745,19 +1627,18 @@ function inferPureExpression(item, env, constants, functions, evaluator, runtime
       runtimeNames,
       facts
     );
-    return [vt, `(${rendered})`];
   }
   if (item.kind === "name") {
     const name = String(item.value);
     const local = env.get(name);
     if (local !== undefined) {
       if (facts && local[2] >= 0) facts.reference(local[2], item.site);
-      return [local[0], mangleGallina("v", name)];
+      return [local[0], local[4] || `v_${name}`];
     }
     const constant = constants.get(name);
     if (constant !== undefined) {
       if (facts && constant[2] >= 0) facts.reference(constant[2], item.site);
-      return [constant[0], mangleGallina("d", name)];
+      return [constant[0], `c_${name}`];
     }
     throw new VelaError("name", item.site.line, item.site.column, `unknown variable '${name}'`);
   }
@@ -1781,46 +1662,75 @@ function inferPureExpression(item, env, constants, functions, evaluator, runtime
     for (const [k, v] of env.entries()) {
       if (v[1] !== null && v[1] !== undefined) {
         staticEnv.set(k, [v[0], v[1], v[2]]);
+      } else if (v[3]) {
+        staticEnv.set(k, [v[0], v[0] === "Nat" ? 0n : false, v[2]]);
       }
     }
     const renderedArgs = [];
+    const closedStaticArgs = new Map();
+    let allConstClosed = sig.constIndices.size > 0;
     for (let i = 0; i < item.children.length; i += 1) {
       const child = item.children[i];
       const expected = sig.parameters[i];
-      if (sig.constIndices.has(i)) {
-        const val = evaluator.evalExpr(child, staticEnv, runtimeNames, true);
-        const actual = typeof val === "boolean" ? "bool" : "Nat";
-        if (actual !== expected) {
-          throw new VelaError(
-            "type",
-            child.site.line,
-            child.site.column,
-            `argument ${i + 1} of '${callee}' expects ${expected}, got ${actual}`
-          );
-        }
-        renderedArgs.push(gallinaStaticValue(val));
-      } else {
-        const [actual, rendered] = inferPureExpression(
-          child,
-          env,
-          constants,
-          functions,
-          evaluator,
-          runtimeNames,
-          facts
+      const [actual, rendered] = inferPureExpression(
+        child,
+        env,
+        constants,
+        functions,
+        evaluator,
+        runtimeNames,
+        facts
+      );
+      if (actual !== expected) {
+        throw new VelaError(
+          "type",
+          child.site.line,
+          child.site.column,
+          `argument ${i + 1} of '${callee}' expects ${expected}, got ${actual}`
         );
-        if (actual !== expected) {
-          throw new VelaError(
-            "type",
-            child.site.line,
-            child.site.column,
-            `argument ${i + 1} of '${callee}' expects ${expected}, got ${actual}`
-          );
-        }
-        renderedArgs.push(rendered);
       }
+      if (sig.constIndices.has(i)) {
+        const val = evaluator.evalExpr(child, staticEnv, runtimeNames, false);
+        if (!exprDependsOnSymbolic(child, env)) {
+          closedStaticArgs.set(sig.parameterNames[i], val);
+        } else {
+          allConstClosed = false;
+        }
+      }
+      renderedArgs.push(rendered);
     }
-    const target = mangleGallina("d", callee);
+    if (allConstClosed && sig.decl && sig.capturedConstants) {
+      const specEnv = new Map();
+      const argBindings = [];
+      for (let i = 0; i < sig.decl.parameters.length; i += 1) {
+        const [pName, pType] = sig.decl.parameters[i];
+        if (closedStaticArgs.has(pName.text)) {
+          const val = closedStaticArgs.get(pName.text);
+          specEnv.set(pName.text, [pType, val, -1, true, gallinaStaticValue(val)]);
+        } else {
+          const fresh = `vela_arg_${evaluator.freshArgument}`;
+          evaluator.freshArgument += 1;
+          argBindings.push([fresh, renderedArgs[i]]);
+          specEnv.set(pName.text, [pType, null, -1, false, fresh]);
+        }
+      }
+      let specBody = checkPureBlock(
+        sig.decl.body,
+        specEnv,
+        new Set(specEnv.keys()),
+        sig.result,
+        sig.capturedConstants,
+        functions,
+        evaluator,
+        null
+      );
+      for (let i = argBindings.length - 1; i >= 0; i -= 1) {
+        const [fresh, argGallina] = argBindings[i];
+        specBody = `(let ${fresh} := ${argGallina} in ${specBody})`;
+      }
+      return [sig.result, specBody];
+    }
+    const target = `f_${callee}`;
     return [sig.result, renderedArgs.length > 0 ? `(${target} ${renderedArgs.join(" ")})` : target];
   }
   if (item.kind === "unary") {
@@ -1841,7 +1751,7 @@ function inferPureExpression(item, env, constants, functions, evaluator, runtime
         "operator '!' requires a bool operand"
       );
     }
-    return ["bool", `(negb ${rendered})`];
+    return ["bool", `(if ${rendered} then ${GALLINA_FALSE} else ${GALLINA_TRUE})`];
   }
   const [lt, lr] = inferPureExpression(
     item.children[0],
@@ -1891,8 +1801,11 @@ function inferPureExpression(item, env, constants, functions, evaluator, runtime
     }
     if (op === "<") return ["bool", `(Corelib.Init.Nat.ltb ${lr} ${rr})`];
     if (op === "<=") return ["bool", `(Corelib.Init.Nat.leb ${lr} ${rr})`];
-    if (op === ">") return ["bool", `(Corelib.Init.Nat.ltb ${rr} ${lr})`];
-    return ["bool", `(Corelib.Init.Nat.leb ${rr} ${lr})`];
+    const cmpFn = op === ">" ? "ltb" : "leb";
+    return [
+      "bool",
+      `(let vela_cmp_left := ${lr} in let vela_cmp_right := ${rr} in Corelib.Init.Nat.${cmpFn} vela_cmp_right vela_cmp_left)`,
+    ];
   }
   if (op === "==" || op === "!=") {
     if (lt !== rt) {
@@ -1903,9 +1816,14 @@ function inferPureExpression(item, env, constants, functions, evaluator, runtime
         `operator '${op}' requires operands of the same type`
       );
     }
-    const eqFn = lt === "Nat" ? "Corelib.Init.Nat.eqb" : "Bool.eqb";
-    const eqExpr = `(${eqFn} ${lr} ${rr})`;
-    return ["bool", op === "==" ? eqExpr : `(negb ${eqExpr})`];
+    const eqExpr =
+      lt === "Nat"
+        ? `(Corelib.Init.Nat.eqb ${lr} ${rr})`
+        : `(let vela_eq_left := ${lr} in let vela_eq_right := ${rr} in if vela_eq_left then vela_eq_right else (if vela_eq_right then ${GALLINA_FALSE} else ${GALLINA_TRUE}))`;
+    return [
+      "bool",
+      op === "==" ? eqExpr : `(if ${eqExpr} then ${GALLINA_FALSE} else ${GALLINA_TRUE})`,
+    ];
   }
   if (lt !== "bool" || rt !== "bool") {
     throw new VelaError(
@@ -1915,8 +1833,12 @@ function inferPureExpression(item, env, constants, functions, evaluator, runtime
       `operator '${op}' requires bool operands`
     );
   }
-  const boolFn = op === "&&" ? "andb" : "orb";
-  return ["bool", `(${boolFn} ${lr} ${rr})`];
+  return [
+    "bool",
+    op === "&&"
+      ? `(if ${lr} then ${rr} else ${GALLINA_FALSE})`
+      : `(if ${lr} then ${GALLINA_TRUE} else ${rr})`,
+  ];
 }
 
 function checkPureBlock(
@@ -1927,13 +1849,11 @@ function checkPureBlock(
   constants,
   functions,
   evaluator,
-  indent,
   facts
 ) {
   const localEnv = new Map(env);
   const localImmutable = new Set(immutable);
-  const lines = [];
-  const pad = " ".repeat(indent);
+  const bindingPairs = [];
   const runtimeNames = new Set();
   for (const [k, v] of localEnv.entries()) {
     if ((v[1] === null || v[1] === undefined) && !v[3]) runtimeNames.add(k);
@@ -1979,9 +1899,7 @@ function checkPureBlock(
         );
       }
       const value = evaluator.evalExpr(stmt.value, staticEnv, runtimeNames, false);
-      const dependsOnSymbolic = Array.from(localEnv.entries()).some(
-        ([, v]) => v[3] && (v[1] === null || v[1] === undefined)
-      );
+      const dependsOnSymbolic = exprDependsOnSymbolic(stmt.value, localEnv);
       const lit = typeof value === "boolean" ? (value ? "true" : "false") : value.toString();
       const detail = dependsOnSymbolic
         ? `const ${stmt.valueType} ${stmt.name.text}`
@@ -1996,9 +1914,7 @@ function checkPureBlock(
       localImmutable.add(stmt.name.text);
       runtimeNames.delete(stmt.name.text);
       const rhs = dependsOnSymbolic ? renderedInit : gallinaStaticValue(value);
-      lines.push(
-        `${pad}let ${mangleGallina("v", stmt.name.text)} : ${gallinaType(stmt.valueType)} := ${rhs} in`
-      );
+      bindingPairs.push([stmt.name.text, rhs]);
       continue;
     }
     const [vt, rendered] = inferPureExpression(
@@ -2026,8 +1942,9 @@ function checkPureBlock(
     localEnv.set(stmt.name.text, [vt, null, symId]);
     localImmutable.add(stmt.name.text);
     runtimeNames.add(stmt.name.text);
-    lines.push(`${pad}let ${mangleGallina("v", stmt.name.text)} : ${gallinaType(vt)} := ${rendered} in`);
+    bindingPairs.push([stmt.name.text, rendered]);
   }
+  let body;
   if (block.terminal.kind === "return") {
     const [vt, rendered] = inferPureExpression(
       block.terminal.value,
@@ -2046,50 +1963,52 @@ function checkPureBlock(
         `return value has type ${vt}, expected ${expected}`
       );
     }
-    lines.push(`${pad}${rendered}`);
-    return lines.join("\n");
-  }
-  const [condType, condRendered] = inferPureExpression(
-    block.terminal.condition,
-    localEnv,
-    constants,
-    functions,
-    evaluator,
-    runtimeNames,
-    facts
-  );
-  if (condType !== "bool") {
-    throw new VelaError(
-      "type",
-      block.terminal.site.line,
-      block.terminal.site.column,
-      "if condition must have type bool"
+    body = rendered;
+  } else {
+    const [condType, condRendered] = inferPureExpression(
+      block.terminal.condition,
+      localEnv,
+      constants,
+      functions,
+      evaluator,
+      runtimeNames,
+      facts
     );
+    if (condType !== "bool") {
+      throw new VelaError(
+        "type",
+        block.terminal.site.line,
+        block.terminal.site.column,
+        "if condition must have type bool"
+      );
+    }
+    const yesRendered = checkPureBlock(
+      block.terminal.yes,
+      localEnv,
+      localImmutable,
+      expected,
+      constants,
+      functions,
+      evaluator,
+      facts
+    );
+    const noRendered = checkPureBlock(
+      block.terminal.no,
+      localEnv,
+      localImmutable,
+      expected,
+      constants,
+      functions,
+      evaluator,
+      facts
+    );
+    body = `(if ${condRendered} then ${yesRendered} else ${noRendered})`;
   }
-  const yesRendered = checkPureBlock(
-    block.terminal.yes,
-    localEnv,
-    localImmutable,
-    expected,
-    constants,
-    functions,
-    evaluator,
-    indent + 2,
-    facts
-  );
-  const noRendered = checkPureBlock(
-    block.terminal.no,
-    localEnv,
-    localImmutable,
-    expected,
-    constants,
-    functions,
-    evaluator,
-    indent + 2,
-    facts
-  );
-  lines.push(`${pad}if ${condRendered} then`, yesRendered, `${pad}else`, noRendered);
-  return lines.join("\n");
+  for (let i = bindingPairs.length - 1; i >= 0; i -= 1) {
+    const [bName, rhs] = bindingPairs[i];
+    body = `(let v_${bName} := ${rhs} in ${body})`;
+  }
+  return body;
 }
 
 function parsePureModule(sourceText) {
@@ -2098,7 +2017,7 @@ function parsePureModule(sourceText) {
   return { parsed, declarationSites: parser.declarationSites };
 }
 
-function runPureTranslate(sourceText, collectFacts = false) {
+function runPureTranslate(sourceText, collectFacts = false, { sourceHash = "" } = {}) {
   const { parsed, declarationSites } = parsePureModule(sourceText);
   const facts = collectFacts ? new PureFacts(sourceText, declarationSites) : null;
   const declarations = new Set();
@@ -2162,34 +2081,32 @@ function runPureTranslate(sourceText, collectFacts = false) {
       symbol: fnSymId,
       isConst: item.isConst,
       constIndices,
+      decl: item,
+      capturedConstants: null,
     });
     constFunctions.set(item.name.text, item);
   }
 
   const evaluator = new PureStaticEvaluator(constants, functions, constFunctions, facts);
-  const mangledModule = mangleGallinaModule(parsed.name.text);
-  const outLines = [
-    "(* Generated by the Vela pure prototype. *)",
-    "From Stdlib Require Import Bool Arith PeanoNat.",
-    `Module ${mangledModule}.`,
-  ];
+  const definitions = [];
 
   for (const item of parsed.declarations) {
     if (item.kind === "constant") {
       const value = evaluator.evaluateConstant(item);
-      outLines.push(
-        `Definition ${mangleGallina("d", item.name.text)} : ${gallinaType(item.valueType)} := ${gallinaStaticValue(value)}.`
+      definitions.push(
+        `Definition c_${item.name.text} : ${gallinaType(item.valueType)} :=\n  ${gallinaStaticValue(value)}.`
       );
       continue;
     }
     const sig = functions.get(item.name.text);
+    sig.capturedConstants = new Map(evaluator.constants);
     const paramEnv = new Map();
     const binders = [];
     for (let i = 0; i < item.parameters.length; i += 1) {
       const [pName, pType] = item.parameters[i];
       const isConstParam = item.constParameters.has(pName.text);
       paramEnv.set(pName.text, [pType, null, sig.parameterIds[i], isConstParam]);
-      binders.push(`(${mangleGallina("v", pName.text)} : ${gallinaType(pType)})`);
+      binders.push(` (v_${pName.text} : ${gallinaType(pType)})`);
     }
     const bodyEnv = new Map(paramEnv);
     for (const [cName] of evaluator.constants.entries()) {
@@ -2207,7 +2124,6 @@ function runPureTranslate(sourceText, collectFacts = false) {
       evaluator.constants,
       functions,
       evaluator,
-      2,
       facts
     );
     if (item.isConst) {
@@ -2227,19 +2143,18 @@ function runPureTranslate(sourceText, collectFacts = false) {
         );
       }
     }
-    if (binders.length > 0) {
-      outLines.push(
-        `Definition ${mangleGallina("d", item.name.text)} ${binders.join(" ")} : ${gallinaType(item.result)} :=`,
-        `${bodyRendered}.`
-      );
-    } else {
-      outLines.push(
-        `Definition ${mangleGallina("d", item.name.text)} : ${gallinaType(item.result)} := ${bodyRendered.trim()}.`
-      );
-    }
+    definitions.push(
+      `Definition f_${item.name.text}${binders.join("")} : ${gallinaType(item.result)} :=\n  ${bodyRendered}.`
+    );
   }
-  outLines.push(`End ${mangledModule}.`, "");
-  const gallina = outLines.join("\n");
+  const header =
+    "(* SPDX-License-" +
+    "Identifier: Apache-2.0 *)\n" +
+    `(* Vela pure prototype: unqualified. Source SHA256: ${sourceHash} *)\n` +
+    "From Corelib Require Import Init.Datatypes Init.Nat.\n\n" +
+    `Module Vela_${parsed.name.text}.\n\n`;
+  const footer = `\n\nEnd Vela_${parsed.name.text}.\n`;
+  const gallina = `${header}${definitions.join("\n\n")}${footer}`;
   if (utf8Bytes(gallina).length > MAX_EMITTED_GALLINA_BYTES) {
     throw new VelaError(
       "limit",
@@ -2257,8 +2172,8 @@ function runPureTranslate(sourceText, collectFacts = false) {
   };
 }
 
-function pureEvaluate(sourceText, expressionText, valueType) {
-  const { evaluator } = runPureTranslate(sourceText, false);
+function pureEvaluate(sourceText, expressionText, valueType, evaluator = null) {
+  const activeEvaluator = evaluator || runPureTranslate(sourceText, false).evaluator;
   if (valueType !== "Nat" && valueType !== "bool") {
     throw new VelaError("type", 1, 1, "expression: expected Nat or bool result type");
   }
@@ -2290,9 +2205,9 @@ function pureEvaluate(sourceText, expressionText, valueType) {
       );
     }
     const probe = new PureStaticEvaluator(
-      evaluator.constants,
-      evaluator.functions,
-      evaluator.constFunctions
+      activeEvaluator.constants,
+      activeEvaluator.functions,
+      activeEvaluator.constFunctions
     );
     const value = probe.evalExpr(expr, new Map(), new Set(), false);
     const actual = typeof value === "boolean" ? "bool" : "Nat";
@@ -4154,21 +4069,12 @@ class MathParser {
       this.peek().kind === "word" &&
       this.peek(2).text === "="
     ) {
-      const startSite = this.current.site;
-      const annotation = this.parseType();
-      const nameTok = this.expect("word", null, "local variable name");
-      this.expect("symbol", "=");
-      const value = this.parseExpression();
-      this.expect("symbol", ";");
-      return {
-        kind: "local",
-        role: "let",
-        annotation,
-        name: nameTok.text,
-        nameSite: nameTok.site,
-        value,
-        site: startSite,
-      };
+      throw new VelaError(
+        "syntax",
+        this.current.site.line,
+        this.current.site.column,
+        "local variable declarations require 'let' or 'var'"
+      );
     }
     const lhs = this.parseExpression();
     if (
@@ -5529,9 +5435,10 @@ function parseFormatSegments(template, site) {
 }
 
 class MathElaborator {
-  constructor(parsedModule, sourceText) {
+  constructor(parsedModule, sourceText, sourceHash = "") {
     this.module = parsedModule;
     this.sourceText = sourceText;
+    this.sourceHash = sourceHash;
     this.records = new Map();
     this.unions = new Map();
     this.unionCtors = new Map();
@@ -6686,10 +6593,9 @@ class MathElaborator {
     findings.sort((a, b) => a.line - b.line || a.column - b.column);
 
     const modIdent = `Vela_${this.module.name.replace(/\./g, "_")}`;
-    const digest = sha256Hex(this.sourceText);
     const gallina = [
       "(* SPDX-License-" + "Identifier: Apache-2.0 *)",
-      `(* Vela mathematical elaboration: unqualified kernel proposal. Source SHA256: ${digest} *)`,
+      `(* Vela mathematical elaboration: unqualified kernel proposal. Source SHA256: ${this.sourceHash} *)`,
       `Module ${modIdent}.`,
       "",
       "From Stdlib Require Import Bool Arith PeanoNat String.",
@@ -6785,11 +6691,11 @@ function renderMathBodyGallina(body) {
   return parts.length > 0 ? parts.join("\n  ") : "tt";
 }
 
-function compileMathematical(sourceText) {
+function compileMathematical(sourceText, sourceHash = "") {
   const tokens = mathTokenize(sourceText);
   const parser = new MathParser(tokens);
   const parsedModule = parser.parseModule();
-  const elaborator = new MathElaborator(parsedModule, sourceText);
+  const elaborator = new MathElaborator(parsedModule, sourceText, sourceHash);
   return {
     ...elaborator.elaborate(),
     elaborator,
@@ -6890,11 +6796,11 @@ export async function browserApi(path, body) {
     return { messages: session.handle(body.message) };
   }
   const sourceText = typeof body.source === "string" ? body.source : "";
-  const sourceHash = sha256Hex(sourceText);
+  const sourceHash = await sha256Hex(sourceText);
 
   if (path === "/api/compile") {
     try {
-      const pureRes = runPureTranslate(sourceText, false);
+      const pureRes = runPureTranslate(sourceText, false, { sourceHash });
       return {
         ok: true,
         sourceHash,
@@ -6906,7 +6812,7 @@ export async function browserApi(path, body) {
     } catch (pureErr) {
       if (pureErr instanceof VelaError && (pureErr.kind === "syntax" || pureErr.kind === "unsupported")) {
         try {
-          const mathRes = compileMathematical(sourceText);
+          const mathRes = compileMathematical(sourceText, sourceHash);
           return {
             ok: true,
             sourceHash,
@@ -6924,20 +6830,23 @@ export async function browserApi(path, body) {
   }
 
   if (path === "/api/evaluate") {
-    let useMath = false;
+    let pureRes = null;
     try {
-      runPureTranslate(sourceText, false);
+      pureRes = runPureTranslate(sourceText, false, { sourceHash });
     } catch (pureErr) {
-      if (pureErr instanceof VelaError && (pureErr.kind === "syntax" || pureErr.kind === "unsupported")) {
-        useMath = true;
-      } else {
+      if (
+        !(
+          pureErr instanceof VelaError &&
+          (pureErr.kind === "syntax" || pureErr.kind === "unsupported")
+        )
+      ) {
         return formatErrorPayload(sourceHash, pureErr);
       }
     }
     try {
-      const res = useMath
-        ? evaluateMathematical(sourceText, body.expression, body.valueType)
-        : pureEvaluate(sourceText, body.expression, body.valueType);
+      const res = pureRes
+        ? pureEvaluate(sourceText, body.expression, body.valueType, pureRes.evaluator)
+        : evaluateMathematical(sourceText, body.expression, body.valueType);
       return {
         ok: true,
         sourceHash,
