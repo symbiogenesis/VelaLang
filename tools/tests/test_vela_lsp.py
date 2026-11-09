@@ -13,6 +13,7 @@ from typing import cast, override
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
+from toolchain import source as source_mod
 from toolchain.lsp import Server, diagnose, serve
 from toolchain.protocol_json import decode_message, encode_message, read_frame
 from toolchain.source import SourceSnapshot
@@ -137,6 +138,26 @@ def _coordinates() -> None:
                   SourceSnapshot(_URI + "x", 1, snapshot.text, 1).identity,
                   SourceSnapshot(_URI, 1, snapshot.text + "x", 1).identity}
     ensure(len(identities) == 5, "snapshot identity omitted one of its bound inputs")
+
+
+def _snapshot_coordinate_reuse() -> None:
+    text = "a😀\r\nbé\rc\n" * 500
+    snapshot = SourceSnapshot(_URI, 1, text, 1)
+    with patch("toolchain.source._normalized", wraps=source_mod._normalized) as normalized:
+        for line in range(1, 1501):
+            column, expected = (3, 3) if line % 3 == 1 else (2, 1)
+            ensure(snapshot.diagnostic_position(line, column) ==
+                   {"line": line - 1, "character": expected},
+                   "repeated diagnostic conversion changed Unicode/newline positions")
+        ensure(normalized.call_count == 1,
+               "diagnostic conversions repeatedly normalized the complete immutable source")
+        replacement = SourceSnapshot(_URI, 2, "é\r\n😀", 2)
+        ensure(replacement.diagnostic_position(2, 2) == {"line": 1, "character": 2},
+               "a replacement snapshot reused the previous source's coordinate data")
+        ensure(normalized.call_count == 2,
+               "a replacement snapshot did not build its own coordinate data")
+    _refuses(lambda: snapshot.diagnostic_position(1502, 1), "line beyond cached source")
+    _refuses(lambda: snapshot.diagnostic_position(1, 4), "column beyond cached source")
 
 
 def _lifecycle() -> None:
@@ -538,6 +559,7 @@ def cases() -> list[Case]:
     return [Case("fragmented-and-coalesced-frames", _framing),
             Case("strict-json-and-nesting", _strict_json),
             Case("source-coordinates-and-identities", _coordinates),
+            Case("immutable-snapshot-coordinate-reuse", _snapshot_coordinate_reuse),
             Case("lifecycle-and-advertised-subset", _lifecycle),
             Case("versioned-full-overlays-and-invalidation", _overlays),
             Case("refused-edit-resynchronization", _refused_edit_resynchronization),

@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from functools import cached_property
 
 from toolchain.ast import MAX_SOURCE_BYTES
 
@@ -29,20 +30,24 @@ class SourceSnapshot:
     def __post_init__(self) -> None:
         if not self.uri or len(self.uri.encode("utf-8")) > MAX_URI_BYTES:
             raise ValueError("document URI is empty or exceeds limit")
-        if len(self.text.encode("utf-8")) > MAX_SOURCE_BYTES:
+        if len(self.source) > MAX_SOURCE_BYTES:
             raise ValueError("document exceeds pure prototype source limit")
         if (type(self.version) is not int or not -(2 ** 31) <= self.version < 2 ** 31
                 or type(self.generation) is not int or self.generation < 1):
             raise ValueError("invalid document version or generation")
 
-    @property
+    @cached_property
     def source(self) -> bytes:
         return self.text.encode("utf-8")
 
-    @property
+    @cached_property
     def identity(self) -> str:
         fields = [self.uri, self.version, self.generation, self.text]
         return hashlib.sha256(json.dumps(fields, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+    @cached_property
+    def _diagnostic_lines(self) -> tuple[str, ...]:
+        return tuple(_normalized(self.text).split("\n"))
 
     def byte_position(self, offset: int) -> dict[str, int]:
         """Convert a UTF-8 boundary to LSP UTF-16, never an interior byte/CRLF."""
@@ -81,7 +86,7 @@ class SourceSnapshot:
 
     def diagnostic_position(self, line: int, column: int) -> dict[str, int]:
         """Adapt the legacy producer's one-based normalized code-point site."""
-        lines = _normalized(self.text).split("\n")
+        lines = self._diagnostic_lines
         if not 1 <= line <= len(lines) or not 1 <= column <= len(lines[line - 1]) + 1:
             raise ValueError("producer diagnostic outside source")
         return {"line": line - 1, "character": _utf16_length(lines[line - 1][:column - 1])}
