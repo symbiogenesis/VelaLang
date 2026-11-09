@@ -1547,6 +1547,8 @@ Binding also checks declared source/Gallina/C subjects, required local law,
 contract and scenario coverage, complete assumption queries, solver-trust status
 and required process subjects/verdicts against retained transcripts. Rehashed
 missing coverage, invented source-proof status and altered process records refuse.
+Native proof observations bind stdout/stderr byte lengths and hashes separately;
+the strict assumption audit reads the bound stdout while retaining all stderr.
 The current replay reports source `accepted: true` with zero solver-trusted
 obligations and unavailable CompCert execution; four Sail capability/fault
 controls pass. Receipt matching does not replay or authenticate these proofs.
@@ -1626,7 +1628,7 @@ independently recover a deterministic timeline and cover quantized zero-duration
 boundaries, changed compiler/parser files, malformed data, truncation/refusal,
 clock regression and late-publication freshness. Independent code review found
 and corrected producer-path, timestamp-boundary and publication-freshness gaps.
-Combined `validate --jobs 4` passes the full local gate and all 497 behavioral
+Combined `validate --jobs 4` passes the full local gate and all 498 behavioral
 cases; one slow case and seven unavailable-lane cases are explicitly skipped.
 Q25cp remains open for wider phases/workers, pinned external-viewer qualification,
 exact runtime closure and comparative overhead measurement. No whole-cell
