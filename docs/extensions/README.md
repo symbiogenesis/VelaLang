@@ -18,6 +18,7 @@ define the release without them.
 | [Unified source contract](unified-source-contract.md) | One Vela codebase for software, proofs, the machine model and hardware, and native self-hosting |
 | [Assurance profiles](assurance-profiles.md) | Proposed Safe, Contracted and Complete presets and evidence presentation beside declarations |
 | [Composition review](full-language-review.md) | How the extensions compose and which owner decides each frontend row |
+| [Numerical workload candidates](numerical-workloads.md) | Deferred e-means client selection and numerical qualification prerequisites |
 
 [PLAN.md](../../PLAN.md#vela-first-release-delivery) owns commissioning and
 budgets for any extension a consumer selects.

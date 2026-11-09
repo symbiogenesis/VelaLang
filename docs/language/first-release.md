@@ -110,6 +110,10 @@ binds that policy as follows; the target bridge must prove the binding.
 | Layout and encoding | Scalar representation/alignment is fixed by the target/ABI. Integer-to-byte encoding uses explicitly named little- or big-endian library operations; native record layout and padding never define a wire format. Capability fabrication and implicit pointer/integer conversion remain excluded. |
 | Floating point | Not in this initial runtime release. A future consumer must select formats, NaN/signed-zero/rounding and exception behavior, equality/ordering, constant evaluation and target correspondence together. Parser recognition or existing hardware floating-point instructions supply no Vela support claim. |
 
+The [e-means numerical research candidate](../extensions/numerical-workloads.md)
+retains separate consumer and arithmetic qualification gates beyond this runtime
+scope; it adds no primitive or first-release client.
+
 Numeric aliases follow the [module rules](#modules-and-packages): use an explicit
 `import Vela.Numerics;` or the fully qualified name, such as `Vela.Numerics.int`.
 The dependency lock binds the standard library package and its definitions;
