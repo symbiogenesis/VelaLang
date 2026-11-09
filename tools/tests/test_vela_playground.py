@@ -400,7 +400,7 @@ def _absolute_read_deadline() -> None:
                 try:
                     connection.shutdown(socket.SHUT_WR)
                     connection.recv(4096)
-                except ConnectionError:
+                except OSError:
                     pass
                 ensure(time.monotonic() - start < 1.5, "trickled input extended the absolute read budget")
             ensure(_http(server, "/", method="GET")[0] == 200,

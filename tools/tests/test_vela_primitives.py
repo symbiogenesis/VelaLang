@@ -411,6 +411,9 @@ def _kernel_rows() -> Iterator[tuple[str, str, str]]:
     """The sampled rows as (evaluator constant, Gallina application, expected term)."""
     for row in _rows(_SAMPLED, _kernel_values,
                      lambda width: [0, 1, width.bits - 1, width.bits, _USIZE.hi]):
+        # Unary Peano results above the 70,000 bound would build multi-gigabyte nat terms.
+        if isinstance(row.expected, tuple) and row.expected[0] == "nat" and cast("int", row.expected[1]) > 70_000:
+            continue
         arguments = " ".join(_literal(_WIDTHS[name], value) for name, value in row.arguments)
         yield (row.name, f"({_GALLINA[row.name]} {arguments})",
                _gallina_outcome(row.expected, _WIDTHS[row.result], row.error))
@@ -494,13 +497,13 @@ _PLACEHOLDERS = {
 
 def _kernel_fault_controls() -> None:
     """Each restored placeholder is killed by a check, never stillborn in the prelude."""
-    prelude_lines = _PRELUDE.count("\n") + 1
     rows = list(_kernel_rows())
     with _scratch() as temporary:
         directory = Path(temporary)
         for index, (prefix, (pattern, placeholder)) in enumerate(_PLACEHOLDERS.items()):
             mutated, replaced = re.subn(pattern, placeholder, _PRELUDE)
             ensure(replaced == 1, f"{prefix} placeholder control no longer matches the prelude")
+            prelude_lines = mutated.count("\n") + 1
             selected = [row for row in rows if row[0].startswith(prefix)]
             ensure(bool(selected), f"{prefix} placeholder control selected no checks")
             done = _compile(directory, f"Mutant{index}", _kernel_file(mutated, selected))
