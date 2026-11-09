@@ -75,16 +75,46 @@ compiler service when launched with a `#token=...` loopback URL, or evaluated
 locally in the browser when served statically from [docs/index.html](../index.html)
 ([docs/app.mjs](../app.mjs), [docs/style.css](../style.css)) on GitHub Pages via
 [.github/workflows/pages.yml](../../.github/workflows/pages.yml).
-The static `docs/` bundle and [tools/toolchain/playground/](../../tools/toolchain/playground/)
-share identical `index.html`, `style.css`, and `app.mjs` assets with relative
-`./style.css` and `./app.mjs` paths so both static hosting and `PlaygroundServer`
-serve the same language overview, tour, compact reference, and embedded
-playground. The browser must clearly report an editor-load failure and
+The canonical `docs/` directory owns `index.html`, `style.css`, and `app.mjs`
+with relative `./style.css` and `./app.mjs` paths so both static hosting and
+`PlaygroundServer` serve the same single-source language overview, tour, compact
+reference, and embedded playground without a duplicate asset tree. The browser must clearly report an editor-load failure and
 offer plain-text editing with the same compile/evaluate controls. This fallback
 does not claim Monaco highlighting or inline editor providers; the inspector
 panels still use the local language services. The
 [third-party record](../../THIRD-PARTY.md#browser-editor-assets) owns the
 selected upstream terms and intended distribution.
+
+<a id="single-source-unification-and-worker-efficiency"></a>
+
+## Single-source unification and worker efficiency
+
+Q25aj in [the plan](../../PLAN.md#q-assessment-actions) eliminates duplicated
+playground assets, drifted in-browser grammar/emission logic, and redundant
+evaluation passes across [docs/app.mjs](../app.mjs),
+[tools/toolchain/playground.py](../../tools/toolchain/playground.py), and
+[tools/toolchain/playground_worker.py](../../tools/toolchain/playground_worker.py):
+
+1. **Single canonical asset root (`docs/`):** `PlaygroundServer` serves
+   `docs/index.html`, `docs/app.mjs`, and `docs/style.css` directly; the
+   duplicate `tools/toolchain/playground/` mirror is retired.
+2. **Exact grammar, `Q25ah` syntax, and `Corelib` Gallina parity:**
+   `VELA_GRAMMAR` matches the active and retired keywords of
+   [lexer.mll](../../tools/toolchain/parser/lexer.mll) exactly, static and
+   in-browser parsing enforce mandatory `let`/`var` local bindings, pure
+   in-browser translation emits the canonical `Corelib.Init.Datatypes` /
+   `Corelib.Init.Nat` Gallina of [tools/toolchain/__init__.py](../../tools/toolchain/__init__.py),
+   and differential tests verify that every catalog example produces identical
+   compilation, findings, and console evaluation across the Python/OCaml worker
+   and `browserApi`.
+3. **Unified client utilities and highlighting:** Static code cards and Monarch
+   share a single grammar-driven lexical table, Web Crypto (`crypto.subtle`)
+   replaces custom bitwise SHA-256 boilerplate, and a unified cancellation/ticket
+   helper replaces per-panel ticket counters.
+4. **Single-pass worker evaluation and stat-cached binary identity:** Expression
+   evaluation selects the compiler without compiling and translating the module
+   twice, and native-parser digest checks avoid redundant per-request disk reads
+   while still refusing any modified executable before or during worker execution.
 
 ## Browser behavior
 

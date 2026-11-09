@@ -81,6 +81,8 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
   - Adopts `open (...) lifts ...` for invariant lifting, automatic `ref` descriptor preservation, mandatory `let`/`var` local keywords, token-shape constructor patterns (retiring `VELA106`) and unified fat-arrow `match` arms across parsers, elaborators, formatters and examples. ([note](docs/assurance/completion-log.md#q25ah-resolve-vela-surface-collisions-and-redundant-spellings))
 - [x] **Q25ai · Publish the Vela language reference and separate extension research** · 12 h retained estimate, actual n/a · agent-parallel
   - Publishes the compact [language reference](docs/language/reference.md), moves extension dossiers under `docs/extensions/` and dated language comparisons to background, and records first-release authoring-cost measurements. ([note](docs/assurance/completion-log.md#q25ai-publish-the-vela-language-reference-and-separate-extension-research))
+- [ ] **Q25aj · Unify Vela playground assets, single-source grammar sync, and single-pass worker execution** · 8 h, range 6–12 · agent-parallel
+  - Retires the duplicated `tools/toolchain/playground/` asset tree in favor of canonical `docs/` assets, unifies the in-browser lexer/parser/evaluator and syntax highlighters with exact `lexer.mll`/`Q25ah`/`Corelib` Gallina parity, and eliminates redundant two-pass source compilation during expression evaluation ([contract](docs/tooling/playground.md#single-source-unification-and-worker-efficiency)).
 
 ## Calibration record (Q25 series)
 
@@ -121,6 +123,7 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 | Q25ag | I | 24 | 16–32 | n/a | n/a |
 | Q25ah | I | 16 | 12–20 | n/a | n/a |
 | Q25ai | I | 12 | 8–16 | n/a | n/a |
+| Q25aj | I | 8 | 6–12 | n/a | n/a |
 
 ## Language core proposals
 
