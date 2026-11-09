@@ -22,6 +22,8 @@ class Command:
 
 
 COMMANDS: tuple[Command, ...] = (
+    Command("validate", "toolchain.cli.validate",
+            "run logged local checks and tests; --static and --full select explicit coverage"),
     Command("gate", "toolchain.cli.gate",
             "run check, markdown, and typecheck in one static verdict"),
     Command("check", "toolchain.cli.check",

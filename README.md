@@ -85,6 +85,7 @@ Every tool and test in this repository runs through `python tools/run.py` (using
 
 | Command | What it does |
 | --- | --- |
+| `python tools/run.py validate` | Run the static gate and behavioral suite sequentially; `--full` adds native development qualification |
 | `python tools/run.py test` | Run the behavioral test suite (also the default when no command is given) |
 | `python tools/run.py gate` | Run all static checks (`check`, `markdown`, and `typecheck`) in one pass |
 | `python tools/run.py vela --help` | Check, format, lint, or emit Gallina for pure Vela files |

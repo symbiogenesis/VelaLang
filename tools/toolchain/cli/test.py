@@ -192,7 +192,8 @@ def _run_module(name: str, slow: bool, lanes: frozenset[Lane], shard: Shard | No
 
 
 def run(only: str | None = None, slow: bool = False, jobs: int | None = None,
-        shard: Shard | None = None, record: Path | None = None) -> Reporter:
+        shard: Shard | None = None, record: Path | None = None,
+        require_toolchain: bool = False) -> Reporter:
     """Run the selected test suite and return the aggregated `Reporter`.
 
     If `record` is set, writes per-module case counts and durations to that path.
@@ -230,6 +231,10 @@ def run(only: str | None = None, slow: bool = False, jobs: int | None = None,
     else:
         # Probe runnable lanes once before spawning workers.
         lanes = _lanes()
+        if require_toolchain and "toolchain" not in lanes:
+            rep.report("tests", "required lane unavailable:",
+                       [f"the native toolchain lane requires Linux and opam switch {env.SAIL_SWITCH}"])
+            return rep
         workers = min(jobs or min(8, os.process_cpu_count() or 1), len(names))
         # Use spawn on all platforms so workers never inherit live threads or module patches.
         with ProcessPoolExecutor(max_workers=workers,
@@ -269,6 +274,8 @@ def main(argv: list[str] | None = None) -> int:
                                 "INDEPENDENT_CASES = True")
     parser.add_argument("--slow", action="store_true",
                         help="include the cases marked slow")
+    parser.add_argument("--require-toolchain", action="store_true",
+                        help="fail unless the native toolchain lane is available")
     parser.add_argument("--jobs", type=int,
                         help="worker processes (default: available CPUs, capped at eight)")
     args = parser.parse_args(argv)
@@ -278,6 +285,6 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--only requires a nonempty module-name substring")
 
     report = run(only=args.only, slow=args.slow, jobs=args.jobs, shard=args.shard,
-                 record=timings.claim())
+                 record=timings.claim(), require_toolchain=args.require_toolchain)
     print("\n".join(report.out))
     return 1 if report.findings else 0

@@ -2,6 +2,18 @@
 
 This file records third-party dependencies, development tools, and reference readings for the VelaLang repository, following [COPYRIGHT.md](COPYRIGHT.md).
 
+## CI environment setup
+
+The [static workflow](.github/workflows/static.yml) invokes `actions/setup-python`
+v7.0.0 at `5fda3b95a4ea91299a34e894583c3862153e4b97` to select the Python minor
+owned by [tools/pyproject.toml](tools/pyproject.toml). Its revision's
+[LICENSE](https://github.com/actions/setup-python/blob/5fda3b95a4ea91299a34e894583c3862153e4b97/LICENSE)
+was read on 2026-11-09: MIT, copyright 2018 GitHub, Inc. and contributors.
+The action runs as a hosted development tool with its upstream notices; no action
+source or runtime binary is copied into this tree or a Vela/VerifiedOS image.
+The workflow installs the existing exact `uv` version from that same manifest
+and synchronizes the repository's locked Python dependencies.
+
 <a id="browser-editor-assets"></a>
 
 ## Browser playground assets

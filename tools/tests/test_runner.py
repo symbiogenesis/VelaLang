@@ -79,8 +79,29 @@ def _aggregate_coverage() -> None:
                "timings must preserve module ordering and the same coverage as the report")
 
 
+def _required_toolchain_lane() -> None:
+    with patch.object(runner, "_module_names", return_value=["fixture"]), \
+            patch.object(runner, "_lanes", return_value=_LANES), \
+            patch.object(runner, "ProcessPoolExecutor") as pool:
+        report = runner.run(require_toolchain=True)
+        ensure(report.findings == 1 and not pool.called,
+               "required native lane silently skipped tests or started workers without prerequisites")
+        ensure(any("required lane unavailable" in line for line in report.out),
+               "missing required native lane was not explained")
+    calls: list[str] = []
+    with patch.object(runner, "_module_names", return_value=["fixture"]), \
+            patch.object(runner, "_lanes", return_value=frozenset({"any", "guest", "toolchain"})), \
+            patch.object(runner, "_load", side_effect=lambda *_args: _fixture(calls)), \
+            patch.object(runner, "ProcessPoolExecutor") as pool:
+        pool.return_value.__enter__.return_value.map.side_effect = map
+        report = runner.run(require_toolchain=True, slow=True)
+        ensure(report.findings == 0 and calls == ["ordinary", "slow", "kernel", "slow-kernel"],
+               "available required native lane did not execute all its selected cases")
+
+
 def cases() -> list[Case]:
     return [Case("runner reports slow and unavailable-lane skips", _filter_coverage),
             Case("runner counts only its shard's skipped cases", _shard_coverage),
             Case("runner retains skipped coverage alongside failures", _failure_coverage),
-            Case("runner aggregates coverage in reports and timings", _aggregate_coverage)]
+            Case("runner aggregates coverage in reports and timings", _aggregate_coverage),
+            Case("runner can require the native toolchain lane", _required_toolchain_lane)]

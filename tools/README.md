@@ -6,6 +6,9 @@
 
 | Command | Lane | Purpose |
 | --- | --- | --- |
+| `python tools/run.py validate` | host / guest | Run the static gate and behavioral suite sequentially with bounded worker concurrency |
+| `python tools/run.py validate --full` | host + guest | Run the complete local development qualification profile with native prerequisites required |
+| `python tools/run.py validate --static` | host / guest | Run Python and Markdown checks without invoking the native parser |
 | `python tools/run.py gate` | host / guest | Run `check`, `markdown`, and `typecheck` in one verdict |
 | `python tools/run.py check` | host / guest | Enforce REUSE v3.3, SPDX headers, EditorConfig, glyph hygiene, source-comment links, JavaScript/playground asset bindings, and plan-summary arithmetic |
 | `python tools/run.py check --fix` | host / guest | Refresh only the generated estimate table in [PLAN.md](../PLAN.md#current-summary), then run all `check` rules |
@@ -24,6 +27,35 @@ The test runner reports executed cases and skips separately. By default it omits
 toolchain. `--slow` includes slow cases in the current lane; it does not enable
 guest or kernel checks on Windows. Parser and elaborator qualification commands
 retain their own native build and replay requirements.
+
+## Validation profiles
+
+`validate` combines the usual `gate` and `test` handoff. It runs one command at a
+time and defaults to four test workers; `--jobs N` selects another positive
+worker count. The gate shares one indexed document corpus between repository
+and Markdown checks. It retains sequential checker execution: overlapping proof
+and editor jobs can exhaust the editor workers' independent time budgets.
+Each run writes per-step logs under `out/validation/`. A failed or timed-out step
+stops the profile and prints its log path and a bounded tail for diagnosis.
+
+`validate --full` requires the pinned Sail and Rocq switches before qualification.
+It includes slow behavioral cases, live editor interoperability, isolated
+generated tests, fresh checked-parser support qualification, syntax campaigns
+and elaboration/kernel replay. Syntax campaigns already include parser
+qualification and migration comparison, so the profile does not repeat those
+commands. On Windows it also runs the guest behavioral suite in WSL; on Linux
+the current suite supplies that coverage once. Required toolchain cases cannot
+silently become skips. These are development-tool verdicts; the first-slice
+artifact and external compiler/admission requirements retain their own owners.
+
+`validate --static` runs only `typecheck` and `markdown`. The broader `gate` also
+checks authored Vela examples through the checked parser and therefore needs the
+native runtime, including WSL on Windows. The
+[static CI workflow](../.github/workflows/static.yml) uses the narrower profile
+on Ubuntu and Windows stock runners. It provides automatic Python and Markdown
+regression checks; it supplies no behavioral or native qualification verdict.
+Hosted execution remains user-managed under the
+[shared workflow](../AGENTS.md#git-workflow-and-worktrees).
 
 ## Dependency and version policy
 

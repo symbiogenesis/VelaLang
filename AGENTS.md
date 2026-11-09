@@ -68,3 +68,8 @@ For a settled change:
 2. Run `python tools/run.py gate` to execute the full static gate (`check`, `markdown`, and `typecheck`) and `python tools/run.py test` to run the behavioral test suite.
 3. Merge the validated worktree branch(es) back to local `main` (preserving the individual logical commits) and remove the worktree(s).
 4. Never push to remote `main` or dispatch hosted CI unless the user explicitly directs that action.
+
+`python tools/run.py validate` runs the required gate and behavioral suite
+sequentially. The [validation profiles](tools/README.md#validation-profiles)
+describe the broader local `--full` qualification and the narrower `--static`
+CI checks; `--static` alone does not satisfy the settled-change handoff.
