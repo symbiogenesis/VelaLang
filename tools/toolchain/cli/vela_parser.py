@@ -91,6 +91,10 @@ def main(argv: list[str] | None = None) -> int:
         help="qualify the Q25w Span<byte> carrier and vela-first-slice validator across Rocq and Sail",
     )
     first_slice.add_argument("--ccomp", type=Path, help="optional path to out-of-tree CompCert ccomp executable")
+    bindings = commands.add_parser(
+        "first-slice-bindings", help="check retained first-slice identities without proof replay or admission",
+    )
+    bindings.add_argument("receipt", type=Path)
     elaborate = commands.add_parser(
         "elaborate", help="emit unqualified Gallina for the bounded generic/dependent mathematical fragment",
         description="Elaborate generic dependent mathematics and explicit proofs. Development prototype; "
@@ -131,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
             output = vela_elaboration_check.qualify(root)
         elif args.command == "first-slice":
             output = vela_first_slice.qualify(root, ccomp_path=getattr(args, "ccomp", None))
+        elif args.command == "first-slice-bindings":
+            output = vela_first_slice.verify_bindings(root, args.receipt)
         elif args.command == "support":
             output = vela_parser_checked.qualify(root, archive=args.archive)
         elif args.command == "migration":

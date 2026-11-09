@@ -501,6 +501,24 @@ context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`).
      four perturbed C negative controls (`wrong-expected-byte`,
      `stale-trailing-leak`, `checksum-scrub-omitted`,
      `restores-length-corrupted`).
+- **Retained development receipts:** schema 2 binds the producer Git revision,
+  current local toolchain Python sources, parser sources and generated outputs,
+  dependency locks, instruction-encoding data, locked prover binaries and runtime
+  libraries, Python interpreter, simulator, target profile, optional CompCert
+  executable, retained outputs and process transcripts. Source, tool, profile,
+  parser or runtime changes during qualification withdraw publication; a failed
+  attempt removes the latest passing receipt and retains its failed journal.
+  `python tools/run.py vela-parser first-slice-bindings <receipt.json>` checks
+  these identities against the current checkout and installed inputs, refusing
+  changed, missing or malformed data. Its `status: matched` reports byte binding;
+  `proof_replayed: false` states that it does not rerun the proof commands.
+  Full local proof replay uses `first-slice`. These receipts preserve
+  `accepted` as the source proof's empty solver-trust verdict and explicitly
+  record `source_correspondence: false`, `artifact_accepted: false` and
+  `production_admission: false`. A missing CompCert run stays visible as
+  `compcert_sail.available: false`. No checked canonical-model, compiler,
+  contextual-security or admission receipt is supplied by this binding check;
+  the [producer-receipt cell](../../PLAN.md#q25ar) remains open.
 - **Remaining full-chain boundaries:** this slice connects exact Vela source to
   kernel-checked Gallina obligations, AST-lowered CompCert Clight/C and purecap
   `sail_riscv_sim` execution, and emits an explicit law, assumption and
