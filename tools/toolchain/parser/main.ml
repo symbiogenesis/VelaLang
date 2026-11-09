@@ -64,11 +64,37 @@ let diagnostic source kind offset message =
   Ast.Object [("kind", Ast.String kind); ("line", Ast.Number line);
               ("column", Ast.Number column); ("message", Ast.String message)]
 
+let classify_pure_failure state lexbuf default_offset history =
+  let next_is_equal () =
+    try Lexer.token state lexbuf = Parser.EQUAL
+    with _ -> false
+  in
+  match history with
+  | (curr_pos, Parser.CONST) :: (_, Parser.CONST) :: (_, Parser.PUBLIC) :: _ ->
+      ("syntax", curr_pos, "repeated const declaration modifier")
+  | (curr_pos, Parser.CONST) :: (_, Parser.CONST) :: _ ->
+      ("syntax", curr_pos, "repeated const parameter qualifier")
+  | (_, Parser.IDENT _) :: (type_pos, Parser.IDENT type_name) :: _ ->
+      ("unsupported", type_pos, "type '" ^ type_name ^ "' is outside Nat and bool")
+  | (type_pos, Parser.IDENT type_name) :: (_, (Parser.PUBLIC | Parser.LPAREN | Parser.COMMA)) :: _ ->
+      ("unsupported", type_pos, "type '" ^ type_name ^ "' is outside Nat and bool")
+  | (type_pos, Parser.IDENT type_name) :: (_, Parser.CONST) :: _ ->
+      if next_is_equal () then
+        ("syntax", type_pos, "const requires an explicit type before its name")
+      else
+        ("unsupported", type_pos, "type '" ^ type_name ^ "' is outside Nat and bool")
+  | _ ->
+      ("syntax", default_offset, "unexpected token or incomplete input")
+
 let () =
   set_binary_mode_in stdin true;
   set_binary_mode_out stdout true;
   let source = ref "" in
   let current = ref 0 in
+  let history = ref [] in
+  let surface_ref = ref false in
+  let state_ref = ref None in
+  let lexbuf_ref = ref None in
   let publish_failure kind offset message =
     print_endline (Ast.encode (diagnostic !source kind offset message));
     exit 1
@@ -79,13 +105,18 @@ let () =
       | [_; "--surface"] -> true
       | _ -> raise (Ast.Refusal ("syntax", 0, "expected no arguments or --surface"))
     in
+    surface_ref := surface;
     source := read_source ();
     validate_utf8 !source;
     let lexbuf = Lexing.from_string !source in
     let state = Lexer.create ~surface () in
+    state_ref := Some state;
+    lexbuf_ref := Some lexbuf;
     let next lexbuf =
       let token = Lexer.token state lexbuf in
-      current := Lexing.lexeme_start lexbuf;
+      let start_pos = Lexing.lexeme_start lexbuf in
+      current := start_pos;
+      if not surface then history := (start_pos, token) :: !history;
       token
     in
     let syntax = (if surface then Parser.surface_file else Parser.file) next lexbuf in
@@ -93,6 +124,12 @@ let () =
                                           ("ast", syntax.syntax)]))
   with
   | Ast.Refusal (kind, offset, message) -> publish_failure kind offset message
-  | Parser.Error -> publish_failure "syntax" !current "unexpected token or incomplete input"
+  | Parser.Error ->
+      (match !surface_ref, !state_ref, !lexbuf_ref with
+       | false, Some state, Some lexbuf ->
+           let kind, offset, message = classify_pure_failure state lexbuf !current !history in
+           publish_failure kind offset message
+       | _ ->
+           publish_failure "syntax" !current "unexpected token or incomplete input")
   | Stack_overflow -> publish_failure "limit" !current "native parser stack limit exceeded"
   | Sys_error message -> publish_failure "io" !current message

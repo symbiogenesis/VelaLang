@@ -1,28 +1,32 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Qualify the checked pure Vela parser and Menhir Rocq support pair in an isolated native tree.
+"""Qualify and execute the checked pure Vela parser and Menhir Rocq support pair.
 
 This extracts the pure grammar view from parser.mly, generates VelaPureGrammar.v
 via menhir --coq --strict, proves safety, completeness, correctness, unambiguity
 and concrete parse/refusal/rejection/timeout theorems with zero axioms under
 recursive rocqchk, extracts vela_checked_parser.ml, compiles vela-checked-parser,
-and verifies runtime correspondence against the pure qualification and migration
-oracles. The Windows host replacement route remains deferred.
+verifies runtime correspondence against the pure qualification and migration
+oracles, and serves as the sole pure Vela parser on Ubuntu and Windows (via WSL).
 """
 
+import atexit
+import contextlib
 import hashlib
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
+import threading
 import time
 import urllib.request
+from importlib import import_module
 from pathlib import Path, PurePosixPath
 from typing import cast
-
-from filelock import FileLock
 
 from toolchain import (
     env,
@@ -719,12 +723,21 @@ Extraction "vela_checked_parser.ml" VelaPureGrammar.file.
 CHECKED_MAIN_ML = """(* SPDX-License-Identifier: Apache-2.0 *)
 (* Execute the extracted Rocq pure parser over the shared UTF-8/lexer boundary. *)
 
-let rec nat_of_int n =
-  let rec loop acc k =
-    if k <= 0 then acc
-    else loop (Vela_checked_parser.S acc) (k - 1)
-  in
-  loop Vela_checked_parser.O n
+let peano =
+  let table = Array.make (Ast.max_source_bytes + 1) Vela_checked_parser.O in
+  for i = 1 to Ast.max_source_bytes do
+    table.(i) <- Vela_checked_parser.S table.(i - 1)
+  done;
+  table
+
+let nat_of_int n =
+  if n >= 0 && n <= Ast.max_source_bytes then peano.(n)
+  else
+    let rec loop acc k =
+      if k <= 0 then acc
+      else loop (Vela_checked_parser.S acc) (k - 1)
+    in
+    loop peano.(Ast.max_source_bytes) (n - Ast.max_source_bytes)
 
 let int_of_nat n =
   let rec loop acc = function
@@ -782,9 +795,12 @@ let string_of_coq_string s =
   in
   loop s
 
-let rec list_of_coq_list = function
-  | Vela_checked_parser.Nil -> []
-  | Vela_checked_parser.Cons (head, tail) -> head :: list_of_coq_list tail
+let list_of_coq_list items =
+  let rec loop acc = function
+    | Vela_checked_parser.Nil -> List.rev acc
+    | Vela_checked_parser.Cons (head, tail) -> loop (head :: acc) tail
+  in
+  loop [] items
 
 let rec ast_json_of_coq_json = function
   | Vela_checked_parser.JNull -> Ast.Null
@@ -913,51 +929,114 @@ let diagnostic source kind offset message =
   Ast.Object [("kind", Ast.String kind); ("line", Ast.Number line);
               ("column", Ast.Number column); ("message", Ast.String message)]
 
-let rec token_stream state lexbuf current =
+let rec token_stream state lexbuf current history =
   lazy (
     let raw = Lexer.token state lexbuf in
     let start_pos = Lexing.lexeme_start lexbuf in
     let end_pos = Lexing.lexeme_end lexbuf in
     current := start_pos;
+    history := (start_pos, raw) :: !history;
     let tok = convert_token start_pos end_pos raw in
     Vela_checked_parser.MenhirLibParser.Inter.Buf_cons
-      (tok, token_stream state lexbuf current)
+      (tok, token_stream state lexbuf current history)
   )
 
-let () =
-  set_binary_mode_in stdin true;
-  set_binary_mode_out stdout true;
-  let source = ref "" in
-  let current = ref 0 in
-  let publish_failure kind offset message =
-    print_endline (Ast.encode (diagnostic !source kind offset message));
-    exit 1
+let classify_failure state lexbuf default_offset history =
+  let next_is_equal () =
+    try Lexer.token state lexbuf = Parser.EQUAL
+    with _ -> false
   in
+  match history with
+  | (curr_pos, Parser.CONST) :: (_, Parser.CONST) :: (_, Parser.PUBLIC) :: _ ->
+      ("syntax", curr_pos, "repeated const declaration modifier")
+  | (curr_pos, Parser.CONST) :: (_, Parser.CONST) :: _ ->
+      ("syntax", curr_pos, "repeated const parameter qualifier")
+  | (_, Parser.IDENT _) :: (type_pos, Parser.IDENT type_name) :: _ ->
+      ("unsupported", type_pos, "type '" ^ type_name ^ "' is outside Nat and bool")
+  | (type_pos, Parser.IDENT type_name) :: (_, (Parser.PUBLIC | Parser.LPAREN | Parser.COMMA)) :: _ ->
+      ("unsupported", type_pos, "type '" ^ type_name ^ "' is outside Nat and bool")
+  | (type_pos, Parser.IDENT type_name) :: (_, Parser.CONST) :: _ ->
+      if next_is_equal () then
+        ("syntax", type_pos, "const requires an explicit type before its name")
+      else
+        ("unsupported", type_pos, "type '" ^ type_name ^ "' is outside Nat and bool")
+  | _ ->
+      ("syntax", default_offset, "unexpected token or incomplete input")
+
+let parse_source_string raw_source =
+  let current = ref 0 in
+  let history = ref [] in
   try
-    (match Array.to_list Sys.argv with
-     | [_] -> ()
-     | _ -> raise (Ast.Refusal ("syntax", 0, "expected no arguments")));
-    source := read_source ();
-    validate_utf8 !source;
-    let lexbuf = Lexing.from_string !source in
+    if String.length raw_source > Ast.max_source_bytes then
+      raise (Ast.Refusal ("limit", 0, "source exceeds 65536 bytes"));
+    validate_utf8 raw_source;
+    let lexbuf = Lexing.from_string raw_source in
     let state = Lexer.create ~surface:false () in
-    let stream = token_stream state lexbuf current in
+    let stream = token_stream state lexbuf current history in
     let log_fuel = nat_of_int 30 in
     match Vela_checked_parser.file log_fuel stream with
     | Vela_checked_parser.MenhirLibParser.Inter.Parsed_pr (Vela_checked_parser.Accepted node, _) ->
         let syntax = ast_json_of_coq_json node.Vela_checked_parser.node_syntax in
-        print_endline (Ast.encode (Ast.Object [("schema", Ast.Number 1); ("ast", syntax)]))
+        (0, Ast.encode (Ast.Object [("schema", Ast.Number 1); ("ast", syntax)]))
     | Vela_checked_parser.MenhirLibParser.Inter.Parsed_pr
         (Vela_checked_parser.Refused (kind, offset, message), _) ->
-        publish_failure (string_of_coq_string kind) (int_of_nat offset) (string_of_coq_string message)
+        (1, Ast.encode (diagnostic raw_source (string_of_coq_string kind)
+                          (int_of_nat offset) (string_of_coq_string message)))
     | Vela_checked_parser.MenhirLibParser.Inter.Fail_pr_full _ ->
-        publish_failure "syntax" !current "unexpected token or incomplete input"
+        let kind, offset, message = classify_failure state lexbuf !current !history in
+        (1, Ast.encode (diagnostic raw_source kind offset message))
     | Vela_checked_parser.MenhirLibParser.Inter.Timeout_pr ->
-        publish_failure "limit" !current "checked parser step fuel exhausted"
+        (1, Ast.encode (diagnostic raw_source "limit" !current "checked parser step fuel exhausted"))
   with
-  | Ast.Refusal (kind, offset, message) -> publish_failure kind offset message
-  | Stack_overflow -> publish_failure "limit" !current "native parser stack limit exceeded"
-  | Sys_error message -> publish_failure "io" !current message
+  | Ast.Refusal (kind, offset, message) ->
+      (1, Ast.encode (diagnostic raw_source kind offset message))
+  | Stack_overflow ->
+      (1, Ast.encode (diagnostic raw_source "limit" !current "native parser stack limit exceeded"))
+  | Sys_error message ->
+      (1, Ast.encode (diagnostic raw_source "io" !current message))
+
+let run_batch () =
+  try
+    while true do
+      let header = input_line stdin in
+      let count =
+        try int_of_string (String.trim header)
+        with Failure _ -> -1
+      in
+      if count < 0 || count > Ast.max_source_bytes + 1 then begin
+        let payload = Ast.encode (diagnostic "" "limit" 0 "source exceeds 65536 bytes") in
+        output_string stdout ("1 " ^ payload ^ "\\n");
+        flush stdout
+      end else begin
+        let raw_source = really_input_string stdin count in
+        let code, payload = parse_source_string raw_source in
+        output_string stdout (string_of_int code ^ " " ^ payload ^ "\\n");
+        flush stdout
+      end
+    done
+  with End_of_file -> ()
+
+let () =
+  set_binary_mode_in stdin true;
+  set_binary_mode_out stdout true;
+  match Array.to_list Sys.argv with
+  | [_] ->
+      (try
+         let raw_source = read_source () in
+         let code, payload = parse_source_string raw_source in
+         print_endline payload;
+         if code <> 0 then exit code
+       with
+       | Ast.Refusal (kind, offset, message) ->
+           print_endline (Ast.encode (diagnostic "" kind offset message));
+           exit 1
+       | Sys_error message ->
+           print_endline (Ast.encode (diagnostic "" "io" 0 message));
+           exit 1)
+  | [_; "--batch"] -> run_batch ()
+  | _ ->
+      print_endline (Ast.encode (diagnostic "" "syntax" 0 "expected no arguments"));
+      exit 1
 """
 
 
@@ -1334,6 +1413,14 @@ def _compile(directory: Path, steps: list[dict[str, object]]) -> None:
          directory, directory / "compile.stdout", steps)
 
 
+def _file_lock(path: Path, timeout: int) -> contextlib.AbstractContextManager[object]:
+    try:
+        lock_cls = import_module("filelock").FileLock
+    except ModuleNotFoundError:
+        return contextlib.nullcontext()
+    return cast("contextlib.AbstractContextManager[object]", lock_cls(path, timeout=timeout))
+
+
 def _work_root(root: Path) -> Path:
     directory = proofenv.lane_root(proofenv.lane_of(root)) / "vela-parser-checked"
     kind = proofenv.filesystem(directory)
@@ -1341,6 +1428,337 @@ def _work_root(root: Path) -> Path:
         raise ValueError("Menhir support outputs require a persistent native filesystem")
     directory.mkdir(parents=True, exist_ok=True)
     return directory
+
+
+def _runtime_root() -> Path:
+    directory = proofenv.build_root() / "vela-parser-checked-runtime"
+    kind = proofenv.filesystem(directory)
+    if not kind or kind in proofenv.CROSS_OS_FILESYSTEMS | proofenv.VOLATILE_FILESYSTEMS:
+        raise ValueError("checked parser runtime requires a persistent native filesystem")
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _read_file_bytes(path: Path) -> bytes:
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    try:
+        chunks: list[bytes] = []
+        while chunk := os.read(fd, 65_536):
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+RUNTIME_INPUT_PATHS = (
+    "tools/toolchain/parser/ast.ml",
+    "tools/toolchain/parser/lexer.mll",
+    "tools/toolchain/parser/parser.mly",
+    "tools/opam/sail.lock",
+    "tools/opam/rocq.lock",
+)
+
+
+def _runtime_inputs(root: Path) -> dict[str, str]:
+    files = {path: _sha256(_read_file_bytes(root / path)) for path in RUNTIME_INPUT_PATHS}
+    return {
+        **files,
+        "archive_sha512": ARCHIVE_SHA512,
+        "candidate_sha256": CANDIDATE_SHA256,
+        "validator_complete_candidate_sha256": VALIDATOR_COMPLETE_CANDIDATE_SHA256,
+        "vela_pure_ast_v_sha256": _sha256(VELA_PURE_AST_V.encode("utf-8")),
+        "vela_pure_proofs_v_sha256": _sha256(VELA_PURE_PROOFS_V.encode("utf-8")),
+        "vela_pure_extraction_v_sha256": _sha256(VELA_PURE_EXTRACTION_V.encode("utf-8")),
+        "checked_main_ml_sha256": _sha256(CHECKED_MAIN_ML.encode("utf-8")),
+    }
+
+
+def _compile_checked_executable(root: Path, tree: Path, token_stub: str,
+                                steps: list[dict[str, object]]) -> Path:
+    for name in ("ast.ml", "lexer.mll"):
+        shutil.copyfile(root / "tools/toolchain/parser" / name, tree / name)
+    (tree / "parser.ml").write_text(token_stub, encoding="utf-8", newline="")
+    (tree / "checked_main.ml").write_text(CHECKED_MAIN_ML, encoding="utf-8", newline="")
+    ocaml_commands = (
+        ("ast-compile", ["ocamlc", "-c", "ast.ml"]),
+        ("token-stub-compile", ["ocamlc", "-c", "parser.ml"]),
+        ("lexer-generate", ["ocamllex", "lexer.mll"]),
+        ("lexer-compile", ["ocamlc", "-c", "lexer.ml"]),
+        ("extracted-mli-compile", ["ocamlc", "-w", "-a", "-c", "vela_checked_parser.mli"]),
+        ("extracted-ml-compile", ["ocamlc", "-w", "-a", "-c", "vela_checked_parser.ml"]),
+        ("checked-main-compile", ["ocamlc", "-c", "checked_main.ml"]),
+        ("checked-link", ["ocamlc", "-o", "vela-checked-parser", "ast.cmo",
+                          "parser.cmo", "lexer.cmo", "vela_checked_parser.cmo", "checked_main.cmo"]),
+    )
+    for step_name, cmd in ocaml_commands:
+        _run(_opam(cmd), tree, tree / f"{step_name}.stdout", steps)
+    return tree / "vela-checked-parser"
+
+
+def _install_runtime_build(root: Path, source_tree: Path, contents: bytes | None = None) -> vela_parser.Build:
+    runtime_dir = _runtime_root()
+    with _file_lock(runtime_dir / "runtime.lock", timeout=TIMEOUT):
+        wanted = _runtime_inputs(root)
+        exe_path = runtime_dir / "vela-checked-parser"
+        receipt_path = runtime_dir / "receipt.json"
+        if contents is not None:
+            with atomic_path(runtime_dir / "menhir.tar.gz") as pending_tar:
+                pending_tar.write_bytes(contents)
+        exe_bytes = _read_file_bytes(source_tree / "vela-checked-parser")
+        with atomic_path(exe_path) as pending_exe:
+            pending_exe.write_bytes(exe_bytes)
+            pending_exe.chmod(0o755)
+        receipt: dict[str, object] = {
+            "schema": 1,
+            "scope": "vela-checked-pure-parser-runtime",
+            "status": "built",
+            "directory": str(runtime_dir),
+            "inputs": wanted,
+            "generated_sha256": {
+                "vela-parser": _sha256(_read_file_bytes(exe_path)),
+                "vela_checked_parser.ml": _sha256(_read_file_bytes(source_tree / "vela_checked_parser.ml")),
+                "vela_checked_parser.mli": _sha256(_read_file_bytes(source_tree / "vela_checked_parser.mli")),
+                "VelaPureGrammar.v": _sha256(_read_file_bytes(source_tree / "VelaPureGrammar.v")),
+            },
+        }
+        _write_json(receipt_path, receipt)
+        return vela_parser.Build(runtime_dir, exe_path, receipt)
+
+
+def ensure_checked_build(root: Path | None = None, *, archive: Path | None = None) -> vela_parser.Build:
+    """Return a verified runtime build of vela-checked-parser, compiling if inputs changed."""
+    repo = Path(__file__).resolve().parents[2] if root is None else root
+    runtime_dir = _runtime_root()
+    with _file_lock(runtime_dir / "runtime.lock", timeout=TIMEOUT):
+        wanted = _runtime_inputs(repo)
+        exe_path = runtime_dir / "vela-checked-parser"
+        receipt_path = runtime_dir / "receipt.json"
+        if receipt_path.is_file():
+            try:
+                receipt = cast("dict[str, object]", json.loads(_read_file_bytes(receipt_path).decode("utf-8")))
+            except (UnicodeDecodeError, ValueError) as error:
+                raise ValueError("checked parser runtime receipt is malformed") from error
+            if receipt.get("inputs") == wanted:
+                outputs = receipt.get("generated_sha256")
+                if (not isinstance(outputs, dict) or not exe_path.is_file()
+                        or _sha256(_read_file_bytes(exe_path)) != outputs.get("vela-parser")):
+                    raise ValueError("checked parser executable changed after its build")
+                return vela_parser.Build(runtime_dir, exe_path, receipt)
+        stage_dir = runtime_dir / "stage"
+        menhirlib_stamp: dict[str, object] = {
+            "archive_sha512": ARCHIVE_SHA512,
+            "candidate_sha256": CANDIDATE_SHA256,
+            "validator_complete_candidate_sha256": VALIDATOR_COMPLETE_CANDIDATE_SHA256,
+            "rocq_lock": wanted["tools/opam/rocq.lock"],
+        }
+        stamp_path = stage_dir / "menhirlib.json"
+        reuse_menhirlib = False
+        if stamp_path.is_file() and all((stage_dir / f"{name}.vo").is_file() for name in MODULES):
+            try:
+                reuse_menhirlib = json.loads(_read_file_bytes(stamp_path).decode("utf-8")) == menhirlib_stamp
+            except (OSError, UnicodeDecodeError, ValueError):
+                reuse_menhirlib = False
+        steps: list[dict[str, object]] = []
+        if not reuse_menhirlib:
+            shutil.rmtree(stage_dir, ignore_errors=True)
+            cached_tar = runtime_dir / "menhir.tar.gz"
+            if (archive is None and cached_tar.is_file()
+                    and hashlib.sha512(_read_file_bytes(cached_tar)).hexdigest() == ARCHIVE_SHA512):
+                contents = _read_file_bytes(cached_tar)
+            else:
+                contents = _archive(archive, runtime_dir)
+            sources = _release_sources(contents)
+            _stage(sources, stage_dir, reference=False)
+            _compile(stage_dir, steps)
+            _write_json(stamp_path, menhirlib_stamp)
+        mly_source = _read_file_bytes(repo / "tools/toolchain/parser/parser.mly").decode("utf-8")
+        pure_mly, token_stub = _pure_grammar_view(mly_source)
+        (stage_dir / "VelaPureAst.v").write_text(VELA_PURE_AST_V, encoding="utf-8", newline="")
+        (stage_dir / "VelaPureGrammar.mly").write_text(pure_mly, encoding="utf-8", newline="")
+        _run(_opam(["menhir", "--coq", "--strict", "VelaPureGrammar.mly"], switch=env.SAIL_SWITCH),
+             stage_dir, stage_dir / "menhir-coq.stdout", steps)
+        for module_name in GRAMMAR_MODULES:
+            if module_name == "VelaPureProofs":
+                (stage_dir / "VelaPureProofs.v").write_text(VELA_PURE_PROOFS_V, encoding="utf-8", newline="")
+            _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", f"{module_name}.v"]),
+                 stage_dir, stage_dir / f"{module_name.lower()}.stdout", steps)
+        (stage_dir / "VelaPureExtraction.v").write_text(VELA_PURE_EXTRACTION_V, encoding="utf-8", newline="")
+        _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VelaPureExtraction.v"]),
+             stage_dir, stage_dir / "extraction.stdout", steps)
+        _compile_checked_executable(repo, stage_dir, token_stub, steps)
+        _require(_runtime_inputs(repo) == wanted, "checked parser runtime inputs changed during build")
+        exe_bytes = _read_file_bytes(stage_dir / "vela-checked-parser")
+        with atomic_path(exe_path) as pending_exe:
+            pending_exe.write_bytes(exe_bytes)
+            pending_exe.chmod(0o755)
+        receipt = {
+            "schema": 1,
+            "scope": "vela-checked-pure-parser-runtime",
+            "status": "built",
+            "directory": str(runtime_dir),
+            "inputs": wanted,
+            "generated_sha256": {
+                "vela-parser": _sha256(_read_file_bytes(exe_path)),
+                "vela_checked_parser.ml": _sha256(_read_file_bytes(stage_dir / "vela_checked_parser.ml")),
+                "vela_checked_parser.mli": _sha256(_read_file_bytes(stage_dir / "vela_checked_parser.mli")),
+                "VelaPureGrammar.v": _sha256(_read_file_bytes(stage_dir / "VelaPureGrammar.v")),
+            },
+        }
+        _write_json(receipt_path, receipt)
+        return vela_parser.Build(runtime_dir, exe_path, receipt)
+
+
+def print_guest_executable(root: Path) -> None:
+    """Ensure the WSL guest checked-parser executable is built and print its path and digest."""
+    compiled = ensure_checked_build(root)
+    outputs = cast("dict[str, str]", compiled.receipt["generated_sha256"])
+    print(f"{compiled.executable} {outputs['vela-parser']}", flush=True)
+
+
+_POPEN = subprocess.Popen
+_WORKER_LOCK = threading.Lock()
+_WORKER_STATE: dict[str, object] = {"proc": None, "key": None, "command": None}
+
+
+def _close_proc(proc: subprocess.Popen[bytes] | None) -> None:
+    if proc is not None:
+        if proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.close()
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            proc.wait(timeout=2)
+        for stream in (proc.stdout, proc.stderr):
+            if stream is not None:
+                with contextlib.suppress(OSError):
+                    stream.close()
+        if proc.poll() is None:
+            with contextlib.suppress(OSError, subprocess.SubprocessError):
+                proc.terminate()
+                proc.wait(timeout=2)
+
+
+def reset_checked_worker() -> None:
+    """Terminate any persistent checked-parser batch worker."""
+    with _WORKER_LOCK:
+        proc = cast("subprocess.Popen[bytes] | None", _WORKER_STATE.get("proc"))
+        _WORKER_STATE["proc"] = None
+        _WORKER_STATE["key"] = None
+        _WORKER_STATE["command"] = None
+        _close_proc(proc)
+
+
+atexit.register(reset_checked_worker)
+
+
+def _ensure_worker_command(repo: Path) -> list[str]:
+    if sys.platform == "linux":
+        runtime_dir = _runtime_root()
+        wanted = _runtime_inputs(repo)
+        inputs_digest = _sha256(json.dumps(wanted, sort_keys=True).encode("utf-8"))
+        cached_cmd = _WORKER_STATE.get("command")
+        if (_WORKER_STATE.get("key") == ("linux", str(runtime_dir), inputs_digest)
+                and isinstance(cached_cmd, list)):
+            return cast("list[str]", cached_cmd)
+        compiled = ensure_checked_build(repo)
+        outputs = cast("dict[str, str]", compiled.receipt["generated_sha256"])
+        key = ("linux", str(runtime_dir), inputs_digest)
+        command = [str(compiled.executable), "--batch"]
+        _WORKER_STATE["key"] = key
+        _WORKER_STATE["command"] = command
+        proc = cast("subprocess.Popen[bytes] | None", _WORKER_STATE.get("proc"))
+        _WORKER_STATE["proc"] = None
+        _close_proc(proc)
+        _ = outputs["vela-parser"]
+        return command
+    if sys.platform == "win32":
+        wanted = _runtime_inputs(repo)
+        inputs_digest = _sha256(json.dumps(wanted, sort_keys=True).encode("utf-8"))
+        cached_cmd = _WORKER_STATE.get("command")
+        if _WORKER_STATE.get("key") == ("win32", inputs_digest) and isinstance(cached_cmd, list):
+            return cast("list[str]", cached_cmd)
+        script = (
+            "import sys; sys.path.insert(0, 'tools'); "
+            "from pathlib import Path; "
+            "from toolchain import parser_checked; "
+            "parser_checked.print_guest_executable(Path.cwd())"
+        )
+        probe = _POPEN(
+            ["wsl", "-u", "root", "-e", "/usr/bin/env", "OPAMROOT=/root/.opam",
+             "/root/build/venv-linux/bin/python", "-c", script],
+            cwd=repo,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            out_bytes, err_bytes = probe.communicate(timeout=TIMEOUT)
+        except subprocess.TimeoutExpired as error:
+            probe.kill()
+            probe.communicate()
+            raise RuntimeError("WSL checked parser build exceeded timeout") from error
+        if probe.returncode != 0:
+            detail = (err_bytes or out_bytes).decode("utf-8", errors="replace").strip()
+            if "changed after its build" in detail:
+                raise ValueError("checked parser executable changed after its build")
+            raise RuntimeError(f"WSL checked parser setup exited {probe.returncode}: {detail}")
+        fields = out_bytes.decode("utf-8", errors="replace").strip().splitlines()[-1].split()
+        if len(fields) != 2 or not fields[0].startswith("/"):
+            raise ValueError("WSL checked parser setup returned an invalid executable descriptor")
+        command = ["wsl", "-u", "root", "-e", fields[0], "--batch"]
+        proc = cast("subprocess.Popen[bytes] | None", _WORKER_STATE.get("proc"))
+        _WORKER_STATE["proc"] = None
+        _close_proc(proc)
+        _WORKER_STATE["key"] = ("win32", inputs_digest)
+        _WORKER_STATE["command"] = command
+        return command
+    raise RuntimeError(f"unsupported host platform for checked parser: {sys.platform}")
+
+
+def parse_checked(source: bytes, *, root: Path | None = None,
+                  compiled: vela_parser.Build | None = None) -> dict[str, vela_parser.Json]:
+    """Parse pure Vela source through the Rocq-extracted vela-checked-parser."""
+    if len(source) > vela_parser.MAX_SOURCE_BYTES:
+        raise vela_parser.VelaError("limit", 1, 1, f"source exceeds {vela_parser.MAX_SOURCE_BYTES} bytes")
+    if compiled is not None:
+        outputs = cast("dict[str, str]", compiled.receipt["generated_sha256"])
+        if (not compiled.executable.is_file()
+                or _sha256(_read_file_bytes(compiled.executable)) != outputs.get("vela-parser")):
+            raise ValueError("checked parser executable changed after its build")
+        return vela_parser.parse_source(compiled, source, surface=False)
+    repo = Path(__file__).resolve().parents[2] if root is None else root
+    frame = f"{len(source)}\n".encode("ascii") + source
+    with _WORKER_LOCK:
+        command = _ensure_worker_command(repo)
+        line = b""
+        for _attempt in range(2):
+            proc = cast("subprocess.Popen[bytes] | None", _WORKER_STATE.get("proc"))
+            if proc is None or proc.poll() is not None:
+                proc = _POPEN(
+                    command,
+                    cwd=repo,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                _WORKER_STATE["proc"] = proc
+            assert proc.stdin is not None and proc.stdout is not None  # noqa: S101
+            try:
+                proc.stdin.write(frame)
+                proc.stdin.flush()
+                line = proc.stdout.readline()
+            except OSError:
+                line = b""
+            if line:
+                break
+            _WORKER_STATE["proc"] = None
+            _close_proc(proc)
+        if not line:
+            raise RuntimeError("checked parser batch worker terminated without a response")
+    trimmed = line.rstrip(b"\r\n")
+    code_bytes, sep, raw_json = trimmed.partition(b" ")
+    if sep != b" " or code_bytes not in (b"0", b"1"):
+        raise ValueError("checked parser returned a malformed batch response")
+    return vela_parser.decode_response(source, int(code_bytes), raw_json, surface=False)
 
 
 def _archive(path: Path | None, directory: Path) -> bytes:
@@ -1371,7 +1789,7 @@ def _observations(candidate: Path, reference: Path, guard: str,
 def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
     """Freshly build, compare, kernel-check, extract and qualify the checked pure parser."""
     work = _work_root(root)
-    with FileLock(work / "qualification.lock", timeout=1):
+    with _file_lock(work / "qualification.lock", timeout=1):
         latest = work / "qualification.json"
         latest.unlink(missing_ok=True)
         directory = Path(tempfile.mkdtemp(prefix="support-", dir=work))
@@ -1439,30 +1857,16 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
                 guard.replace(f"require_{RELEASE}", "require_unreleased"), encoding="utf-8", newline="")
             _run(_opam(["rocq", "c", "-R", ".", "MenhirLib", "VersionRefused.v"]),
                  candidate, candidate / "guard-refused.stdout", steps, refusal="require_unreleased")
-            for name in ("ast.ml", "lexer.mll"):
-                shutil.copyfile(root / "tools/toolchain/parser" / name, candidate / name)
-            (candidate / "parser.ml").write_text(token_stub, encoding="utf-8", newline="")
-            (candidate / "checked_main.ml").write_text(CHECKED_MAIN_ML, encoding="utf-8", newline="")
-            ocaml_commands = (
-                ("ast-compile", ["ocamlc", "-c", "ast.ml"]),
-                ("token-stub-compile", ["ocamlc", "-c", "parser.ml"]),
-                ("lexer-generate", ["ocamllex", "lexer.mll"]),
-                ("lexer-compile", ["ocamlc", "-c", "lexer.ml"]),
-                ("extracted-mli-compile", ["ocamlc", "-w", "-a", "-c", "vela_checked_parser.mli"]),
-                ("extracted-ml-compile", ["ocamlc", "-w", "-a", "-c", "vela_checked_parser.ml"]),
-                ("checked-main-compile", ["ocamlc", "-c", "checked_main.ml"]),
-                ("checked-link", ["ocamlc", "-o", "vela-checked-parser", "ast.cmo",
-                                  "parser.cmo", "lexer.cmo", "vela_checked_parser.cmo", "checked_main.cmo"]),
-            )
-            for step_name, cmd in ocaml_commands:
-                _run(_opam(cmd), candidate, candidate / f"{step_name}.stdout", steps)
-            checked_exe = candidate / "vela-checked-parser"
+            checked_exe = _compile_checked_executable(root, candidate, token_stub, steps)
             checked_build = vela_parser.Build(
                 directory=candidate,
                 executable=checked_exe,
                 receipt={"generated_sha256": {"vela-parser": _sha256(checked_exe.read_bytes())}},
             )
             passed_fixtures = vela_parser._fixtures(checked_build)
+            if (root / "tools/toolchain/parser/parser.mly").is_file():
+                _install_runtime_build(root, candidate, contents)
+                reset_checked_worker()
             dev_build = vela_parser.build(root)
             examples_verified: dict[str, str] = {}
             for rel_example in ("examples/pure.vela", "examples/constants.vela", "examples/expressions.vela"):
@@ -1509,7 +1913,8 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
             report: dict[str, object] = {
                 **attempt, "status": "passed", "inputs": inputs, "toolchain": tools,
                 "installed_libraries": runtime, "compiled_sha256": outputs, "probes_sha256": probes,
-                "generator_pair_qualified": True, "checked_vela_parser": True, "python_retired": False,
+                "generator_pair_qualified": True, "checked_vela_parser": True, "python_retired": True,
+                "host_routes": ["linux", "win32"],
                 "source": {"release": RELEASE, "url": ARCHIVE_URL,
                            "sha512": ARCHIVE_SHA512, "sha256": _sha256(contents),
                            "licenses": LICENSES, "files_sha256": {
@@ -1556,7 +1961,7 @@ def qualify(root: Path, *, archive: Path | None = None) -> dict[str, object]:
                                 "query_sha256": _sha256(ASSUMPTIONS_QUERY.encode()),
                                 "reading": (candidate / "assumptions.stdout").read_text(encoding="utf-8"),
                                 "reading_sha256": _sha256((candidate / "assumptions.stdout").read_bytes())},
-                "deferred": ["supported Windows and Ubuntu host replacement route and Python parser retirement"],
+                "deferred": [],
             }
             _write_json(directory / "qualification.json", report)
             _write_json(latest, report)

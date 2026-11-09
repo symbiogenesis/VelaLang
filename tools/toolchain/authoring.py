@@ -213,13 +213,12 @@ def _render(parts: list[_Part]) -> bytes:
 def format_source(source: bytes) -> bytes:
     """Return checked canonical bytes without mutating source or filesystem state."""
     vela.translate(source)
-    tokens = vela._tokens(source)
-    original = vela._Parser(tokens).parse()
+    original = vela.parse_module(source)
     parts = _parts(source)
     result = _render(parts)
     # Checking the candidate also enforces its expanded byte and syntax bounds.
     vela.translate(result)
-    candidate = vela._Parser(vela._tokens(result)).parse()
+    candidate = vela.parse_module(result)
     rendered = _parts(result)
     if _fingerprint(parts) != _fingerprint(rendered) or _shape(original) != _shape(candidate):
         raise syntax.VelaError("format", 1, 1, "formatting changed tokens, comments or syntax")
@@ -237,7 +236,7 @@ def _unwrapped(value: syntax.Expression) -> syntax.Expression:
 def lint_source(source: bytes) -> tuple[Finding, ...]:
     """Report optional findings only after complete compiler acceptance."""
     facts = vela.inspect_source(source)
-    module = vela._Parser(vela._tokens(source)).parse()
+    module = vela.parse_module(source)
     findings: list[Finding] = []
 
     def report(code: str, message: str, site: syntax.Site) -> None:

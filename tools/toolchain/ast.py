@@ -177,6 +177,7 @@ class Function:
     body: Block
     is_const: bool = False
     const_parameters: frozenset[str] = frozenset()
+    site: Site = Site(1, 1)
 
 
 @dataclass(frozen=True)
@@ -659,7 +660,7 @@ class _Decoder:
             converted.append(Function(self._text(function["name"], function_span),
                                       self._type(function["result"], function_span, 3),
                                       tuple(converted_parameters), self._body(function["body"], function_span, 3),
-                                      is_const, frozenset(const_parameters)))
+                                      is_const, frozenset(const_parameters), self._site(function_span[0])))
         return Module(self._text(node["name"], span), tuple(converted))
 
 

@@ -5,6 +5,7 @@ The parser is a native-lane build product. Its JSON syntax tree is no type,
 elaboration, checked-parser or source-correspondence verdict.
 """
 
+import contextlib
 import hashlib
 import json
 import re
@@ -12,20 +13,17 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import cast
 
-from filelock import FileLock
-
 from toolchain import (
-    MAX_SOURCE_BYTES,
-    VelaError,
     env,
 )
 from toolchain import (
     surface as vela_surface,
 )
-from toolchain.ast import MAX_SYNTAX_DEPTH
+from toolchain.ast import MAX_SOURCE_BYTES, MAX_SYNTAX_DEPTH, VelaError
 from toolchain.atomic import atomic_path
 from toolchain.jsonutil import finite_float, unique_object
 
@@ -148,10 +146,15 @@ def _work_root(root: Path) -> Path:
     return directory
 
 
+def _file_lock(path: Path, timeout: int) -> contextlib.AbstractContextManager[object]:
+    lock_cls = import_module("filelock").FileLock
+    return cast("contextlib.AbstractContextManager[object]", lock_cls(path, timeout=timeout))
+
+
 def build(root: Path) -> Build:
     """Make a fresh build; unsuccessful builds never acquire a passing receipt."""
     directory = _work_root(root)
-    with FileLock(directory / "build.lock", timeout=1):
+    with _file_lock(directory / "build.lock", timeout=1):
         tools = _toolchain(root)
         output = Path(tempfile.mkdtemp(prefix="build-", dir=directory))
         return _compile(root, output, tools)
@@ -249,6 +252,35 @@ def _validate_tree(value: Json, source: bytes) -> None:
                 raise ValueError("native parser returned a non-Unicode syntax string") from error
 
 
+def decode_response(source: bytes, returncode: int, stdout: bytes, stderr: bytes = b"", *,
+                    surface: bool = False) -> dict[str, Json]:
+    """Validate one native parser process response against the input source."""
+    if len(stdout) > MAX_RESPONSE_BYTES or stderr:
+        raise ValueError("native parser returned excessive output or unexpected standard error")
+    response = _response(stdout)
+    if returncode == 1:
+        kind, line, column, message = (response.get(key) for key in ("kind", "line", "column", "message"))
+        if (set(response) != {"kind", "line", "column", "message"}
+                or not isinstance(kind, str) or kind not in {"syntax", "unsupported", "encoding", "limit"}
+                or type(line) is not int or type(column) is not int
+                or line < 1 or column < 1 or not isinstance(message, str)):
+            raise ValueError("native parser returned an invalid refusal")
+        try:
+            message.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("native parser returned an invalid refusal message") from error
+        raise VelaError(cast("str", kind), line, column, message)
+    if returncode:
+        raise RuntimeError(f"native parser exited {returncode}")
+    ast = _object(response.get("ast"), "syntax tree")
+    schema, kind = (2, "surface_file") if surface else (1, "file")
+    if (set(response) != {"schema", "ast"} or type(response.get("schema")) is not int
+            or response["schema"] != schema or ast.get("kind") != kind):
+        raise ValueError("native parser returned an unsupported syntax-tree schema")
+    _validate_tree(ast, source)
+    return {"schema": schema, "source_sha256": hashlib.sha256(source).hexdigest(), "ast": ast}
+
+
 def parse_source(compiled: Build, source: bytes, *, surface: bool = False) -> dict[str, Json]:
     """Decode one complete native response, refusing any unsuccessful process."""
     if len(source) > MAX_SOURCE_BYTES:
@@ -262,30 +294,7 @@ def parse_source(compiled: Build, source: bytes, *, surface: bool = False) -> di
                               timeout=PARSE_TIMEOUT, check=False)
     except subprocess.TimeoutExpired as error:
         raise VelaError("limit", 1, 1, f"parser exceeded {PARSE_TIMEOUT} seconds") from error
-    if len(done.stdout) > MAX_RESPONSE_BYTES or done.stderr:
-        raise ValueError("native parser returned excessive output or unexpected standard error")
-    response = _response(done.stdout)
-    if done.returncode == 1:
-        kind, line, column, message = (response.get(key) for key in ("kind", "line", "column", "message"))
-        if (set(response) != {"kind", "line", "column", "message"}
-                or not isinstance(kind, str) or kind not in {"syntax", "unsupported", "encoding", "limit"}
-                or type(line) is not int or type(column) is not int
-                or line < 1 or column < 1 or not isinstance(message, str)):
-            raise ValueError("native parser returned an invalid refusal")
-        try:
-            message.encode("utf-8")
-        except UnicodeEncodeError as error:
-            raise ValueError("native parser returned an invalid refusal message") from error
-        raise VelaError(cast("str", kind), line, column, message)
-    if done.returncode:
-        raise RuntimeError(f"native parser exited {done.returncode}")
-    ast = _object(response.get("ast"), "syntax tree")
-    schema, kind = (2, "surface_file") if surface else (1, "file")
-    if (set(response) != {"schema", "ast"} or type(response.get("schema")) is not int
-            or response["schema"] != schema or ast.get("kind") != kind):
-        raise ValueError("native parser returned an unsupported syntax-tree schema")
-    _validate_tree(ast, source)
-    return {"schema": schema, "source_sha256": hashlib.sha256(source).hexdigest(), "ast": ast}
+    return decode_response(source, done.returncode, done.stdout, done.stderr, surface=surface)
 
 
 def _body(result: dict[str, Json]) -> dict[str, Json]:

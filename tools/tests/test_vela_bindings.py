@@ -34,7 +34,7 @@ def _typed_local_semantics() -> None:
     ensure(outputs[0] == outputs[1],
            "equivalent inferred/explicit immutable bindings changed interpreted terms")
     for source, annotation, explicit in zip(sources, (None, "Nat"), (True, True), strict=True):
-        module = vela._Parser(vela._tokens(source)).parse()
+        module = vela.parse_module(source)
         declaration = module.declarations[0]
         if not isinstance(declaration, vela.syntax.Function):
             raise TypeError("test declaration is not callable")

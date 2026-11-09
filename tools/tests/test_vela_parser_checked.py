@@ -3,13 +3,16 @@
 
 import hashlib
 import io
+import json
 import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import toolchain as vela
 from tests.harness import Case, ensure
+from toolchain import parser as vela_parser
 from toolchain import parser_checked as checked
 
 
@@ -288,6 +291,44 @@ def _changed_observations() -> None:
                 ensure(changed is None, "changed proof probe or transcript acquired qualification")
 
 
+def _host_replacement_and_retirement() -> None:
+    ensure(not hasattr(vela, "_Parser"), "legacy Python recursive-descent parser is still present")
+    source = b"module M; public const Nat Base = 4; public Nat F(Nat x) => x + Base;"
+    envelope = checked.parse_checked(source)
+    ensure(envelope.get("schema") == 1 and envelope.get("source_sha256") == checked._sha256(source),
+           "checked host parser returned an invalid envelope")
+    module = vela.parse_module(source)
+    ensure(module.name.text == "M" and len(module.declarations) == 2,
+           "checked host parser decoded unexpected declarations")
+    ensure(vela.translate_ast(source, envelope) == vela.translate(source),
+           "translate and translate_ast diverged under the checked parser")
+    root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory(prefix="vela-checked-runtime-") as temporary:
+        runtime_dir = Path(temporary)
+        exe = runtime_dir / "vela-checked-parser"
+        exe.write_bytes(b"original binary")
+        receipt: dict[str, object] = {
+            "schema": 1,
+            "inputs": checked._runtime_inputs(root),
+            "generated_sha256": {"vela-parser": checked._sha256(b"different binary")},
+        }
+        (runtime_dir / "receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
+        with patch.object(checked, "_runtime_root", return_value=runtime_dir):
+            try:
+                checked.ensure_checked_build(root)
+            except ValueError as error:
+                ensure("changed after its build" in str(error), "tampered runtime binary lost its cause")
+            else:
+                raise AssertionError("tampered runtime binary was accepted")
+        tampered = vela_parser.Build(runtime_dir, exe, receipt)
+        try:
+            checked.parse_checked(source, compiled=tampered)
+        except ValueError as error:
+            ensure("changed after its build" in str(error), "tampered explicit build lost its cause")
+        else:
+            raise AssertionError("tampered explicit build was accepted")
+
+
 def cases() -> list[Case]:
     return [Case("immutable-source-and-version-controls", _archive_controls),
             Case("proof-opening-byte-footprint", _proof_footprint),
@@ -296,4 +337,5 @@ def cases() -> list[Case]:
             Case("bounded-command-and-negative-verdict-controls", _process_controls),
             Case("locked-generator-and-prover-controls", _toolchain_controls),
             Case("changed-probes-and-transcripts-refuse", _changed_observations),
-            Case("failed-qualification-discards-stale-success", _refused_qualification)]
+            Case("failed-qualification-discards-stale-success", _refused_qualification),
+            Case("host-replacement-and-python-retirement", _host_replacement_and_retirement)]

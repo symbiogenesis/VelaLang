@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Untrusted pure Vela syntax consumption and translation into existing CIC terms.
+"""Pure Vela syntax consumption and translation into existing CIC terms.
 
-Both syntax routes feed the same name/type checker and emitter. The emitted
-definitions interpret this fragment; no source-correspondence or kernel verdict
-is supplied. Python parsing remains the default pending native qualification.
+Checked parsing through the Rocq-extracted vela-checked-parser feeds the common
+name/type checker and emitter. The emitted definitions interpret this fragment;
+the Python recursive-descent parser is retired.
 """
 
 import hashlib
 from dataclasses import dataclass
+from importlib import import_module
 from typing import cast
 
 from toolchain import ast as syntax
@@ -23,7 +24,7 @@ from toolchain.facts import Facts, SymbolKind
 
 __all__ = ["MAX_BLOCK_DEPTH", "MAX_EXPRESSION_DEPTH", "MAX_LITERAL_DIGITS", "MAX_SOURCE_BYTES",
            "StaticEvaluation", "Translation", "ValueType", "VelaError", "evaluate",
-           "inspect_source", "translate", "translate_ast"]
+           "inspect_source", "parse_module", "translate", "translate_ast"]
 
 _TYPES: dict[ValueType, str] = {
     "Nat": "Corelib.Init.Datatypes.nat",
@@ -134,250 +135,6 @@ def _tokens(source: bytes) -> list[_Token]:
         column += len(spelling)
     result.append(_Token("eof", "end of file", line, column))
     return result
-
-
-class _Parser:
-    """Legacy syntax route; actions contain no resolution, typing or emission."""
-
-    def __init__(self, tokens: list[_Token]) -> None:
-        self.tokens = tokens
-        self.offset = 0
-        self.declaration_sites: dict[syntax.Site, syntax.Site] = {}
-
-    def _current(self) -> _Token:
-        return self.tokens[self.offset]
-
-    def _error(self, kind: str, message: str, token: _Token | None = None) -> VelaError:
-        site = self._current() if token is None else token
-        return VelaError(kind, site.line, site.column, message)
-
-    def _take(self, spelling: str) -> bool:
-        if self._current().text == spelling:
-            self.offset += 1
-            return True
-        return False
-
-    def _expect(self, spelling: str) -> _Token:
-        token = self._current()
-        if not self._take(spelling):
-            raise self._error("syntax", f"expected '{spelling}', found {token.text!r}")
-        return token
-
-    def _name(self) -> syntax.Name:
-        token = self._current()
-        if token.kind != "name":
-            raise self._error("syntax", f"expected identifier, found {token.text!r}")
-        self.offset += 1
-        return syntax.Name(token.text, token.site)
-
-    def _value_type(self) -> ValueType:
-        token = self._current()
-        if token.text in {"Nat", "bool"}:
-            self.offset += 1
-            return token.text
-        if token.kind not in {"name", "keyword"}:
-            raise self._error("syntax", f"expected parameter or result type, found {token.text!r}")
-        raise self._error("unsupported", f"type {token.text!r} is outside Nat and bool")
-
-    def parse(self) -> syntax.Module:
-        self._expect("module")
-        module = self._name()
-        self._expect(";")
-        declarations: list[syntax.Function | syntax.Constant] = []
-        while self._current().kind != "eof":
-            start = self._expect("public")
-            is_const = self._take("const")
-            if self._current().text == "const":
-                raise self._error("syntax", "repeated const declaration modifier")
-            if is_const and self._current().kind == "name" and self.tokens[self.offset + 1].text == "=":
-                raise self._error("syntax", "const requires an explicit type before its name")
-            result = self._value_type()
-            name = self._name()
-            self.declaration_sites[name.site] = start.site
-            if self._current().text == "(":
-                declarations.append(self._function(name, result, is_const))
-            elif is_const:
-                self._expect("=")
-                value = self._expression(1)
-                self._expect(";")
-                declarations.append(syntax.Constant(name, result, value, start.site))
-            else:
-                raise self._error("syntax", "expected '(' after function name")
-        if not declarations:
-            raise self._error("syntax", "module requires at least one function or constant")
-        return syntax.Module(module, tuple(declarations))
-
-    def _constant(self, start: _Token | None = None) -> syntax.Constant:
-        token = self._expect("const")
-        if self._current().kind == "name" and self.tokens[self.offset + 1].text == "=":
-            raise self._error("syntax", "const requires an explicit type before its name")
-        value_type = self._value_type()
-        name = self._name()
-        self._expect("=")
-        value = self._expression(1)
-        self._expect(";")
-        return syntax.Constant(name, value_type, value, (token if start is None else start).site)
-
-    def _function(self, name: syntax.Name, result: ValueType, is_const: bool) -> syntax.Function:
-        self._expect("(")
-        parameters: list[tuple[syntax.Name, ValueType]] = []
-        const_parameters: set[str] = set()
-        if not self._take(")"):
-            while True:
-                parameter_const = self._take("const")
-                if self._current().text == "const":
-                    raise self._error("syntax", "repeated const parameter qualifier")
-                value_type = self._value_type()
-                parameter = self._name()
-                parameters.append((parameter, value_type))
-                if parameter_const:
-                    const_parameters.add(parameter.text)
-                if self._take(")"):
-                    break
-                self._expect(",")
-                if self._take(")"):
-                    break
-        arrow = self._current()
-        if self._take("=>"):
-            value = self._expression(1)
-            self._expect(";")
-            body = syntax.Block((), syntax.Return(value, arrow.site), value.site)
-        else:
-            body = self._block(1)
-        return syntax.Function(name, result, tuple(parameters), body, is_const, frozenset(const_parameters))
-
-    def _block(self, nesting: int) -> syntax.Block:
-        self._expect("{")
-        start = self._current()
-        bindings: list[syntax.Binding | syntax.Reassignment | syntax.Constant] = []
-        while (self._current().text in {"let", "const", "Nat", "bool"}
-               or (self._current().kind == "name"
-                   and (self.tokens[self.offset + 1].text == "="
-                        or self.tokens[self.offset + 1].kind == "name"))):
-            if nesting + len(bindings) > MAX_BLOCK_DEPTH:
-                raise self._error("limit", f"block or binding nesting exceeds {MAX_BLOCK_DEPTH}")
-            if self._current().text == "const":
-                bindings.append(self._constant())
-                continue
-            token = self._current()
-            explicit_binding = self._take("let")
-            typed = (self._current().text in {"Nat", "bool"}
-                     or (self._current().kind == "name" and self.tokens[self.offset + 1].kind == "name"))
-            annotation = self._value_type() if typed else None
-            if not explicit_binding and annotation is not None:
-                raise self._error(
-                    "syntax",
-                    f"local declaration requires 'let' or 'var' before its type "
-                    f"(write 'let {annotation} x = e;' or 'var {annotation} x = e;')",
-                    token,
-                )
-            immutable = explicit_binding
-            name = self._name()
-            self._expect("=")
-            value = self._expression(1)
-            self._expect(";")
-            bindings.append(syntax.Binding(name, value, token.site, annotation, explicit_binding)
-                            if immutable else syntax.Reassignment(name, value, token.site))
-        if nesting + len(bindings) > MAX_BLOCK_DEPTH:
-            raise self._error("limit", f"block or binding nesting exceeds {MAX_BLOCK_DEPTH}")
-        token = self._current()
-        if self._take("return"):
-            terminal: syntax.Return | syntax.Conditional = syntax.Return(self._expression(1), token.site)
-            self._expect(";")
-        elif self._take("if"):
-            self._expect("(")
-            condition = self._expression(1)
-            self._expect(")")
-            yes = self._block(nesting + len(bindings) + 1)
-            self._expect("else")
-            no = self._block(nesting + len(bindings) + 1)
-            terminal = syntax.Conditional(condition, yes, no, token.site)
-        else:
-            raise self._error("syntax", "expected let, return or a returning if statement")
-        self._expect("}")
-        return syntax.Block(tuple(bindings), terminal, start.site)
-
-    def _expression(self, nesting: int) -> syntax.Expression:
-        if nesting > MAX_EXPRESSION_DEPTH:
-            raise self._error("limit", f"expression nesting exceeds {MAX_EXPRESSION_DEPTH}")
-        left = self._conjunction(nesting)
-        while self._current().text == "||":
-            token = self._expect("||")
-            left = syntax.expression("binary", "||", token.site, (left, self._conjunction(nesting)))
-        return left
-
-    def _conjunction(self, nesting: int) -> syntax.Expression:
-        left = self._comparison(nesting)
-        while self._current().text == "&&":
-            token = self._expect("&&")
-            left = syntax.expression("binary", "&&", token.site, (left, self._comparison(nesting)))
-        return left
-
-    def _comparison(self, nesting: int) -> syntax.Expression:
-        left = self._sum(nesting)
-        token = self._current()
-        if token.text in {"==", "!=", "<", "<=", ">", ">="}:
-            self.offset += 1
-            return syntax.expression("binary", token.text, token.site, (left, self._sum(nesting)))
-        return left
-
-    def _sum(self, nesting: int) -> syntax.Expression:
-        left = self._product(nesting)
-        while self._current().text in {"+", "-"}:
-            token = self._current()
-            self.offset += 1
-            left = syntax.expression("binary", token.text, token.site, (left, self._product(nesting)))
-        return left
-
-    def _product(self, nesting: int) -> syntax.Expression:
-        left = self._unary(nesting)
-        while self._current().text in {"*", "/", "%"}:
-            token = self._current()
-            self.offset += 1
-            left = syntax.expression("binary", token.text, token.site, (left, self._unary(nesting)))
-        return left
-
-    def _unary(self, nesting: int) -> syntax.Expression:
-        if nesting > MAX_EXPRESSION_DEPTH:
-            raise self._error("limit", f"expression nesting exceeds {MAX_EXPRESSION_DEPTH}")
-        token = self._current()
-        if self._take("!"):
-            return syntax.expression("unary", "!", token.site, (self._unary(nesting + 1),))
-        return self._atom(nesting)
-
-    def _atom(self, nesting: int) -> syntax.Expression:
-        token = self._current()
-        if self._take("("):
-            result = self._expression(nesting + 1)
-            self._expect(")")
-            return syntax.expression("group", "", token.site, (result,))
-        if token.kind == "decimal":
-            self.offset += 1
-            return syntax.expression("nat", token.text, token.site)
-        if token.text in {"true", "false"}:
-            self.offset += 1
-            return syntax.expression("bool", token.text == "true", token.site)
-        if token.kind != "name":
-            raise self._error("syntax", f"expected expression, found {token.text!r}")
-        name = self._name()
-        if self._take("("):
-            arguments: list[syntax.Expression] = []
-            labels: list[syntax.Name | None] = []
-            if not self._take(")"):
-                while True:
-                    label = None
-                    if self._current().kind == "name" and self.tokens[self.offset + 1].text == ":":
-                        label = self._name()
-                        self._expect(":")
-                    labels.append(label)
-                    arguments.append(self._expression(nesting + 1))
-                    if self._take(")"):
-                        break
-                    self._expect(",")
-                    if self._take(")"):
-                        break
-            return syntax.expression("call", name.text, name.site, tuple(arguments), labels=tuple(labels))
-        return syntax.expression("name", name.text, name.site)
 
 
 def _error(kind: str, message: str, site: syntax.Site) -> VelaError:
@@ -798,9 +555,15 @@ def _translate(source: bytes, module: syntax.Module, facts: Facts | None = None,
     return Translation(name, gallina)
 
 
+def parse_module(source: bytes) -> syntax.Module:
+    """Parse and decode pure Vela source through the Rocq-extracted checked parser."""
+    checked = import_module("toolchain.parser_checked")
+    return syntax.decode(source, checked.parse_checked(source))
+
+
 def translate(source: bytes) -> Translation:
-    """Validate the complete bounded source through the retained Python syntax route."""
-    return _translate(source, _Parser(_tokens(source)).parse())
+    """Validate the complete bounded source through the Rocq-extracted checked parser."""
+    return _translate(source, parse_module(source))
 
 
 def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEvaluation:
@@ -810,7 +573,7 @@ def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEva
     restricts this development service to the existing bounded static evaluator.
     """
     elaborator = _Elaborator()
-    _translate(source, _Parser(_tokens(source)).parse(), elaborator=elaborator)
+    _translate(source, parse_module(source), elaborator=elaborator)
     if value_type not in {"Nat", "bool"}:
         raise VelaError("type", 1, 1, "expression: expected Nat or bool result type")
     if len(expression.encode("utf-8")) > 4096:
@@ -818,7 +581,7 @@ def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEva
     probe = (f"module Playground;\npublic const {value_type} __vela_console_result =\n"
              f"{expression}\n;").encode()
     try:
-        parsed = _Parser(_tokens(probe)).parse()
+        parsed = parse_module(probe)
     except VelaError as error:
         lines = expression.replace("\r\n", "\n").replace("\r", "\n").split("\n")
         line = max(1, error.line - 2)
@@ -845,9 +608,10 @@ def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEva
 
 def inspect_source(source: bytes) -> dict[str, object]:
     """Return diagnostic resolution facts only after a complete successful pure check."""
-    parser = _Parser(_tokens(source))
-    module = parser.parse()
-    facts = Facts(source, parser.declaration_sites)
+    module = parse_module(source)
+    declaration_sites = {declaration.name.site: declaration.site
+                         for declaration in module.declarations}
+    facts = Facts(source, declaration_sites)
     _translate(source, module, facts)
     return facts.result()
 

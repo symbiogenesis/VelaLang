@@ -53,7 +53,7 @@ def _pure_protocol_and_spelling() -> None:
         tree = _fixture(source, _literal(source, b"0_001"))
         ensure(vela.translate_ast(source, tree) == vela.translate(source),
                "pure native consumer changed separated-literal term or provenance")
-        parsed = vela._Parser(vela._tokens(source)).parse()
+        parsed = vela.parse_module(source)
         function = parsed.declarations[0]
         if not isinstance(function, vela_ast.Function) or not isinstance(function.body.terminal, vela_ast.Return):
             raise TypeError("separated literal changed the function/return syntax roles")
