@@ -33,13 +33,16 @@ def main() -> int:
         print(encoded, end="")
         return 0
     if sys.argv[1:] == ["--inspect"]:
+        digest = hashlib.sha256(source).hexdigest()
         try:
             inspection = inspect_source(source)
         except VelaError as error:
             inspection = {"status": "unavailable", "reason": error.kind}
+        inspection["source_sha256"] = digest
         encoded = json.dumps(inspection, ensure_ascii=True)
         if len(encoded.encode("utf-8")) > MAX_BODY_BYTES:
-            encoded = json.dumps({"status": "unavailable", "reason": "inspection-limit"})
+            encoded = json.dumps({"status": "unavailable", "reason": "inspection-limit",
+                                  "source_sha256": digest})
         print(encoded, end="")
         return 0
     if sys.argv[1:]:

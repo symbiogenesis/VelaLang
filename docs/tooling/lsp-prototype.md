@@ -174,6 +174,11 @@ and `column`. Its index is a snapshot-local identity. Each occurrence has
 worker shape, bounds, identity links and exact source spelling before converting
 positions through the shared source API. Worker output and each complete reply
 retain the 1,048,576-byte bound; an oversized result is refused as a whole.
+The isolated worker adds `source_sha256` to every inspection response, including
+unavailable and over-budget results. The transport verifies it against the exact
+input bytes before projecting or caching facts; missing or mismatched bindings
+refuse the request, and the next query retries the producer. This binds worker
+output to its input without adding a source-correspondence proof.
 
 [Declaration documentation](authoring-tools.md#documentation-comments) extends a
 public function or constant symbol with an optional `documentation` record:

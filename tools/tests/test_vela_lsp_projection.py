@@ -2,13 +2,17 @@
 """Independent controls for the pure-fact worker boundary and LSP projection."""
 
 import copy
+import hashlib
 import json
 import subprocess
 from collections.abc import Callable
+from io import BytesIO
+from types import SimpleNamespace
 from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
+from toolchain import VelaError, lsp_worker
 from toolchain.lsp import Server
 from toolchain.lsp_services import InspectionError, inspect_document, project
 from toolchain.protocol_json import MAX_BODY_BYTES, encode_message
@@ -129,7 +133,10 @@ def _producer_refusals() -> None:
 
 
 def _worker_boundary() -> None:
-    done = subprocess.CompletedProcess(["fixed"], 0, b'{"status":"unavailable","reason":"syntax"}', b"")
+    source = b"source"
+    digest = hashlib.sha256(source).hexdigest()
+    refused = {"status": "unavailable", "reason": "syntax", "source_sha256": digest}
+    done = subprocess.CompletedProcess(["fixed"], 0, json.dumps(refused).encode(), b"")
     with patch("toolchain.lsp_services.subprocess.run", return_value=done) as run:
         ensure(inspect_document(b"source") == {"status": "unavailable", "reason": "syntax"},
                "worker JSON was not consumed")
@@ -140,11 +147,56 @@ def _worker_boundary() -> None:
                "inspection did not use isolated fixed producer and timeout")
     for done in (subprocess.CompletedProcess(["fixed"], 1, b"", b""),
                  subprocess.CompletedProcess(["fixed"], 0, b"x" * (MAX_BODY_BYTES + 1), b""),
-                 subprocess.CompletedProcess(["fixed"], 0, b'{"status":"ok","status":"ok"}', b"")):
+                 subprocess.CompletedProcess(["fixed"], 0, b'{"status":"ok","status":"ok"}', b""),
+                 *[subprocess.CompletedProcess([], 0, json.dumps(raw).encode(), b"")
+                   for raw in ({"status": "unavailable", "reason": "syntax"},
+                               {**refused, "source_sha256": hashlib.sha256(b"other").hexdigest()},
+                               {**refused, "source_sha256": None},
+                               {**refused, "source_sha256": [digest]})]):
         with patch("toolchain.lsp_services.subprocess.run", return_value=done):
             _refuses(lambda: inspect_document(b"source"), "bad worker output accepted")
     with patch("toolchain.lsp_services.subprocess.run", side_effect=subprocess.TimeoutExpired("fixed", 5)):
         _refuses(lambda: inspect_document(b"source"), "worker timeout accepted")
+
+
+def _inspection_worker_source_binding() -> None:
+    source = "module M;\r\n// 😀\rpublic Nat F()=>0;".encode()
+    digest = hashlib.sha256(source).hexdigest()
+    for result, expected, reason in (({"status": "ok", "symbols": [], "occurrences": []}, "ok", None),
+                                     (VelaError("type", 1, 1, "chosen error"), "unavailable", "type"),
+                                     ({"status": "ok", "symbols": ["x" * MAX_BODY_BYTES],
+                                       "occurrences": []}, "unavailable", "inspection-limit")):
+        output = BytesIO()
+        producer = (patch.object(lsp_worker, "inspect_source", side_effect=result)
+                    if isinstance(result, VelaError) else
+                    patch.object(lsp_worker, "inspect_source", return_value=copy.deepcopy(result)))
+        with (patch.object(lsp_worker.sys, "stdin", SimpleNamespace(buffer=BytesIO(source))),
+              patch.object(lsp_worker.sys, "stdout", SimpleNamespace(
+                  write=lambda text, output=output: output.write(text.encode()))),
+              patch.object(lsp_worker.sys, "argv", ["worker", "--inspect"]),
+              producer):
+            ensure(lsp_worker.main() == 0, "inspection worker failed to encode a bounded response")
+        raw = json.loads(output.getvalue())
+        ensure(raw["source_sha256"] == digest and raw["status"] == expected,
+               "inspection worker omitted the exact original-byte binding")
+        ensure(len(output.getvalue()) <= MAX_BODY_BYTES, "inspection binding exceeded the worker bound")
+        ensure(raw.get("reason") == reason, "inspection worker lost its explicit refusal")
+
+
+def _stale_inspection_transport_recovery() -> None:
+    server = _opened(inspect_document)
+    original = _facts()
+    stale = {**original, "source_sha256": hashlib.sha256(_TEXT.replace("Demo", "OldM").encode()).hexdigest()}
+    current = {**original, "source_sha256": hashlib.sha256(_TEXT.encode()).hexdigest()}
+    outcomes = [subprocess.CompletedProcess([], 0, json.dumps(raw).encode(), b"") for raw in (stale, current)]
+    with patch("toolchain.lsp_services.subprocess.run", side_effect=outcomes) as run:
+        response = server.handle(_request("textDocument/hover", _params()))
+        ensure(_error_code(response) == -32803 and not server._inspections,
+               "stale worker facts were published or cached against another source")
+        response = server.handle(_request("textDocument/hover", _params()))
+        ensure("result" in response[0] and response[0]["result"] is not None
+               and len(server._inspections) == 1 and run.call_count == 2,
+               "a stale worker response poisoned retry or current-source caching")
 
 
 def _request_refusals() -> None:
@@ -220,6 +272,8 @@ def cases() -> list[Case]:
     return [Case("resolved-fact-projection-and-source-units", _projection),
             Case("producer-shape-source-links-and-bounds", _producer_refusals),
             Case("isolated-inspection-worker-boundary", _worker_boundary),
+            Case("inspection-worker-original-byte-source-binding", _inspection_worker_source_binding),
+            Case("stale-inspection-transport-refusal-and-recovery", _stale_inspection_transport_recovery),
             Case("query-parameter-lifecycle-and-overlay-refusals", _request_refusals),
             Case("oversized-result-refusal-and-session-recovery", _oversized_reply_recovery),
             Case("frame-sized-request-id-recovery", _frame_sized_request_id_recovery)]
