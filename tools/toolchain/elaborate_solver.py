@@ -1117,8 +1117,6 @@ class _SolverMixin:
             fh, fa = self.spine(f_item)
             if fh == _constant("Seq_All") and len(fa) == 3:
                 all_elem, all_seq, all_pred = fa
-                d_val = self._default_term_for_type(all_elem)
-                # Check if w is an instance of all_pred(Seq_At(all_elem, d_val, all_seq, idx))
                 for sub_t in self._collect_seq_at_terms(w):
                     sh, sa = self.spine(sub_t)
                     if sh == _constant("Seq_At") and len(sa) == 4 and self.convertible(sa[2], all_seq):

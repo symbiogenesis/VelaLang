@@ -259,7 +259,7 @@ class _StringsMixin:
             idx = start_idx
             while idx < len(tokens):
                 tk, tv, _, _ = tokens[idx]
-                if tk == "punct" and tv in {"<", ":: <", "::<"}:
+                if tk == "punct" and tv in {"<", "::<"}:
                     depth += 1
                 elif tk == "punct" and tv == ">":
                     depth -= 1

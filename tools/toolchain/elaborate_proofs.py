@@ -1481,8 +1481,6 @@ class _ProofsMixin:
                 return self.pi(domain, codomain)
         if node["kind"] == "quantifier":
             quantifier = node["quantifier"]
-            if quantifier not in {"forall", "exists"}:
-                raise self.fail("unsupported", f"quantifier '{quantifier}' is not supported", node)
             variables, extended = self.telescope([], self.nodes(node["parameters"]), environment)
             body = self.asserted_proposition(self.node(node["value"]), extended)
             if quantifier == "forall":

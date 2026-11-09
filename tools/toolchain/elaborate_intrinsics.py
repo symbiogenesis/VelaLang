@@ -2290,8 +2290,6 @@ class _IntrinsicsMixin:
                 return self.pi(domain, self.proposition(self.node(node["right"]), environment))
         if node["kind"] == "quantifier":
             quant = node["quantifier"]
-            if quant not in {"forall", "exists"}:
-                raise self.fail("unsupported", "only universal and existential propositions are supported")
             variables, extended = self.telescope([], self.nodes(node["parameters"]), environment)
             body = self.proposition(self.node(node["value"]), extended)
             if quant == "forall":

@@ -1264,27 +1264,6 @@ class _WhnfMixin:
             self.tick(True)
             skipped = _apps(_constant("Seq_Skip"), elem, seq_term, off_term)
             return self.whnf(_apps(_constant("Seq_Take"), elem, skipped, cnt_term))
-        if name == "Seq_Contains" and len(arguments) == 3:
-            _elem, seq_term, val_term = arguments
-            s_w = self.whnf(seq_term)
-            elems = self._extract_seq_elements(s_w)
-            if elems is not None:
-                if len(elems) == 0:
-                    self.tick(True)
-                    return _term("bool", value=0)
-                all_decided = True
-                for item in elems:
-                    if self.convertible(item, val_term):
-                        self.tick(True)
-                        return _term("bool", value=1)
-                    item_w = self.whnf(item)
-                    val_w = self.whnf(val_term)
-                    if item_w.kind != val_w.kind or item_w.kind not in {"nat", "int", "bool", "char"}:
-                        all_decided = False
-                if all_decided:
-                    self.tick(True)
-                    return _term("bool", value=0)
-            return None
         if name in {"Seq_All", "Seq_Any"} and len(arguments) == 3:
             _elem, seq_term, pred_term = arguments
             s_w = self.whnf(seq_term)

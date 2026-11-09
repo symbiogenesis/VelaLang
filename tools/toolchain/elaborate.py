@@ -174,6 +174,7 @@ class _Elaborator(
         self.frozen_collections: set[str] = set()
         self.lifted_invariants: dict[str, set[str]] = {}
         self.active_lift_scopes: int = 0
+        self._in_lifted_target_assignment: str | None = None
         self.in_loop_depth: int = 0
         self.active_regions: set[str] = set()
         self.in_executable_function: bool = False
@@ -396,9 +397,6 @@ class _Elaborator(
         self.constants["Seq_Slice"] = _Binding(
             _constant("Seq_Slice"), telescope((a,), self.pi(seq_a, self.pi(_NAT, self.pi(_NAT, seq_a)))), 1
         )
-        self.constants["Seq_Contains"] = _Binding(
-            _constant("Seq_Contains"), telescope((a,), self.pi(seq_a, self.pi(a, _BOOL))), 1
-        )
         self.constants["Seq_All"] = _Binding(
             _constant("Seq_All"), telescope((a,), self.pi(seq_a, self.pi(self.pi(a, _BOOL), _BOOL))), 1
         )
@@ -556,7 +554,6 @@ class _Elaborator(
         ae_info = _UnionInfo(
             "ArithmeticError",
             ae_type_const,
-            ae_type_binding,
             (),
             tuple(ae_ctors),
             (ae_rep_type, _term("sum", _UNIT, _UNIT), _UNIT),
@@ -583,7 +580,6 @@ class _Elaborator(
         ce_info = _UnionInfo(
             "ConversionError",
             ce_type_const,
-            ce_type_binding,
             (),
             (oor_ctor,),
             (_UNIT,),
@@ -629,7 +625,6 @@ class _Elaborator(
         res_info = _UnionInfo(
             "Result",
             res_type_const,
-            res_type_binding,
             (tv_var, te_var),
             (err_ctor, ok_ctor),
             (res_rep, tv_var),

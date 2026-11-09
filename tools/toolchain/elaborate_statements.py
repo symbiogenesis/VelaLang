@@ -344,7 +344,7 @@ class _StatementsMixin:
             if self._is_readonly_span(cur_b.term):
                 raise self.fail("type", f"cannot mutate a read-only 'in' parameter '{tname}'", target)
             if op == "=":
-                prev_assign_target = getattr(self, "_in_lifted_target_assignment", None)
+                prev_assign_target = self._in_lifted_target_assignment
                 self._in_lifted_target_assignment = tname
                 try:
                     rhs_term = self.check(val_node, cur_b.type, updated)
@@ -2778,7 +2778,7 @@ class _StatementsMixin:
             self.unify(result_type, expected)
         base_unwrapped = self._unwrap_group(base_node)
         base_name = self.name(base_unwrapped["name"]) if base_unwrapped["kind"] == "name" else None
-        assign_target = getattr(self, "_in_lifted_target_assignment", None)
+        assign_target = self._in_lifted_target_assignment
         excluded = (
             self.lifted_invariants.get(base_name, set())
             if base_name is not None and base_name == assign_target

@@ -226,7 +226,6 @@ class _RecordInfo:
     name: str
     type_const: str
     ctor_const: str
-    type_binding: _Binding
     ctor_binding: _Binding
     generic_vars: tuple[_Term, ...]
     fields: tuple[_RecordField, ...]
@@ -253,7 +252,6 @@ class _UnionCtor:
 class _UnionInfo:
     name: str
     type_const: str
-    type_binding: _Binding
     generic_vars: tuple[_Term, ...]
     constructors: tuple[_UnionCtor, ...]
     suffix_types: tuple[_Term, ...]
@@ -272,7 +270,6 @@ class _InterfaceMethodSpec:
     self_var: _Term
     nullary: bool
     preconditions: tuple[tuple[tuple[int, ...], _Term], ...]
-    ensures_clauses: tuple[Node, ...]
     ensures_props: tuple[_Term, ...]
 
 
@@ -281,8 +278,6 @@ class _InterfaceLawSpec:
     name: str
     kind: str
     param_vars: tuple[_Term, ...]
-    requires_clauses: tuple[Node, ...]
-    ensures_clauses: tuple[Node, ...]
     req_props: tuple[_Term, ...]
     ensures_props: tuple[_Term, ...]
 
@@ -297,7 +292,6 @@ class _InterfaceInfo:
 
 @dataclass(frozen=True)
 class _ImplInstance:
-    interface_name: str
     generic_vars: tuple[_Term, ...]
     target_types: tuple[_Term, ...]
     where_constraints: tuple[tuple[str, tuple[_Term, ...]], ...]
@@ -377,7 +371,6 @@ _GALLINA = {
     "Seq_Take": "vela_Seq_Take",
     "Seq_Skip": "vela_Seq_Skip",
     "Seq_Slice": "vela_Seq_Slice",
-    "Seq_Contains": "vela_Seq_Contains",
     "Seq_All": "vela_Seq_All",
     "Seq_Any": "vela_Seq_Any",
     "Seq_Eq": "vela_Seq_Eq",
@@ -1674,12 +1667,6 @@ Fixpoint vela_Seq_Skip (A : Type@{vela_u0}) (s : vela_Seq A) (n : nat) {struct n
 
 Definition vela_Seq_Slice (A : Type@{vela_u0}) (s : vela_Seq A) (off cnt : nat) : vela_Seq A :=
   vela_Seq_Take A (vela_Seq_Skip A s off) cnt.
-
-Definition vela_Seq_Contains (A : Type@{vela_u0}) (s : vela_Seq A) (_ : A) : bool :=
-  match s with
-  | vela_Seq_Empty _ => false
-  | vela_Seq_Cons _ _ _ => true
-  end.
 
 Fixpoint vela_Seq_All (A : Type@{vela_u0}) (s : vela_Seq A) (p : A -> bool) {struct s} : bool :=
   match s with

@@ -365,7 +365,6 @@ class _DeclarationsMixin:
             name=name,
             type_const=type_emitted,
             ctor_const=ctor_emitted,
-            type_binding=type_binding,
             ctor_binding=ctor_binding,
             generic_vars=tuple(generic_vars),
             fields=tuple(record_fields),
@@ -913,7 +912,6 @@ class _DeclarationsMixin:
         union_info = _UnionInfo(
             name=name,
             type_const=type_emitted,
-            type_binding=type_binding,
             generic_vars=tuple(generic_vars),
             constructors=tuple(union_ctors),
             suffix_types=tuple(suffix_types),
@@ -1329,7 +1327,6 @@ class _DeclarationsMixin:
                         self_var=m_self_var,
                         nullary=not bool(m_params),
                         preconditions=tuple(m_preconds),
-                        ensures_clauses=tuple(m_enss),
                         ensures_props=tuple(m_ens_terms),
                     )
                     methods[mname] = mspec
@@ -1397,8 +1394,6 @@ class _DeclarationsMixin:
                         name=mname,
                         kind=cast("str", mkind),
                         param_vars=tuple(l_vars),
-                        requires_clauses=tuple(l_reqs),
-                        ensures_clauses=tuple(l_enss),
                         req_props=tuple(l_req_props),
                         ensures_props=tuple(l_ens_props),
                     )
@@ -1537,7 +1532,6 @@ class _DeclarationsMixin:
                 )
             where_iface_constraints.extend(ifaces_c)
         candidate_inst = _ImplInstance(
-            interface_name=iface_name,
             generic_vars=tuple(impl_generic_vars),
             target_types=tuple(target_types),
             where_constraints=tuple((wi.name, wt) for wi, wt, _ in where_iface_constraints),
@@ -2003,7 +1997,6 @@ class _DeclarationsMixin:
             self.uninitialized_out_params.clear()
 
         final_inst = _ImplInstance(
-            interface_name=iface_name,
             generic_vars=tuple(impl_generic_vars),
             target_types=tuple(target_types),
             where_constraints=tuple((wi.name, wt) for wi, wt, _ in where_iface_constraints),
@@ -3441,8 +3434,8 @@ class _DeclarationsMixin:
                             c_h.kind == "const"
                             and isinstance(c_h.value, str)
                             and (
-                                c_h.value in {"eq_nat", "char_eq", "bool_eq"}
-                                or c_h.value.startswith(("int_eq_", "union_eq_", "record_eq_"))
+                                c_h.value in {"eq_nat", "char_eq", "eq_bool"}
+                                or c_h.value.startswith("int_eq_")
                             )
                             and len(c_args) == 2
                         ):
@@ -3478,8 +3471,8 @@ class _DeclarationsMixin:
                 c_h.kind == "const"
                 and isinstance(c_h.value, str)
                 and (
-                    c_h.value in {"eq_nat", "char_eq", "bool_eq"}
-                    or c_h.value.startswith(("int_eq_", "union_eq_", "record_eq_"))
+                    c_h.value in {"eq_nat", "char_eq", "eq_bool"}
+                    or c_h.value.startswith("int_eq_")
                 )
                 and len(c_args) == 2
                 and match_eq(c_args[0], c_args[1])
