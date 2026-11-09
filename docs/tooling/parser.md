@@ -180,22 +180,27 @@ frontend remains subject to [Q25d's interpretation and admission prerequisites](
 
 ### Executable migration preparation
 
-The prototype's Python syntax parser and the generated AST decoder feed the same
-separate resolution, typing and Gallina emission consumer. The generated-tree
-decoder checks the complete schema, exact source digest, spans and token spellings,
-child containment and resource budgets before elaboration. It never invokes the
-Python lexer or parser as a fallback.
+The Rocq-extracted `vela-checked-parser` and the code-backend development parser
+(`vela-parser`) both emit located JSON syntax envelopes consumed by the same strict
+generated-AST decoder and separate resolution, typing and Gallina emission pipeline.
+The generated-tree decoder checks the complete schema, exact source digest, spans
+and token spellings, child containment and resource budgets before elaboration. The
+legacy handwritten Python recursive-descent `_Parser` has been retired from
+[`tools/toolchain/__init__.py`](../../tools/toolchain/__init__.py), and
+`vela.parse_module` routes all pure Vela parsing (`translate`, `evaluate`,
+`inspect_source`, `format_source`, `lint_source`) through
+[`parser_checked.parse_checked`](../../tools/toolchain/parser_checked.py) without a
+Python lexer or parser fallback.
 
 `python tools/run.py vela-parser migration` builds and qualifies the syntax parser,
-then compares both routes on independently categorized fixtures, source edits,
-semantic diagnostic locations and resource boundaries. Accepted module identities
-and complete emitted bytes must agree. Every difference is retained in
-`migration.json` and produces a nonzero verdict; changed consumer, source,
-toolchain or generated-parser bytes invalidate the report. Guest CI's model lane
-runs this comparison and retains its verdict separately from syntax qualification.
-Agreement supplies a migration prerequisite, with no checked-parser or
-source-correspondence claim. The ordinary `vela` command continues to select Python
-syntax until the complete promotion contract passes.
+then compares the active `vela.translate` route (`vela-checked-parser`) and the
+development `vela-parser` route (`vela.translate_ast`) on independently categorized
+fixtures, source edits, semantic diagnostic locations and resource boundaries.
+Accepted module identities and complete emitted bytes must agree. Every difference
+is retained in `migration.json` and produces a nonzero verdict; changed consumer,
+source, toolchain or generated-parser bytes invalidate the report. Guest CI's model
+lane runs this comparison and retains its verdict separately from syntax
+qualification.
 
 Whole-file syntax precedes semantics: a multiply-invalid file may report a later
 syntax error before an earlier name/type error. Independent single-fault semantic
@@ -210,8 +215,9 @@ Rocq support library in `verifiedos-rocq-9.3.0-ocaml-5.4.1`, generates the concr
 pure grammar from [`parser.mly`](../../tools/toolchain/parser/parser.mly) with
 `menhir 20260209 --coq --strict` in `verifiedos-sail-0.20.3-ocaml-5.4.1`, proves its
 concrete parser theorems, runs the recursive kernel checker across all 14 modules,
-extracts and compiles `vela-checked-parser`, and verifies runtime correspondence. An
-optional `--archive FILE` uses the same authenticated bytes without downloading them.
+extracts and compiles `vela-checked-parser`, installs the verified runtime build, and
+verifies runtime correspondence. An optional `--archive FILE` uses the same
+authenticated bytes without downloading them.
 
 Two bounded source adaptations are guarded by exact SHA-256 digests:
 
@@ -264,11 +270,15 @@ recursive `rocqchk` across all 14 `MenhirLib.*` modules.
 `VelaPureGrammar.file` to OCaml and links it with `ast.ml`, `lexer.mll`, a token-only
 `parser.ml` stub (linking zero code-backend Menhir tables) and `checked_main.ml` into
 `vela-checked-parser`
-(`4b52eb88eea5804795bd688ddc54806b45a8a302da02d72a0a299921dce51eba`). The extracted
-executable passes all `70` pure qualification fixtures, matches `vela-parser`
+(`2bf312bd2e1e38f62878c8cb4f2fdbc8d8288dbab5488a7a127393ae7a735529`).
+[`ensure_checked_build`](../../tools/toolchain/parser_checked.py) maintains the
+receipt-verified runtime binary at `/root/build/vela-parser-checked-runtime/vela-checked-parser`
+and [`parse_checked`](../../tools/toolchain/parser_checked.py) drives its `--batch`
+framed protocol on both Ubuntu (`linux`) and Windows (`win32` via `wsl.exe`). The
+extracted executable passes all `70` pure qualification fixtures, matches `vela-parser`
 byte-for-byte on [`examples/pure.vela`](../../examples/pure.vela),
 [`examples/constants.vela`](../../examples/constants.vela) and
-[`examples/expressions.vela`](../../examples/expressions.vela), and agrees with the
-Python baseline on all `173` migration fixtures (`0` differences). The Windows host
-replacement route, Python parser retirement and hosted CI verdicts remain Q25h's
-outstanding items.
+[`examples/expressions.vela`](../../examples/expressions.vela), and agrees on all `173`
+migration fixtures (`0` differences), retiring the Python `_Parser`
+(`"python_retired": true`, `"host_routes": ["linux", "win32"]`, `"deferred": []`).
+User-managed Host CI and Guest CI verdicts remain Q25h's open items.

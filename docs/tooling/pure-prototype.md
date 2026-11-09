@@ -23,16 +23,20 @@ parsing/checking supplies no kernel acceptance, checked source correspondence,
 ## Development parser goal
 
 The [Menhir development route](../assurance/verification-strategy.md#development-parser-and-grammar)
-produces located syntax before separate checking/elaboration. Python syntax and
-the strict generated-AST decoder feed shared resolution, typing and emission.
-Replacement requires the [plan's qualification](../../PLAN.md#vela-whole-system-authoring-proposal)
+produces located syntax before separate checking/elaboration. Both the Rocq-extracted
+`vela-checked-parser` and the code-backend `vela-parser` feed the strict generated-AST
+decoder and shared resolution, typing and emission pipeline under the
+[plan's qualification](../../PLAN.md#vela-whole-system-authoring-proposal)
 and [parser/migration contract](parser.md).
 
 `python tools/run.py vela-parser parse SOURCE` exercises generated syntax;
 `vela-parser qualify` checks independent AST fixtures/regeneration;
 `vela-parser migration` compares source edits and independently expected
-acceptance/refusal categories, retaining all differences. `vela` uses Python
-syntax until Q25h passes. Retain current examples/refusals as migration fixtures.
+acceptance/refusal categories, retaining all differences; and `vela-parser support`
+qualifies the Rocq-extracted `vela-checked-parser`. Ordinary `vela` commands parse
+pure source through `vela-checked-parser` (`vela.parse_module`) on both Ubuntu and
+Windows (`wsl.exe`), with the legacy handwritten Python `_Parser` retired (`Q25h`).
+Retain current examples/refusals as migration fixtures.
 
 ## Source fragment
 
