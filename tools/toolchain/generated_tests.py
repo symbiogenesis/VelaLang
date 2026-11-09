@@ -369,6 +369,8 @@ def deterministic_inspector(raw: bytes) -> dict[str, object]:
                 "name": "Entry",
                 "kind": "function",
                 "detail": "public Nat Entry(Nat input)",
+                "type": {"kind": "function", "result": "Nat", "const": False,
+                         "parameters": [{"type": "Nat", "required_static": False}]},
                 "line": line_no,
                 "column": entry_col,
             })
@@ -383,6 +385,7 @@ def deterministic_inspector(raw: bytes) -> dict[str, object]:
                 "name": "input",
                 "kind": "parameter",
                 "detail": "input: Nat",
+                "type": {"kind": "scalar", "name": "Nat"},
                 "line": line_no,
                 "column": input_col,
             })
@@ -403,6 +406,7 @@ def deterministic_inspector(raw: bytes) -> dict[str, object]:
                 "name": "local",
                 "kind": "variable",
                 "detail": "local: Nat",
+                "type": {"kind": "scalar", "name": "Nat"},
                 "line": line_no,
                 "column": local_col,
             })
