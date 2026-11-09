@@ -226,6 +226,52 @@ unsupported views, incomplete input and bounded truncation without reporting a
 partial response as complete. The inspection API remains read-only; explicit
 checked-generation requests retain their separate metaprogramming obligations.
 
+### Pure development snapshot increment
+
+`python tools/run.py vela inspect SOURCE` exports version 1 of the bounded
+pure inspection view. Its [JSON Schema](../../tools/toolchain/inspection.schema.json)
+covers bulk snapshots and query replies; the
+[implementation](../../tools/toolchain/inspection.py) consumes the existing
+[pure resolution producer](lsp-prototype.md#pure-navigation-increment) through its
+isolated five-second worker. This is partial Q25ch delivery. The wider frontend,
+syntax-tree, generated, proof and lowering views retain their producer prerequisites.
+
+Each snapshot preserves the exact UTF-8 source text, including comments, line
+endings and supplementary characters. Declaration and occurrence spans are
+half-open UTF-8 byte offsets. The view supplies source-ordered declaration kinds,
+compiler type/signature labels, authored identifier origins, documentation and
+resolved reference links. It does not supply a syntax tree, structural scope
+tree, inferred argument terms or generated definitions. Same-spelled declarations
+retain distinct identities; a symbol handle contains its complete snapshot digest.
+
+Snapshot identity binds the source URI and digest, the fixed `pure-default-v1`
+configuration and `gallina-pure-v1` target, Python implementation/version, and a
+conservative digest manifest of local compiler Python/parser sources and locked
+tool dependencies. The pure producer has no imported Vela dependencies. These
+identities describe development inspection inputs; they supply no checked source
+correspondence, kernel or runtime-artifact acceptance. The isolated producer uses
+the existing checked-parser runtime qualification and integrity checks.
+
+`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 1`,
+the exported `snapshot` digest and one `operation`: `symbols`, `symbol-at` with a
+byte `offset`, or `references` with a snapshot-scoped `symbol` handle. Optional
+`limit` is an integer from 1 through 256. Reference results include declaration
+occurrences. An identifier's end, punctuation and comments select no symbol.
+Offsets inside UTF-8 characters or CRLF are refused. The Python `Snapshot.query`
+interface also requires the current source and rechecks URI, configuration, target
+and producer closure; a changed binding or cross-snapshot handle is refused.
+
+Bulk inspection retains the existing 65,536-byte source, 1,024-declaration and
+4,096-occurrence bounds, with a 1,048,576-byte compact export bound. Queries report
+the total result count; truncation returns `partial`, `complete: false` and
+`result-limit`. Only a complete successful pure check or query reports `checked`
+and `complete: true`. Invalid or unsupported source yields `unavailable` with no
+semantic facts, worker timeout yields `timed-out`, and unsupported operations or
+targets yield `unsupported`. Malformed requests, stale identities and producer
+changes yield `refused`. Source text remains available in failed bulk inspections;
+empty semantic arrays carry no successful absence claim. The CLI returns success
+only for `checked` and preserves the source file.
+
 ## Syntax grammars and highlighting
 
 Distribute [Tree-sitter grammars and queries](https://tree-sitter.github.io/tree-sitter/3-syntax-highlighting.html)

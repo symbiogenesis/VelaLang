@@ -19,6 +19,8 @@ from toolchain.generated_tests import (
     DEFAULT_TIMEOUT_SECONDS,
     qualify_isolated_campaign,
 )
+from toolchain.inspection import MAX_EXPORT_BYTES, inspect
+from toolchain.protocol_json import decode_message
 
 
 @dataclass(frozen=True)
@@ -182,6 +184,10 @@ def main(argv: list[str] | None = None) -> int:
     generated.add_argument("--max-examples", type=int, default=DEFAULT_MAX_EXAMPLES)
     generated.add_argument("--step-count", type=int, default=DEFAULT_STEP_COUNT)
     generated.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
+    inspection = commands.add_parser("inspect", help="export versioned pure compiler facts (Q25ch subset)")
+    inspection.add_argument("source", type=Path)
+    inspection.add_argument("--query", type=Path,
+                            help="read a version-1 bounded query JSON object instead of exporting all facts")
     args = parser.parse_args(argv)
     if args.command in {"trace", "trace-validate"}:
         return _trace(args)
@@ -209,6 +215,17 @@ def main(argv: list[str] | None = None) -> int:
     path = Path(args.source)
     try:
         source = _read_source(path)
+        if args.command == "inspect":
+            snapshot = inspect(source.data, uri=path.resolve().as_uri())
+            result = snapshot.export()
+            if args.query is not None:
+                with args.query.open("rb") as stream:
+                    request = stream.read(MAX_EXPORT_BYTES + 1)
+                result = snapshot.query(source.data, decode_message(request))
+            _unchanged(source)
+            encoded = json.dumps(result, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            print(encoded)
+            return 0 if result["status"] == "checked" else 1
         # A failed complete check never rewrites even syntactically valid input.
         translation = translate(source.data)
         if args.command == "lint":
@@ -267,5 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except OSError as error:
         print(f"{path}:1:1: io: {error}", file=sys.stderr)
+        return 1
+    except ValueError as error:
+        print(f"{path}:1:1: inspection: {error}", file=sys.stderr)
         return 1
     return 0
