@@ -9,7 +9,6 @@ expands pseudo-instructions, encodes canonical 32-bit words via
 
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Final, Protocol
 
 from . import dialect, image
@@ -27,7 +26,8 @@ TEXT_BASE = 0x8000_0000
 DATA_BASE = 0x8000_8000
 
 MASK64 = (1 << 64) - 1
-CANONICAL_BITS: Final[int] = 32
+
+LABEL_RE: Final = re.compile(r"([A-Za-z_.$][A-Za-z_.$0-9]*)\s*:")
 
 # Data directives and their byte widths.
 _DATA_WIDTHS: Final[dict[str, int]] = {".byte": 1, ".half": 2, ".word": 4, ".dword": 8}
@@ -44,22 +44,6 @@ _TOKEN = re.compile(r"""
 
 _ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "0": "\0", "\\": "\\",
             '"': '"', "'": "'"}
-
-
-@dataclass(frozen=True)
-class Site:
-    """Metadata for a single emitted 32-bit instruction word (`site_id`, address, mnemonic, word, 1-based source line, and section)."""
-
-    site_id: str
-    address: int
-    opcode: str
-    word: int
-    source: int
-    section: str
-
-    def __post_init__(self) -> None:
-        if type(self.word) is not int or not 0 <= self.word < 1 << CANONICAL_BITS:
-            raise ValueError("instruction site word must be an unsigned 32-bit integer")
 
 
 @dataclass
@@ -85,7 +69,6 @@ class Assembler:
         self.data_base = data_base
         self.externals = dict(externals or {})
         self.items: list[Item] = []
-        self.sites: list[Site] = []
         self.symbols: dict[str, int] = {}
         self.symbol_section: dict[str, str] = {}
         self.constants: dict[str, tuple[int, str]] = {}   # .equ, with its section
@@ -101,7 +84,7 @@ class Assembler:
         for lineno, raw in enumerate(source.splitlines(), 1):
             text = raw.split("#", 1)[0].split("//", 1)[0].strip()
             while text:
-                label = re.match(r"([A-Za-z_.$][A-Za-z_.$0-9]*)\s*:", text)
+                label = LABEL_RE.match(text)
                 if not label:
                     break
                 self.items.append(Item("label", lineno, self.section,
@@ -188,7 +171,6 @@ class Assembler:
             raise AsmError(f"{self.name}: layout did not settle in eight rounds")
 
         self.strict = True
-        self.sites = []
         text = image.Section(".text", self.text_base, executable=True)
         data = image.Section(".data", self.data_base, writable=True)
         sections = {".text": text, ".data": data}
@@ -249,11 +231,6 @@ class Assembler:
             if item.address % 4 or item.size % 4:
                 raise self._error(item.line, "executable alignment needs whole 32-bit instructions")
             word = dialect.encode("addi", [0, 0, 0], item.address)
-            for address in range(item.address, item.address + item.size, 4):
-                self.sites.append(Site(
-                    site_id=f"{Path(self.name).stem}#{len(self.sites):05d}",
-                    address=address, opcode="addi", word=word,
-                    source=item.line, section=item.section))
             return word.to_bytes(4, "little") * (item.size // 4)
         if item.kind in ("space", "align"):
             return b"\0" * item.size
@@ -274,14 +251,6 @@ class Assembler:
                 out += word.to_bytes(4, "little")
             except AsmError as exc:
                 raise self._error(item.line, f"{item.text}: {exc}") from None
-            # One site per *emitted* instruction rather than per source line, because
-            # that is what §4's record is one of: a `li` that materializes in three
-            # words is three sites, and an analyzer counting source lines would report a
-            # stratum smaller than the stream it is stratifying.
-            self.sites.append(Site(
-                site_id=f"{Path(self.name).stem}#{len(self.sites):05d}",
-                address=pc, opcode=mnemonic, word=word, source=item.line,
-                section=item.section))
             pc += 4
         return bytes(out)
 
@@ -736,13 +705,3 @@ PSEUDOS: Final[dict[str, Pseudo]] = {
     "bgt": _branch_swapped("blt"), "ble": _branch_swapped("bge"),
     "bgtu": _branch_swapped("bltu"), "bleu": _branch_swapped("bgeu"),
 }
-
-
-def assemble_file(source: Path, elf: Path, sites: list[Site] | None = None) -> int:
-    """Assemble `source` into `elf`, optionally appending emitted `Site` records to `sites`, and return the section byte count."""
-    asm = Assembler(source.read_text(encoding="utf-8"), source.name)
-    sections, symbols, entry = asm.assemble()
-    image.write_elf(elf, sections, symbols, entry)
-    if sites is not None:
-        sites += asm.sites
-    return sum(len(s.data) for s in sections)
