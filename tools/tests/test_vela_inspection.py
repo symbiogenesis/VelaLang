@@ -12,7 +12,7 @@ from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
-from toolchain import inspection
+from toolchain import inspect_source, inspection
 from toolchain.cli import vela as cli
 from toolchain.lsp_services import InspectionError
 from toolchain.schema import validate
@@ -25,7 +25,7 @@ SOURCE = ("module Inspect;\r\n// supplementary: 😀\r\n"
 
 
 def _request(snapshot: inspection.Snapshot, operation: str, **fields: object) -> dict[str, object]:
-    return {"schema": 1, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
+    return {"schema": 2, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
 
 
 def _symbols(value: dict[str, object]) -> list[dict[str, object]]:
@@ -106,6 +106,91 @@ def _nested_scope_consumer() -> None:
         ensure(response["items"] == [symbol], "nested block reference resolved to sibling declaration")
 
 
+def _structured_types_consumer() -> None:
+    source = (b"module Types;\r\n// Unicode: \xf0\x9f\x98\x80\r\npublic const Nat Limit = 3;\r\n"
+              b"public const bool IsReady(const Nat threshold, bool enabled) { "
+              b"let bool same = enabled; return same && threshold == Limit; }\r\n"
+              b"public bool Use(Nat IsReady) { let ready = IsReady(3, true); "
+              b"return ready && IsReady == 3; }\r\n")
+    snapshot = inspection.inspect(source)
+    value = snapshot.export()
+    validate(inspection.SCHEMA_PATH, value)
+    symbols = _symbols(value)
+    callable_type = {"kind": "function", "result": "bool", "const": True,
+                     "parameters": [{"type": "Nat", "required_static": True},
+                                    {"type": "bool", "required_static": False}]}
+    expected: list[object] = [
+        {"kind": "scalar", "name": "Nat"}, callable_type,
+        {"kind": "scalar", "name": "Nat"}, {"kind": "scalar", "name": "bool"},
+        {"kind": "scalar", "name": "bool"},
+        {"kind": "function", "result": "bool", "const": False,
+         "parameters": [{"type": "Nat", "required_static": False}]},
+        {"kind": "scalar", "name": "Nat"}, {"kind": "scalar", "name": "bool"}]
+    ensure([symbol["type"] for symbol in symbols] == expected,
+           "structured types lost scalar inference, explicit annotations or static-call requirements")
+    sites = [(source.index(b"Limit ="), 0), (source.index(b"IsReady(const"), 1),
+             (source.index(b"Limit;"), 0), (source.index(b"IsReady(3"), 1),
+             (source.index(b"IsReady =="), 6), (source.index(b"return ready") + 7, 7)]
+    for offset, index in sites:
+        symbol = symbols[index]
+        for query_offset in (offset, offset + 1):
+            response = snapshot.query(source, _request(snapshot, "type-at", offset=query_offset))
+            validate(inspection.SCHEMA_PATH, response)
+            ensure(response["status"] == "checked" and response["items"] == [
+                {"symbol": symbol["id"], "span": [offset, offset + len(cast("str", symbol["name"]))],
+                 "type": expected[index]}], "type-at changed reference span, binding or structured type")
+    for offset in (0, source.index(b";") + 1, source.index(b"IsReady(3") + len(b"IsReady")):
+        response = snapshot.query(source, _request(snapshot, "type-at", offset=offset))
+        ensure(response["status"] == "checked" and response["items"] == [],
+               "type-at invented a type outside a resolved identifier")
+    for offset in (True, -1, len(source) + 1, source.index(b"\xf0\x9f") + 1, source.index(b"\r\n") + 1):
+        response = snapshot.query(source, _request(snapshot, "type-at", offset=offset))
+        ensure(response["status"] == "refused" and response["reason"] == "invalid-offset",
+               "type-at accepted malformed, interior Unicode or CRLF coordinates")
+    stale = snapshot.query(source + b" ", _request(snapshot, "type-at", offset=sites[0][0]))
+    ensure(stale["reason"] == "stale-input" and stale["items"] == [], "type-at reused stale types")
+
+
+def _malformed_type_refusal() -> None:
+    raw = inspect_source(SOURCE)
+    scalar = {"kind": "scalar", "name": "Nat"}
+    callable_type = {"kind": "function", "result": "Nat", "const": False,
+                     "parameters": [{"type": "Nat", "required_static": False}]}
+    replacements: list[tuple[int, object]] = [
+        (0, None), (0, scalar), (1, callable_type), (1, {**scalar, "name": "u32"}),
+        (1, {**scalar, "extra": True}), (0, {**callable_type, "result": "bool"}),
+        (0, {**callable_type, "const": True}), (0, {**callable_type, "const": 1}),
+        (0, {**callable_type, "parameters": []}),
+        (0, {**callable_type, "parameters": [{"type": "Nat", "required_static": True}]}),
+        (0, {**callable_type, "parameters": [{"type": "Nat", "required_static": 0}]}),
+        (0, {**callable_type, "parameters": [{"type": "Nat", "required_static": False, "extra": 0}]})]
+    for index, value_type in replacements:
+        changed = copy.deepcopy(raw)
+        cast("list[dict[str, object]]", changed["symbols"])[index]["type"] = value_type
+        with patch.object(inspection, "inspect_document", return_value=changed):
+            result = inspection.inspect(SOURCE).export()
+        validate(inspection.SCHEMA_PATH, result)
+        ensure(result["status"] == "unavailable" and result["symbols"] == [] and result["occurrences"] == [],
+               "malformed or inconsistent producer types escaped as checked facts")
+    missing = copy.deepcopy(raw)
+    del cast("list[dict[str, object]]", missing["symbols"])[0]["type"]
+    with patch.object(inspection, "inspect_document", return_value=missing):
+        ensure(inspection.inspect(SOURCE).export()["status"] == "unavailable",
+               "an obsolete producer response silently acquired reconstructed types")
+    snapshot = inspection.inspect(SOURCE)
+    old = snapshot.query(SOURCE, _request(snapshot, "type-at", schema=1, offset=0))
+    ensure(old["reason"] == "schema-version" and old["items"] == [], "version-1 query accepted version-2 semantics")
+    for index, value_type in ((0, scalar), (1, callable_type)):
+        invalid = snapshot.export()
+        _symbols(invalid)[index]["type"] = value_type
+        try:
+            validate(inspection.SCHEMA_PATH, invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("public schema accepted a callable/scalar kind mismatch")
+
+
 def _binding_invalidation() -> None:
     snapshot = inspection.inspect(SOURCE)
     request = _request(snapshot, "symbols")
@@ -135,7 +220,7 @@ def _bounded_and_malformed_queries() -> None:
            and partial["total"] == 5 and len(cast("list[object]", partial["items"])) == 1,
            "bounded query disguised truncation as complete")
     for bad in (None, [], {}, _request(snapshot, "symbols", extra=True),
-                _request(snapshot, "symbols", schema=True), _request(snapshot, "symbols", schema=2),
+                _request(snapshot, "symbols", schema=True), _request(snapshot, "symbols", schema=1),
                 _request(snapshot, "symbols", limit=0), _request(snapshot, "symbols", limit=257),
                 _request(snapshot, "symbols", limit=True)):
         response = snapshot.query(SOURCE, bad)
@@ -165,7 +250,7 @@ def _unavailable_status_and_schema() -> None:
     with patch.object(inspection, "inspect_document", side_effect=InspectionError("exceeded 5 seconds")):
         timed = inspection.inspect(SOURCE).export()
     ensure(timed["status"] == "timed-out" and timed["symbols"] == [], "timeout retained successful status")
-    for change in ({"schema": 2}, {"complete": True}, {"unknown": "field"}):
+    for change in ({"schema": 1}, {"complete": True}, {"unknown": "field"}):
         invalid = {**timed, **change}
         try:
             validate(inspection.SCHEMA_PATH, invalid)
@@ -200,7 +285,7 @@ def _cli_source_preservation() -> None:
         value = json.loads(output.getvalue())
         validate(inspection.SCHEMA_PATH, value)
         query = Path(directory) / "query.json"
-        query.write_text(json.dumps({"schema": 1, "snapshot": value["snapshot"], "operation": "symbols"}),
+        query.write_text(json.dumps({"schema": 2, "snapshot": value["snapshot"], "operation": "symbols"}),
                          encoding="utf-8")
         with redirect_stdout(output := StringIO()), redirect_stderr(errors := StringIO()):
             code = cli.main(["inspect", str(path), "--query", str(query)])
@@ -215,6 +300,8 @@ def cases() -> list[Case]:
             Case("byte-position-and-scoped-reference-consumer", _query_consumer),
             Case("deterministic-snapshot-and-handle-lifetime", _determinism_and_cross_snapshot_handles),
             Case("nested-sibling-scope-consumer", _nested_scope_consumer),
+            Case("structured-scalar-callable-and-type-at-consumer", _structured_types_consumer),
+            Case("malformed-structured-types-and-version-refusal", _malformed_type_refusal),
             Case("source-config-target-and-producer-invalidation", _binding_invalidation),
             Case("query-bounds-and-malformed-input-refusal", _bounded_and_malformed_queries),
             Case("unavailable-timeout-and-schema-refusal", _unavailable_status_and_schema),

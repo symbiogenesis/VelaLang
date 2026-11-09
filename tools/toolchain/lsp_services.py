@@ -15,9 +15,10 @@ from toolchain.ast import (
     UNSUPPORTED,
     Name,
     Site,
+    ValueType,
 )
 from toolchain.documentation import DocumentationSource
-from toolchain.facts import MAX_OCCURRENCES, MAX_SYMBOLS
+from toolchain.facts import MAX_OCCURRENCES, MAX_SYMBOLS, PureType
 from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_message
 from toolchain.source import SourceSnapshot
@@ -61,6 +62,7 @@ class _Symbol:
     name: str
     kind: str
     detail: str
+    value_type: PureType
     start: Position
     end: Position
     type_hint: str | None
@@ -92,6 +94,32 @@ def _integer(value: object) -> int:
     if type(value) is not int or not 0 <= value < 2 ** 31:
         raise InspectionError("Invalid pure prototype inspection integer")
     return value
+
+
+def _value_type(value: object) -> ValueType:
+    if value not in ("Nat", "bool"):
+        raise InspectionError("Invalid pure prototype scalar type")
+    return cast("ValueType", value)
+
+
+def _pure_type(value: object, kind: object) -> PureType:
+    if kind != "function":
+        record = _object(value, {"kind", "name"})
+        if record["kind"] != "scalar":
+            raise InspectionError("Invalid pure prototype scalar type kind")
+        return PureType(_value_type(record["name"]))
+    record = _object(value, {"kind", "result", "parameters", "const"})
+    raw = record["parameters"]
+    if (record["kind"] != "function" or type(record["const"]) is not bool
+            or not isinstance(raw, list) or len(raw) > MAX_SYMBOLS):
+        raise InspectionError("Invalid pure prototype callable type")
+    parameters: list[tuple[ValueType, bool]] = []
+    for item in raw:
+        parameter = _object(item, {"type", "required_static"})
+        if type(parameter["required_static"]) is not bool:
+            raise InspectionError("Invalid pure prototype static parameter type")
+        parameters.append((_value_type(parameter["type"]), parameter["required_static"]))
+    return PureType(_value_type(record["result"]), tuple(parameters), record["const"])
 
 
 def _span(snapshot: SourceSnapshot, lines: list[str], name: str,
@@ -129,7 +157,7 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
     documentation = DocumentationSource(snapshot.source)
     symbols: list[_Symbol] = []
     for value in symbols_raw:
-        fields = {"name", "kind", "detail", "line", "column"}
+        fields = {"name", "kind", "detail", "type", "line", "column"}
         if isinstance(value, dict) and "documentation" in value:
             fields.add("documentation")
         if isinstance(value, dict) and "inferred" in value:
@@ -142,6 +170,7 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
             raise InspectionError("Invalid pure prototype inspection symbol")
         if "inferred" in symbol and (symbol["inferred"] is not False or kind != "variable"):
             raise InspectionError("Invalid pure prototype local inference flag")
+        value_type = _pure_type(symbol["type"], kind)
         first, last = _span(snapshot, lines, name, symbol)
         if symbols and first <= symbols[-1].start:
             raise InspectionError("Pure prototype inspection declarations are unordered or duplicated")
@@ -149,14 +178,13 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
         if kind == "variable":
             # The compiler records each checked local type and whether an
             # explicit annotation supplied it. The adapter never infers a type.
-            type_hint = {f"{name}: Nat": ": Nat", f"{name}: bool": ": bool"}.get(detail)
-            if type_hint is None:
+            if detail != f"{name}: {value_type.result}":
                 raise InspectionError("Invalid pure prototype inferred local type")
+            type_hint = f": {value_type.result}"
             if symbol.get("inferred") is False:
                 type_hint = None
         elif kind == "parameter":
-            if detail not in {f"{name}: Nat", f"{name}: bool",
-                              f"const {name}: Nat", f"const {name}: bool"}:
+            if detail not in {f"{name}: {value_type.result}", f"const {name}: {value_type.result}"}:
                 raise InspectionError("Invalid pure prototype parameter detail")
         elif kind == "constant":
             natural_prefix = f"const Nat {name} = "
@@ -169,11 +197,31 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
                     f"const bool {name} = true", f"const bool {name} = false",
                     f"const Nat {name}", f"const bool {name}"}:
                 raise InspectionError("Invalid pure prototype constant detail")
+            if not detail.startswith(f"const {value_type.result} {name}"):
+                raise InspectionError("Pure prototype constant type differs from its label")
         doc = None
         if "documentation" in symbol:
             site = Site(_integer(symbol["line"]), _integer(symbol["column"]))
             doc = documentation.validate(symbol["documentation"], Name(name, site), cast("str", kind))
-        symbols.append(_Symbol(name, cast("str", kind), detail, first, last, type_hint, doc))
+        symbols.append(_Symbol(name, cast("str", kind), detail, value_type, first, last, type_hint, doc))
+    for index, symbol in enumerate(symbols):
+        parameters = symbol.value_type.parameters
+        if parameters is None:
+            continue
+        declared = symbols[index + 1:index + 1 + len(parameters)]
+        if len(declared) != len(parameters):
+            raise InspectionError("Pure prototype callable omits parameter declarations")
+        labels: list[str] = []
+        for parameter, (value_type, required_static) in zip(declared, parameters, strict=True):
+            prefix = "const " if required_static else ""
+            if (parameter.kind != "parameter" or parameter.value_type != PureType(value_type)
+                    or parameter.detail != f"{prefix}{parameter.name}: {value_type}"):
+                raise InspectionError("Pure prototype callable type differs from its parameters")
+            labels.append(f"{prefix}{value_type} {parameter.name}")
+        prefix = "const " if symbol.value_type.const else ""
+        expected = f"public {prefix}{symbol.value_type.result} {symbol.name}({', '.join(labels)})"
+        if symbol.detail != expected:
+            raise InspectionError("Pure prototype callable type differs from its label")
     occurrences: list[_Occurrence] = []
     declarations: set[int] = set()
     for value in occurrences_raw:

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vela pure development inspection version 1",
+  "title": "Vela pure development inspection version 2",
   "$defs": {
     "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "span": {
@@ -8,6 +8,29 @@
       "items": false, "minItems": 2
     },
     "handle": {"type": "string", "pattern": "^[0-9a-f]{64}:symbol:[0-9]+$"},
+    "type": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "name"],
+          "properties": {"kind": {"const": "scalar"}, "name": {"enum": ["Nat", "bool"]}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "result", "parameters", "const"],
+          "properties": {
+            "kind": {"const": "function"}, "result": {"enum": ["Nat", "bool"]},
+            "const": {"type": "boolean"},
+            "parameters": {
+              "type": "array", "maxItems": 1024,
+              "items": {
+                "type": "object", "additionalProperties": false, "required": ["type", "required_static"],
+                "properties": {"type": {"enum": ["Nat", "bool"]}, "required_static": {"type": "boolean"}}
+              }
+            }
+          }
+        }
+      ]
+    },
     "binding": {
       "type": "object", "additionalProperties": false,
       "required": ["uri", "source_sha256", "producer", "configuration", "target", "coordinate_unit", "symbol_lifetime"],
@@ -30,29 +53,41 @@
     },
     "symbol": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "name", "kind", "detail", "span", "origin", "documentation"],
+      "required": ["id", "name", "kind", "detail", "type", "span", "origin", "documentation"],
       "properties": {
         "id": {"$ref": "#/$defs/handle"}, "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"},
         "kind": {"enum": ["function", "parameter", "variable", "constant"]},
         "detail": {"type": "string", "minLength": 1}, "span": {"$ref": "#/$defs/span"},
+        "type": {"$ref": "#/$defs/type"},
         "documentation": {"type": ["string", "null"]},
         "origin": {
           "type": "object", "additionalProperties": false, "required": ["kind", "span"],
           "properties": {"kind": {"const": "authored"}, "span": {"$ref": "#/$defs/span"}}
         }
-      }
+      },
+      "allOf": [{
+        "if": {"properties": {"kind": {"const": "function"}}},
+        "then": {"properties": {"type": {"properties": {"kind": {"const": "function"}}}}},
+        "else": {"properties": {"type": {"properties": {"kind": {"const": "scalar"}}}}}
+      }]
     },
     "occurrence": {
       "type": "object", "additionalProperties": false, "required": ["symbol", "span", "declaration"],
       "properties": {
         "symbol": {"$ref": "#/$defs/handle"}, "span": {"$ref": "#/$defs/span"}, "declaration": {"type": "boolean"}
       }
+    },
+    "type_at": {
+      "type": "object", "additionalProperties": false, "required": ["symbol", "span", "type"],
+      "properties": {
+        "symbol": {"$ref": "#/$defs/handle"}, "span": {"$ref": "#/$defs/span"}, "type": {"$ref": "#/$defs/type"}
+      }
     }
   },
   "type": "object",
   "required": ["schema", "scope", "snapshot", "binding", "status", "complete", "reason"],
   "properties": {
-    "schema": {"const": 1}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
+    "schema": {"const": 2}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
     "status": {"enum": ["checked", "unavailable", "timed-out", "partial", "unsupported", "refused"]},
     "complete": {"type": "boolean"}, "reason": {"type": ["string", "null"]}
   },
@@ -82,7 +117,7 @@
           "required": ["items", "total"],
           "properties": {
             "scope": {"const": "vela-pure-inspection-query"}, "total": {"type": "integer", "minimum": 0},
-            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}]}}
+            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}]}}
           }
         }
       ]

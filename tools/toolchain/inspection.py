@@ -17,7 +17,7 @@ from toolchain.lsp_services import (
 )
 from toolchain.source import SourceSnapshot
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 CONFIGURATION = "pure-default-v1"
 TARGET = "gallina-pure-v1"
 MAX_QUERY_RESULTS = 256
@@ -63,7 +63,8 @@ def _facts(document: SourceSnapshot, inspection: Inspection, identity: str) -> t
     for index, symbol in enumerate(inspection.symbols):
         span = _span(document, symbol.start, symbol.end)
         symbols.append({"id": f"{identity}:symbol:{index}", "name": symbol.name,
-                        "kind": symbol.kind, "detail": symbol.detail, "span": span,
+                        "kind": symbol.kind, "detail": symbol.detail,
+                        "type": symbol.value_type.export(), "span": span,
                         "origin": {"kind": "authored", "span": span},
                         "documentation": symbol.documentation})
     occurrences: list[object] = [
@@ -114,10 +115,10 @@ class Snapshot:
         if query.get("snapshot") != current["snapshot"]:
             return refuse("stale-snapshot")
         operation = query.get("operation")
-        if not isinstance(operation, str) or operation not in {"symbol-at", "references", "symbols"}:
+        if not isinstance(operation, str) or operation not in {"symbol-at", "type-at", "references", "symbols"}:
             return refuse("unsupported-operation", "unsupported")
         required = {"schema", "snapshot", "operation"}
-        if operation == "symbol-at":
+        if operation in {"symbol-at", "type-at"}:
             required.add("offset")
         elif operation == "references":
             required.add("symbol")
@@ -149,6 +150,9 @@ class Snapshot:
                              < cast("list[int]", item["span"])[1]), None)
             items = [] if selected is None else [
                 item for item in symbols if item["id"] == selected["symbol"]]
+            if operation == "type-at" and selected is not None:
+                items = [{"symbol": item["id"], "span": selected["span"], "type": item["type"]}
+                         for item in items]
         count = len(items)
         response.update(status="checked" if count <= limit else "partial",
                         complete=count <= limit, reason=None if count <= limit else "result-limit",

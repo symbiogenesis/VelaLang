@@ -62,9 +62,16 @@ def _expected() -> dict[str, object]:
         (8, 15, 12, True), (9, 15, 22, True),
         (0, 15, 37, False), (9, 15, 42, False),
     ]
+    function_parameters = {0: ["Nat"], 3: ["bool", "Nat"], 8: ["Nat"]}
+    types: list[dict[str, object]] = [
+        ({"kind": "function", "result": "Nat", "const": False,
+          "parameters": [{"type": value_type, "required_static": False}
+                         for value_type in function_parameters[index]]}
+         if index in function_parameters else {"kind": "scalar", "name": "bool" if index == 4 else "Nat"})
+        for index in range(len(declarations))]
     return {"status": "ok", "symbols": [
-                {"name": name, "kind": kind, "detail": detail, "line": line, "column": column}
-                for name, kind, detail, line, column in declarations],
+                {"name": name, "kind": kind, "detail": detail, "type": value_type, "line": line, "column": column}
+                for (name, kind, detail, line, column), value_type in zip(declarations, types, strict=True)],
             "occurrences": [
                 {"symbol": symbol, "line": line, "column": column, "declaration": declaration}
                 for symbol, line, column, declaration in uses]}
@@ -85,9 +92,13 @@ def _inferred_types_and_coordinates() -> None:
     source = "// 😀 café\nmodule Types;\npublic bool F(bool input) { let same = input == true; return same; }"
     expected: dict[str, object] = {"status": "ok", "symbols": [
         {"name": "F", "kind": "function", "detail": "public bool F(bool input)",
+         "type": {"kind": "function", "result": "bool", "const": False,
+                  "parameters": [{"type": "bool", "required_static": False}]},
          "line": 3, "column": 13},
-        {"name": "input", "kind": "parameter", "detail": "input: bool", "line": 3, "column": 20},
-        {"name": "same", "kind": "variable", "detail": "same: bool", "line": 3, "column": 33}],
+        {"name": "input", "kind": "parameter", "detail": "input: bool",
+         "type": {"kind": "scalar", "name": "bool"}, "line": 3, "column": 20},
+        {"name": "same", "kind": "variable", "detail": "same: bool",
+         "type": {"kind": "scalar", "name": "bool"}, "line": 3, "column": 33}],
         "occurrences": [
             {"symbol": 0, "line": 3, "column": 13, "declaration": True},
             {"symbol": 1, "line": 3, "column": 20, "declaration": True},

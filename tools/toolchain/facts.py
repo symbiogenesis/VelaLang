@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from toolchain.ast import Name, Site, VelaError
+from toolchain.ast import Name, Site, ValueType, VelaError
 from toolchain.documentation import DocumentationSource
 
 MAX_SYMBOLS = 1024
@@ -13,10 +13,27 @@ type SymbolKind = Literal["function", "parameter", "variable", "constant"]
 
 
 @dataclass(frozen=True)
+class PureType:
+    """Compiler-owned scalar or callable type, independent of display labels."""
+
+    result: ValueType
+    parameters: tuple[tuple[ValueType, bool], ...] | None = None
+    const: bool = False
+
+    def export(self) -> dict[str, object]:
+        if self.parameters is None:
+            return {"kind": "scalar", "name": self.result}
+        return {"kind": "function", "result": self.result, "const": self.const,
+                "parameters": [{"type": value_type, "required_static": required_static}
+                               for value_type, required_static in self.parameters]}
+
+
+@dataclass(frozen=True)
 class _Symbol:
     name: Name
     kind: SymbolKind
     detail: str
+    value_type: PureType
     inferred: bool | None = None
 
 
@@ -37,14 +54,15 @@ class Facts:
         self.documentation = None if source is None else DocumentationSource(source)
         self.declaration_sites = {} if declaration_sites is None else dict(declaration_sites)
 
-    def declare(self, name: Name, kind: SymbolKind, detail: str, *, inferred: bool | None = None) -> int:
+    def declare(self, name: Name, kind: SymbolKind, detail: str, value_type: PureType, *,
+                inferred: bool | None = None) -> int:
         if len(self.symbols) >= MAX_SYMBOLS:
             raise VelaError("inspection-limit", name.site.line, name.site.column,
                             "pure inspection exceeds declaration limit")
         identity = len(self.symbols)
         if inferred is not None and (inferred is not False or kind != "variable"):
             raise ValueError("only an explicitly annotated variable carries an inference flag")
-        self.symbols.append(_Symbol(name, kind, detail, inferred))
+        self.symbols.append(_Symbol(name, kind, detail, value_type, inferred))
         self.reference(identity, name.site, declaration=True)
         return identity
 
@@ -60,6 +78,7 @@ class Facts:
         identities = {old: new for new, (old, _) in enumerate(ordered)}
         symbols: list[dict[str, object]] = [
             {"name": symbol.name.text, "kind": symbol.kind, "detail": symbol.detail,
+             "type": symbol.value_type.export(),
              "line": symbol.name.site.line, "column": symbol.name.site.column}
             for _, symbol in ordered]
         for data, (_, symbol) in zip(symbols, ordered, strict=True):
