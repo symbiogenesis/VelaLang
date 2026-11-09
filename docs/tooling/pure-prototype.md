@@ -328,3 +328,50 @@ module `Vela_Oracle` with `f_Cube`/`f_Choose`. The
 logic, comparisons and saturating natural subtraction. The playground console
 evaluates closed expressions through the bounded static evaluator; kernel
 acceptance requires the separate replay.
+
+## Bounded compiler traces
+
+The pure development compiler supplies a scoped increment of
+[Q25cp](../../PLAN.md#q25cp) under the
+[performance trace contract](tooling-protocols.md#compiler-decisions-and-performance-traces).
+Create the destination directory, then run:
+
+```console
+python tools/run.py vela trace examples/pure.vela --output out/pure-trace.json
+python tools/run.py vela trace-validate out/pure-trace.json --source examples/pure.vela
+```
+
+The read-only trace command records `compile`, nested `parse` and
+`elaborate-and-emit` phases from the existing pure producer. Resolution and Gallina
+emission share one elaborator and remain one measured phase. The synchronous host
+worker includes time waiting for the checked parser process; it does not report
+that process's internal phases. Source and Gallina byte counters use Chrome
+Trace Event `C` records, and completed phases use `X` records with recording-relative
+integer microseconds derived from `perf_counter_ns`. The fixed worker identities
+are `pid: 1`, `tid: 1`; they describe this recording, not operating-system IDs.
+[Perfetto documents these event formats](https://perfetto.dev/docs/getting-started/other-formats)
+as an input to its viewer. No external viewer is qualified by this increment.
+
+The `vela` schema-1 manifest binds events and completeness metadata, exact source
+bytes, local Python/compiler/parser input files and Python/platform versions.
+These hashes detect changed data; they authenticate no producer and carry no
+exact native-runtime, theorem or artifact-admission verdict. The validation
+command refuses changed source or producer identities, malformed events, crossing
+spans, invalid clocks, missing phases or counters, and incomplete recordings.
+A successful complete recording measures a successful pure check only.
+
+Recording retains at most 4,096 events; `--max-events` selects a smaller positive
+limit. Phase names, counters, nesting and exported/decoded bytes have fixed bounds.
+Dropped events, open spans, clock faults and refused or cancelled work prevent a
+complete measurement claim. A refused source writes a diagnostic trace and returns
+failure. Publication is atomic, refuses source aliases and rechecks source and
+producer freshness; failed preparation preserves an existing output. The manifest
+reports measured recorder bookkeeping in nanoseconds, excluding identity hashing,
+serialization and file publication. No hard elapsed-time overhead bound is claimed.
+
+[Independent timeline fixtures](../../tools/tests/test_vela_compiler_trace.py)
+recover expected order, durations, nesting and counters with a separate JSON reader
+and exercise corruption, overflow, clock and refusal controls. Wider phase/worker
+coverage, pinned external-viewer qualification, exact runtime closure and comparative
+overhead measurements remain open under Q25cp. Compiler timings supply no execution
+time, WCET or constant-time evidence for emitted programs.

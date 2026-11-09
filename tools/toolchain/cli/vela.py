@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from toolchain import MAX_SOURCE_BYTES, VelaError, translate
+from toolchain import MAX_SOURCE_BYTES, VelaError, compiler_trace, translate
 from toolchain.atomic import atomic_path
 from toolchain.authoring import LINT_CODES, format_source, lint_source
 from toolchain.generated_tests import (
@@ -101,6 +101,50 @@ def _lint(path: Path, source: bytes, allowed: set[str], denied: set[str], *,
     return not failed
 
 
+def _trace(args: argparse.Namespace) -> int:
+    source_path = args.source
+    try:
+        source = _read_source(source_path)
+        producer = compiler_trace.producer_identity()
+        if args.command == "trace-validate":
+            with args.trace.open("rb") as stream:
+                data = stream.read(compiler_trace.MAX_TRACE_BYTES + 1)
+            compiler_trace.validate(compiler_trace.decode(data), source.data, producer)
+            _unchanged(source)
+            print("ok vela: complete pure compiler recording; no program timing verdict")
+            return 0
+        _destination(source_path, args.output)
+        recorder = compiler_trace.Recorder(max_events=args.max_events)
+        outcome = "success"
+        result = 0
+        try:
+            translate(source.data, trace=recorder)
+        except VelaError as error:
+            outcome, result = "refused", 1
+            print(f"{source_path}:{error.line}:{error.column}: {error.kind}: {error.message}", file=sys.stderr)
+        except BaseException as error:
+            outcome, result = "cancelled" if isinstance(error, KeyboardInterrupt) else "refused", 1
+            raise
+        finally:
+            document = recorder.export(source.data, producer, outcome=outcome)
+            manifest = compiler_trace.validate(document, source.data, producer, require_complete=False)
+            _unchanged(source)
+            if compiler_trace.producer_identity() != producer:
+                raise OSError("compiler inputs changed during recording")
+            _destination(source_path, args.output)
+            with atomic_path(args.output) as pending:
+                pending.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="")
+                _unchanged(source)
+                if compiler_trace.producer_identity() != producer:
+                    raise OSError("compiler inputs changed before trace publication")
+    except (OSError, ValueError) as error:
+        print(f"{source_path}:1:1: trace: {error}", file=sys.stderr)
+        return 1
+    else:
+        print(f"vela: {args.output}: {outcome}; recording complete: {manifest['complete']}")
+        return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(suggest_on_error=True, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -123,6 +167,13 @@ def main(argv: list[str] | None = None) -> int:
         if name == "emit":
             command.add_argument("--output", type=Path,
                                  help="atomically replace a file in an existing directory")
+    trace = commands.add_parser("trace", help="record bounded pure compiler phase timings")
+    trace.add_argument("source", type=Path)
+    trace.add_argument("--output", type=Path, required=True)
+    trace.add_argument("--max-events", type=int, default=compiler_trace.MAX_EVENTS)
+    trace_validation = commands.add_parser("trace-validate", help="refuse incomplete or stale compiler traces")
+    trace_validation.add_argument("trace", type=Path)
+    trace_validation.add_argument("--source", type=Path, required=True)
     generated = commands.add_parser(
         "generated-tests",
         help="qualify isolated Hypothesis generated development tests (Q25x)",
@@ -132,6 +183,8 @@ def main(argv: list[str] | None = None) -> int:
     generated.add_argument("--step-count", type=int, default=DEFAULT_STEP_COUNT)
     generated.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args(argv)
+    if args.command in {"trace", "trace-validate"}:
+        return _trace(args)
     if args.command == "generated-tests":
         root = Path(__file__).resolve().parents[3]
         try:

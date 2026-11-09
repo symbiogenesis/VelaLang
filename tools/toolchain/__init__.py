@@ -20,6 +20,7 @@ from toolchain.ast import (
     ValueType,
     VelaError,
 )
+from toolchain.compiler_trace import Recorder
 from toolchain.facts import Facts, SymbolKind
 
 __all__ = ["MAX_BLOCK_DEPTH", "MAX_EXPRESSION_DEPTH", "MAX_LITERAL_DIGITS", "MAX_SOURCE_BYTES",
@@ -577,11 +578,20 @@ def parse_module(source: bytes) -> syntax.Module:
     return syntax.decode(source, checked.parse_checked(source))
 
 
-def translate(source: bytes) -> Translation:
+def translate(source: bytes, *, trace: Recorder | None = None) -> Translation:
     """Validate the complete bounded source through the Rocq-extracted checked parser."""
     global _LAST_ELABORATED  # noqa: PLW0603
     elaborator = _Elaborator()
-    translated = _translate(source, parse_module(source), elaborator=elaborator)
+    if trace is None:
+        translated = _translate(source, parse_module(source), elaborator=elaborator)
+    else:
+        with trace.span("compile"):
+            trace.counter("source_bytes", len(source))
+            with trace.span("parse"):
+                module = parse_module(source)
+            with trace.span("elaborate-and-emit"):
+                translated = _translate(source, module, elaborator=elaborator)
+            trace.counter("gallina_bytes", len(translated.gallina.encode("utf-8")))
     _LAST_ELABORATED = (_budget_key(source), elaborator.copy())
     return translated
 
