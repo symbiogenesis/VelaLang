@@ -203,6 +203,10 @@ def _compiler_and_command() -> None:
             ensure(run("trace", str(source), "--output", str(source)) == 1, "source alias permitted")
             ensure(run("trace", str(source), "--output", str(output), "--max-events", "0") == 1, "invalid bound permitted")
             ensure(output.read_bytes() == previous, "failed preparation replaced trace")
+            with patch.object(trace, "producer_identity", side_effect=[PRODUCER, PRODUCER, "b" * 64]):
+                ensure(run("trace", str(source), "--output", str(output)) == 1,
+                       "late producer change published a stale recording")
+            ensure(output.read_bytes() == previous, "late producer change replaced existing trace")
             source.write_bytes(b"module Bad; public Nat Wrong() => missing;")
             ensure(run("trace", str(source), "--output", str(output)) == 1, "refused source succeeded")
             manifest = trace.validate(trace.decode(output.read_bytes()), source.read_bytes(), PRODUCER,
