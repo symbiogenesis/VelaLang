@@ -970,6 +970,63 @@ class _IntrinsicsMixin:
                 "exclusive 'ref' borrow cannot escape as a value expression; ref argument is only supported as the target of Format.Write or a mutable call target (exclusive-loan-escape)",
                 node,
             )
+        if isinstance(node["operator"], dict) and node["operator"].get("text") == "move":
+            target_node = self._unwrap_group(self.node(node["value"]))
+            if target_node["kind"] in {"member", "index"}:
+                raise self.fail(
+                    "type",
+                    "cannot move a projected field or element out of its owning container (partial-owner-move-unsupported)",
+                    node,
+                )
+            if target_node["kind"] != "name":
+                raise self.fail(
+                    "type",
+                    "'move' requires a named local or owned parameter binding",
+                    node,
+                )
+            vname = self.name(target_node["name"])
+            if vname == "this":
+                raise self.fail("type", "cannot move borrowed receiver 'this'", node)
+            if vname not in environment:
+                if vname in self.globals:
+                    raise self.fail(
+                        "type",
+                        f"cannot move constant or top-level declaration '{vname}'",
+                        node,
+                    )
+                self.lookup(vname, environment)
+            binding = environment[vname]
+            if binding.constant:
+                raise self.fail("type", f"cannot move constant binding '{vname}'", node)
+            if vname in self.uninitialized_out_params:
+                raise self.fail("type", f"cannot move uninitialized 'out' parameter '{vname}'", node)
+            if vname in self.local_borrows:
+                raise self.fail(
+                    "type",
+                    f"cannot move through local borrow '{vname}' (move-through-loan-unsupported)",
+                    node,
+                )
+            if vname in self.readonly_in_params or self._is_readonly_span(binding.term):
+                raise self.fail("type", f"cannot move borrowed 'in' parameter '{vname}'", node)
+            if vname in self.out_param_names or (
+                binding.term.kind == "var" and cast("int", binding.term.value) in self.ref_parameters
+            ):
+                raise self.fail("type", f"cannot move borrowed 'ref' or 'out' parameter '{vname}'", node)
+            if vname in self.frozen_collections:
+                raise self.fail(
+                    "type",
+                    f"cannot move collection '{vname}' while it is traversed by 'foreach'",
+                    node,
+                )
+            lifted_set = self.lifted_invariants.get(vname)
+            if lifted_set is not None and len(lifted_set) > 0:
+                clause_n = min(lifted_set)
+                raise self.fail(
+                    "type",
+                    f"cannot move record '{vname}' while invariant '{clause_n}' is lifted",
+                    node,
+                )
+            return binding
         operator = self.operator(node["operator"])
         operand_node = self.node(node["value"])
         if operator == "!":
@@ -1426,13 +1483,15 @@ class _IntrinsicsMixin:
                 p_mod = mspec.param_modifiers[idx]
                 is_out_param = p_mod == "out"
                 is_ref_param = p_mod == "ref"
+                is_in_param = p_mod == "in"
+                is_owned_param = p_mod == "owned"
                 arg_val_node = self._unwrap_group(self.node(arg_node["value"]))
                 arg_mod = (
                     cast("Node", arg_val_node["operator"]).get("text")
                     if (
                         arg_val_node["kind"] == "unary"
                         and isinstance(arg_val_node.get("operator"), dict)
-                        and cast("Node", arg_val_node["operator"]).get("text") in {"ref", "in", "out"}
+                        and cast("Node", arg_val_node["operator"]).get("text") in {"ref", "in", "out", "move"}
                     )
                     else None
                 )
@@ -1443,6 +1502,29 @@ class _IntrinsicsMixin:
                 if not is_out_param and arg_mod == "out":
                     raise self.fail(
                         "type", "'out' call-site argument modifier requires an 'out' parameter", arg_node
+                    )
+                if is_owned_param and arg_mod != "move":
+                    raise self.fail(
+                        "type", "an 'owned' parameter requires a 'move' call-site argument modifier", arg_node
+                    )
+                if (is_ref_param or is_in_param or is_out_param) and arg_mod == "move":
+                    loan_kind = "out" if is_out_param else ("ref" if is_ref_param else "in")
+                    raise self.fail(
+                        "type",
+                        f"cannot pass 'move' argument to borrowed '{loan_kind}' parameter",
+                        arg_node,
+                    )
+                if is_ref_param and arg_mod == "in":
+                    raise self.fail(
+                        "type",
+                        "cannot pass shared 'in' borrow to mutable 'ref' parameter",
+                        arg_node,
+                    )
+                if not is_ref_param and arg_mod == "ref":
+                    raise self.fail(
+                        "type",
+                        "'ref' call-site argument modifier requires a 'ref' parameter",
+                        arg_node,
                     )
                 if arg_mod == "out":
                     arg_ident_node = self._unwrap_group(self.node(arg_val_node["value"]))
@@ -1466,13 +1548,13 @@ class _IntrinsicsMixin:
                     arg_terms.append(target_b.term)
                     loan_targets[idx] = (arg_ident_node, p_dom)
                 else:
-                    val_node = (
+                    arg_ident_node = (
                         self._unwrap_group(self.node(arg_val_node["value"]))
-                        if arg_mod in {"ref", "in"}
-                        else self.node(arg_node["value"])
+                        if arg_mod in {"ref", "in", "move"}
+                        else arg_val_node
                     )
-                    if val_node["kind"] == "name":
-                        arg_vname = self.name(val_node["name"])
+                    if arg_ident_node["kind"] == "name":
+                        arg_vname = self.name(arg_ident_node["name"])
                         if is_ref_param or arg_mod == "ref":
                             if arg_vname not in self.mutable_locals:
                                 raise self.fail(
@@ -1483,10 +1565,23 @@ class _IntrinsicsMixin:
                             if arg_vname in all_arg_var_names:
                                 raise self.fail("type", f"overlapping loan for '{arg_vname}' in call", arg_node)
                             seen_loan_names.add(arg_vname)
-                            loan_targets[idx] = (val_node, p_dom)
+                            loan_targets[idx] = (arg_ident_node, p_dom)
+                        elif arg_mod == "move":
+                            if arg_vname in all_arg_var_names:
+                                raise self.fail(
+                                    "type",
+                                    f"cannot use or borrow '{arg_vname}' after it was moved in the same call (use-after-owner-move)",
+                                    arg_node,
+                                )
+                            seen_loan_names.add(arg_vname)
                         elif arg_vname in seen_loan_names:
                             raise self.fail("type", f"overlapping loan for '{arg_vname}' in call", arg_node)
                         all_arg_var_names.add(arg_vname)
+                    val_node = (
+                        arg_ident_node
+                        if arg_mod in {"ref", "in"}
+                        else self.node(arg_node["value"])
+                    )
                     if self.whnf(p_dom).kind == "meta":
                         arg_b = self.expression(val_node, environment)
                         self.unify(p_dom, arg_b.type)

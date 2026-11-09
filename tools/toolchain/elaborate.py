@@ -115,9 +115,15 @@ class _Elaborator(
         self.readonly_span_vars: set[int] = set()
         self.ref_parameters: set[int] = set()
         self.out_parameters: set[int] = set()
+        self.owned_parameters: set[int] = set()
         self.out_param_names: set[str] = set()
         self.uninitialized_out_params: set[str] = set()
         self.callable_ref_updates: dict[str, tuple[tuple[int, ...], dict[int, _Term]]] = {}
+        self.callable_source_names: dict[str, str] = {}
+        self.callable_has_effects: set[str] = set()
+        self.callable_effect_calls: dict[str, set[str]] = {}
+        self.untracked_effect_functions: set[str] = set()
+        self.active_effect_calls: set[str] | None = None
         self.callable_ensures: dict[
             str, list[tuple[tuple[int, ...], tuple[tuple[int, int], ...], int | None, _Term]]
         ] = {}
@@ -1131,6 +1137,40 @@ class _Elaborator(
             self.current_rec_var is not None
             and callee_head == self.current_rec_var
         )
+        if self.active_effect_calls is not None and not is_rec_call:
+            if callee_head.kind == "var" and cast("int", callee_head.value) in self.parameter_names:
+                cb_name = self.parameter_names[cast("int", callee_head.value)]
+                if cb_name not in self.active_effect_calls:
+                    raise self.fail(
+                        "type",
+                        f"callable invokes parameter '{cb_name}' not declared in effects calls(...)",
+                        call_site,
+                    )
+            elif callee_head.kind == "const" and isinstance(callee_head.value, str):
+                c_const = callee_head.value
+                g_name = self.callable_source_names.get(c_const, c_const)
+                short_g = g_name.split(".")[-1]
+                if c_const in self.untracked_effect_functions:
+                    if g_name not in self.active_effect_calls and short_g not in self.active_effect_calls:
+                        raise self.fail(
+                            "type",
+                            f"callable invokes function '{g_name}' not declared in effects calls(...)",
+                            call_site,
+                        )
+                elif c_const in self.callable_effect_calls:
+                    g_calls = self.callable_effect_calls[c_const]
+                    if (
+                        g_calls
+                        and g_name not in self.active_effect_calls
+                        and short_g not in self.active_effect_calls
+                    ):
+                        for req_call in sorted(g_calls):
+                            if req_call not in self.active_effect_calls:
+                                raise self.fail(
+                                    "type",
+                                    f"callable transitively invokes '{req_call}' via '{g_name}' not declared in effects calls(...)",
+                                    call_site,
+                                )
         specializing = False
         specialized_term = term
         runtime_arguments: list[tuple[_Term, _Term]] = []
@@ -1185,13 +1225,15 @@ class _Elaborator(
                         raise self.fail("name", f"expected argument label '{expected}', got '{spelling}'", node)
                 is_out_param = param_var_id in self.out_parameters
                 is_ref_param = param_var_id in self.ref_parameters
+                is_owned_param = param_var_id in self.owned_parameters
+                is_in_param = param_var_id in self.readonly_span_vars
                 arg_val_node = self._unwrap_group(self.node(node["value"]))
                 arg_mod = (
                     cast("Node", arg_val_node["operator"]).get("text")
                     if (
                         arg_val_node["kind"] == "unary"
                         and isinstance(arg_val_node.get("operator"), dict)
-                        and cast("Node", arg_val_node["operator"]).get("text") in {"ref", "in", "out"}
+                        and cast("Node", arg_val_node["operator"]).get("text") in {"ref", "in", "out", "move"}
                     )
                     else None
                 )
@@ -1199,6 +1241,18 @@ class _Elaborator(
                     raise self.fail("type", "an 'out' parameter requires an 'out' call-site argument modifier", node)
                 if not is_out_param and arg_mod == "out":
                     raise self.fail("type", "'out' call-site argument modifier requires an 'out' parameter", node)
+                if is_owned_param and arg_mod != "move":
+                    raise self.fail("type", "an 'owned' parameter requires a 'move' call-site argument modifier", node)
+                if (is_out_param or is_ref_param or is_in_param) and arg_mod == "move":
+                    raise self.fail("type", "cannot pass consuming 'move' argument to a borrowed parameter", node)
+                if is_ref_param and arg_mod == "in":
+                    raise self.fail("type", "a 'ref' parameter requires a 'ref' call-site argument modifier", node)
+                if is_in_param and arg_mod == "ref":
+                    raise self.fail(
+                        "type",
+                        "an 'in' parameter cannot accept an exclusive 'ref' call-site argument modifier",
+                        node,
+                    )
                 if arg_mod == "out":
                     arg_ident_node = self._unwrap_group(self.node(arg_val_node["value"]))
                     if arg_ident_node["kind"] != "name":
@@ -1226,7 +1280,7 @@ class _Elaborator(
                 else:
                     arg_ident_node = (
                         self._unwrap_group(self.node(arg_val_node["value"]))
-                        if arg_mod in {"ref", "in"}
+                        if arg_mod in {"ref", "in", "move"}
                         else arg_val_node
                     )
                     if arg_ident_node["kind"] == "name":
@@ -1252,13 +1306,26 @@ class _Elaborator(
                                 raise self.fail("type", f"overlapping loan for '{arg_vname}' in call", node)
                             seen_loan_names.add(arg_vname)
                             loan_targets[idx] = (arg_ident_node, value_type.args[0])
+                        elif arg_mod == "move":
+                            if arg_vname in all_arg_var_names:
+                                raise self.fail(
+                                    "type",
+                                    f"cannot use or borrow '{arg_vname}' after it was moved in the same call (use-after-owner-move)",
+                                    node,
+                                )
+                            seen_loan_names.add(arg_vname)
                         elif arg_vname in seen_loan_names:
                             raise self.fail("type", f"overlapping loan for '{arg_vname}' in call", node)
                         all_arg_var_names.add(arg_vname)
                     required_static = param_var_id in self.constant_parameters
                     checker = self.static_argument if required_static else self.check
+                    check_target = (
+                        arg_ident_node
+                        if arg_mod in {"ref", "in"} and arg_ident_node is not arg_val_node
+                        else self.node(node["value"])
+                    )
                     argument = checker(
-                        arg_ident_node if arg_ident_node is not arg_val_node else self.node(node["value"]),
+                        check_target,
                         value_type.args[0],
                         environment,
                     )
@@ -1461,6 +1528,10 @@ class _Elaborator(
                 param_type_node["kind"] == "modified_type"
                 and param_type_node.get("modifier") == "out"
             )
+            is_owned_param = (
+                param_type_node["kind"] == "modified_type"
+                and param_type_node.get("modifier") == "owned"
+            )
             domain = self.type(param_type_node, extended, allow_out=True)
             variable = self.fresh(domain)
             variables.append(variable)
@@ -1470,9 +1541,13 @@ class _Elaborator(
                 self.ref_parameters.add(cast("int", variable.value))
             if is_out_param:
                 self.out_parameters.add(cast("int", variable.value))
+            if is_owned_param:
+                self.owned_parameters.add(cast("int", variable.value))
             static = cast("bool", node.get("const", False))
             if static and is_out_param:
                 raise self.fail("type", "constant parameter cannot be an 'out' loan", node)
+            if static and is_owned_param:
+                raise self.fail("type", "constant parameter cannot be an 'owned' consuming parameter", node)
             if static:
                 self.constant_parameters.add(cast("int", variable.value))
             if node["name"] is not None:
@@ -1496,21 +1571,7 @@ class _Elaborator(
 
     def _is_supported_loan_type(self, ty: _Term) -> bool:
         inner_w = self.whnf(ty)
-        inner_head, inner_args = self.spine(inner_w)
-        return (
-            inner_w == _BOOL
-            or self._int_spec(inner_w) is not None
-            or (inner_head == _constant("Span") and len(inner_args) == 1 and self.whnf(inner_args[0]) == _U8)
-            or (inner_head == _constant("Slots") and len(inner_args) == 2)
-            or (inner_head == _constant("Vec") and len(inner_args) == 2)
-            or (inner_head == _constant("Seq") and len(inner_args) == 1)
-            or (inner_head == _constant("TextBuilder") and len(inner_args) == 1)
-            or (
-                inner_head.kind == "const"
-                and isinstance(inner_head.value, str)
-                and inner_head.value in self.records_by_type
-            )
-        )
+        return inner_w not in (_PROP, _UNIT) and inner_w.kind not in {"pi", "sort"}
 
     def wrap(self, kind: str, variables: list[_Term], result: _Term) -> _Term:
         for variable in reversed(variables):
@@ -1623,12 +1684,24 @@ class _Elaborator(
                 if inner_w in (_PROP, _UNIT) or inner_w.kind in {"pi", "sort"}:
                     raise self.fail("type", "'out' parameter requires a runtime value type", node)
                 result = inner_type
+            elif modifier == "owned":
+                if not allow_out:
+                    raise self.fail(
+                        "type",
+                        "'owned' type modifier is only permitted on callable parameters and data fields",
+                        node,
+                    )
+                inner_type = self.type(self.node(node["type"]), environment, require_sort=require_sort)
+                inner_w = self.whnf(inner_type)
+                if inner_w in (_PROP, _UNIT) or inner_w.kind in {"pi", "sort"}:
+                    raise self.fail("type", "'owned' parameter requires a runtime value type", node)
+                result = inner_type
             elif modifier in {"in", "ref"}:
                 inner_type = self.type(self.node(node["type"]), environment, require_sort=require_sort)
                 if not self._is_supported_loan_type(inner_type):
                     raise self.fail(
-                        "unsupported",
-                        f"modifier '{modifier}' is only supported on fixed-width integers, bool, Span<byte>, Slots<T, capacity>, Vec<T, n>, Seq<T>, TextBuilder<capacity> or record types in the first-slice carrier",
+                        "type",
+                        f"modifier '{modifier}' requires a runtime value type",
                         node,
                     )
                 result = inner_type

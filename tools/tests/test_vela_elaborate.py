@@ -1565,7 +1565,7 @@ def _holes_unsupported_and_hygiene() -> None:
                          contracts=(_contract(role, _boolean(True)),))
         _refuses(wrong, "unsupported")
     wrong = _Fixture()
-    wrong.definition("Resource", _NAT, (("value", _modified("owned", _NAT)),), _variable("value"))
+    wrong.definition("Resource", _NAT, (("value", _modified("tracked", _NAT)),), _variable("value"))
     _refuses(wrong, "unsupported")
     wrong = _Fixture()
     effectful = _function_type((("value", _NAT),), _NAT, effects=(_type("Read"),))

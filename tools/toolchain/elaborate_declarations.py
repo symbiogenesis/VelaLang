@@ -232,7 +232,7 @@ class _DeclarationsMixin:
             if param_node.get("const", False):
                 raise self.fail("unsupported", "record fields cannot be marked const", param_node)
             pt = self.node(param_node["type"])
-            if pt["kind"] == "modified_type" and pt.get("modifier") != "in":
+            if pt["kind"] == "modified_type" and pt.get("modifier") not in {"in", "owned"}:
                 raise self.fail("unsupported", f"record fields cannot have loan modifier '{pt.get('modifier')}'", param_node)
         variables, environment = self.telescope(generics, parameters, {}, unit=False)
         generic_vars = variables[:len(generics)]
@@ -530,7 +530,11 @@ class _DeclarationsMixin:
             )
         requires_clauses: list[Node] = []
         ensures_clauses: list[Node] = []
+        effects_clauses: list[Node] = []
         for contract in self.nodes(member_node["contracts"]):
+            if contract["kind"] == "effects":
+                effects_clauses.append(contract)
+                continue
             self.node(contract, "contract")
             role = contract["role"]
             if role in {"requires", "where"}:
@@ -543,6 +547,8 @@ class _DeclarationsMixin:
                     f"contract '{role}' on record method requires the full frontend",
                     contract,
                 )
+        if len(effects_clauses) > 1:
+            raise self.fail("type", "at most one effects clause is permitted", effects_clauses[1])
         m_params = self.nodes(member_node["parameters"])
         m_param_names: set[str] = set()
         m_param_labels: list[str | None] = []
@@ -580,6 +586,12 @@ class _DeclarationsMixin:
         m_vars, method_env = self.telescope(m_generics, m_params, base_env, unit=True)
         m_gen_vars = m_vars[:len(m_generics)]
         param_vars = m_vars[len(m_generics):]
+        m_ref_param_names = set(self.mutable_locals)
+        m_effect_reads, m_effect_writes, m_effect_calls = (
+            self._parse_effects_clause(effects_clauses[0], method_env, m_ref_param_names)
+            if effects_clauses
+            else (set(), set(), set())
+        )
         self.entry_env = dict(method_env)
         self.final_ref_bindings = dict(method_env)
         req_bool_terms: list[_Term] = []
@@ -627,10 +639,25 @@ class _DeclarationsMixin:
         entry_body_facts = [*req_bool_terms, *self._fact_bool_terms((), method_env)]
         saved_body_facts = list(self.active_facts)
         self.active_facts.extend(entry_body_facts)
+        prev_effect_calls = self.active_effect_calls
+        if effects_clauses:
+            self.active_effect_calls = set(m_effect_calls)
         try:
             body_term = self.check(body_node, result_ty, method_env)
+            if effects_clauses:
+                self._verify_closed_effects(
+                    effects_clauses[0],
+                    m_params,
+                    m_ref_param_names,
+                    m_effect_reads,
+                    m_effect_writes,
+                    body_node,
+                    body_term,
+                    self_var=self_var,
+                )
             self._check_callable_loans(member_node, enclosing_type=name)
         finally:
+            self.active_effect_calls = prev_effect_calls
             self.active_facts = saved_body_facts
             self.current_return_type = prev_ret
         all_vars = [*generic_vars, *m_gen_vars, self_var, *param_vars]
@@ -647,6 +674,12 @@ class _DeclarationsMixin:
         m_binding = _Binding(_constant(m_emitted), m_sig, len(generics) + len(m_generics))
         self.constants[m_emitted] = m_binding
         self.definitions[m_emitted] = m_def
+        self.callable_source_names[m_emitted] = f"{name}.{method_name}"
+        if effects_clauses:
+            self.callable_has_effects.add(m_emitted)
+            self.callable_effect_calls[m_emitted] = set(m_effect_calls)
+        elif m_kind == "function":
+            self.untracked_effect_functions.add(m_emitted)
         param_ids = tuple(cast("int", v.value) for v in all_vars)
         preconditions = tuple((param_ids, req_t) for req_t in req_bool_terms)
         if preconditions:
@@ -759,7 +792,7 @@ class _DeclarationsMixin:
                 if param_node.get("const", False):
                     raise self.fail("unsupported", "union constructor fields cannot be marked const", param_node)
                 pt = self.node(param_node["type"])
-                if pt["kind"] == "modified_type":
+                if pt["kind"] == "modified_type" and pt.get("modifier") != "owned":
                     raise self.fail("unsupported", f"union constructor fields cannot have loan modifier '{pt.get('modifier')}'", param_node)
             field_vars, _ = self.telescope([], cparams, generic_env, unit=False)
             field_names = [self.name(p["name"]) for p in cparams]
@@ -950,6 +983,7 @@ class _DeclarationsMixin:
         self.readonly_span_vars.update(mod.readonly_span_vars)
         self.ref_parameters.update(mod.ref_parameters)
         self.out_parameters.update(mod.out_parameters)
+        self.owned_parameters.update(mod.owned_parameters)
         self.constants.update(mod.constants)
         self.definitions.update(mod.definitions)
         self.records_by_type.update(mod.records_by_type)
@@ -961,6 +995,10 @@ class _DeclarationsMixin:
         self.callable_ensures.update(mod.callable_ensures)
         self.callable_ref_updates.update(mod.callable_ref_updates)
         self.callable_where_constraints.update(mod.callable_where_constraints)
+        self.callable_source_names.update(mod.callable_source_names)
+        self.callable_has_effects.update(mod.callable_has_effects)
+        self.callable_effect_calls.update(mod.callable_effect_calls)
+        self.untracked_effect_functions.update(mod.untracked_effect_functions)
         self.fix_names.update(mod.fix_names)
         existing_out = set(self.output)
         for line in mod.output:
@@ -2178,6 +2216,20 @@ class _DeclarationsMixin:
                         f"cannot use or borrow '{owner_id}' after it was moved (use-after-owner-move)",
                         site,
                     )
+                if issue.kind == "partial-owner-move-unsupported":
+                    owner_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot move a projected field or element out of '{owner_id}' (partial-owner-move-unsupported)",
+                        site,
+                    )
+                if issue.kind == "move-through-loan-unsupported":
+                    loan_id = res[0] if res else ""
+                    raise self.fail(
+                        "type",
+                        f"cannot move through loan '{loan_id}' (move-through-loan-unsupported)",
+                        site,
+                    )
                 if issue.kind == "open-invariant-whole-receiver":
                     owner_id = res[0] if res else ""
                     raise self.fail(
@@ -2196,6 +2248,267 @@ class _DeclarationsMixin:
                     "type",
                     f"loan analysis rejected callable '{fn_name}': {issue.kind} ({', '.join(res)})",
                     site,
+                )
+
+    def _parse_effects_clause(
+        self: _Elaborator,
+        eff_clause: Node,
+        environment: dict[str, _Binding],
+        ref_param_names: set[str],
+    ) -> tuple[set[str], set[str], set[str]]:
+        declared_reads: set[str] = set()
+        declared_writes: set[str] = set()
+        declared_calls: set[str] = set()
+        for eff_item in self.nodes(eff_clause["values"]):
+            if eff_item["kind"] == "name" and self.name(eff_item["name"]) == "none":
+                continue
+            if eff_item["kind"] != "call":
+                raise self.fail(
+                    "type",
+                    "effects clause item must be reads(...), writes(...), calls(...) or none",
+                    eff_item,
+                )
+            eff_callee = self.node(eff_item["callee"])
+            eff_name = self.name(eff_callee["name"]) if eff_callee["kind"] == "name" else ""
+            if eff_name not in {"reads", "writes", "calls"}:
+                raise self.fail("type", f"unsupported effect clause item '{eff_name}'", eff_item)
+            eff_args = self.nodes(eff_item["arguments"])
+            if not eff_args:
+                raise self.fail("type", f"effects {eff_name}(...) requires at least one target", eff_item)
+            for eff_arg in eff_args:
+                self.node(eff_arg, "argument")
+                if eff_arg["label"] is not None:
+                    raise self.fail("name", f"effects {eff_name}(...) does not accept labeled arguments", eff_arg)
+                eff_val = self._unwrap_group(self.node(eff_arg["value"]))
+                if eff_name in {"reads", "writes"}:
+                    if eff_val["kind"] != "name":
+                        raise self.fail("type", f"effects {eff_name}(...) target must be an identifier", eff_val)
+                    t_ident = self.name(eff_val["name"])
+                    if t_ident not in environment:
+                        raise self.fail("name", f"unknown parameter '{t_ident}' in effects {eff_name}(...)", eff_val)
+                    if eff_name == "reads":
+                        if t_ident in self.out_param_names:
+                            raise self.fail(
+                                "type",
+                                f"effects reads('{t_ident}') cannot name an uninitialized 'out' parameter",
+                                eff_val,
+                            )
+                        declared_reads.add(t_ident)
+                    else:
+                        if t_ident not in ref_param_names:
+                            raise self.fail(
+                                "type",
+                                f"effects writes('{t_ident}') requires a 'ref' or 'out' parameter",
+                                eff_val,
+                            )
+                        declared_writes.add(t_ident)
+                else:
+                    if eff_val["kind"] == "member":
+                        recv_node = self._unwrap_group(self.node(eff_val["value"]))
+                        m_name = self.name(eff_val["name"])
+                        if recv_node["kind"] == "name":
+                            r_name = self.name(recv_node["name"])
+                            if r_name in self.records and m_name in self.records[r_name].methods:
+                                declared_calls.add(f"{r_name}.{m_name}")
+                                declared_calls.add(m_name)
+                                continue
+                            if r_name in environment:
+                                r_head, _ = self.spine(self.whnf(environment[r_name].type))
+                                if (
+                                    r_head.kind == "const"
+                                    and isinstance(r_head.value, str)
+                                    and r_head.value in self.records_by_type
+                                ):
+                                    rinfo = self.records_by_type[r_head.value]
+                                    if m_name in rinfo.methods:
+                                        declared_calls.add(f"{rinfo.name}.{m_name}")
+                                        declared_calls.add(m_name)
+                                        continue
+                            raise self.fail(
+                                "name",
+                                f"unknown callable '{r_name}.{m_name}' in effects calls(...)",
+                                eff_val,
+                            )
+                    if eff_val["kind"] != "name":
+                        raise self.fail("type", "effects calls(...) target must be an identifier", eff_val)
+                    t_ident = self.name(eff_val["name"])
+                    if t_ident in environment:
+                        if self.whnf(environment[t_ident].type).kind != "pi" and t_ident not in self.globals:
+                            raise self.fail(
+                                "type",
+                                f"effects calls('{t_ident}') target is not a callable",
+                                eff_val,
+                            )
+                    elif t_ident in self.globals:
+                        if self.whnf(self.globals[t_ident].type).kind != "pi":
+                            raise self.fail(
+                                "type",
+                                f"effects calls('{t_ident}') target is not a callable",
+                                eff_val,
+                            )
+                    else:
+                        raise self.fail("name", f"unknown callable '{t_ident}' in effects calls(...)", eff_val)
+                    declared_calls.add(t_ident)
+        return declared_reads, declared_writes, declared_calls
+
+    def _collect_runtime_read_names(
+        self: _Elaborator,
+        node: Node,
+        candidates: set[str],
+        shadowed: set[str] | None = None,
+    ) -> set[str]:
+        if not candidates:
+            return set()
+        active_shadow = set() if shadowed is None else set(shadowed)
+        kind = node.get("kind")
+        if kind in {"assert", "contract", "invariant", "open_invariant"}:
+            if kind == "open_invariant" and isinstance(node.get("body"), dict):
+                return self._collect_runtime_read_names(
+                    self.node(node["body"]), candidates, active_shadow
+                )
+            return set()
+        if kind == "name":
+            ident = self.name(node["name"])
+            if ident in candidates and ident not in active_shadow:
+                return {ident}
+            return set()
+        if kind == "block":
+            found: set[str] = set()
+            block_shadow = set(active_shadow)
+            for stmt in self.nodes(node.get("statements", [])):
+                skind = stmt.get("kind")
+                if skind in {"let", "var", "typed_local", "constant_local"}:
+                    if isinstance(stmt.get("value"), dict):
+                        found |= self._collect_runtime_read_names(
+                            self.node(stmt["value"]), candidates, block_shadow
+                        )
+                    if stmt.get("name") is not None:
+                        block_shadow.add(self.name(stmt["name"]))
+                elif skind in {"let_pattern", "var_pattern", "let_else", "var_else"}:
+                    if isinstance(stmt.get("value"), dict):
+                        found |= self._collect_runtime_read_names(
+                            self.node(stmt["value"]), candidates, block_shadow
+                        )
+                    if isinstance(stmt.get("else"), dict):
+                        found |= self._collect_runtime_read_names(
+                            self.node(stmt["else"]), candidates, block_shadow
+                        )
+                elif skind == "assign":
+                    target = self._unwrap_group(self.node(stmt["target"]))
+                    if target.get("kind") != "name":
+                        found |= self._collect_runtime_read_names(
+                            target, candidates, block_shadow
+                        )
+                    if isinstance(stmt.get("value"), dict):
+                        found |= self._collect_runtime_read_names(
+                            self.node(stmt["value"]), candidates, block_shadow
+                        )
+                else:
+                    found |= self._collect_runtime_read_names(stmt, candidates, block_shadow)
+            return found
+        if kind == "call":
+            found = self._collect_runtime_read_names(
+                self.node(node["callee"]), candidates, active_shadow
+            )
+            for arg in self.nodes(node.get("arguments", [])):
+                aval = self._unwrap_group(self.node(arg["value"]))
+                if (
+                    aval.get("kind") == "unary"
+                    and isinstance(aval.get("operator"), dict)
+                    and cast("Node", aval["operator"]).get("text") == "out"
+                ):
+                    continue
+                found |= self._collect_runtime_read_names(aval, candidates, active_shadow)
+            return found
+        found = set()
+        for key, val in node.items():
+            if key in {"kind", "span", "contracts", "type", "result", "generics", "parameters"}:
+                continue
+            if isinstance(val, dict) and "kind" in val:
+                found |= self._collect_runtime_read_names(
+                    cast("Node", val), candidates, active_shadow
+                )
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, dict) and "kind" in item:
+                        found |= self._collect_runtime_read_names(
+                            cast("Node", item), candidates, active_shadow
+                        )
+        return found
+
+    def _verify_closed_effects(
+        self: _Elaborator,
+        eff_clause: Node,
+        parameters: list[Node],
+        ref_param_names: set[str],
+        declared_reads: set[str],
+        declared_writes: set[str],
+        body_node: Node,
+        body_term: _Term,
+        *,
+        self_var: _Term | None = None,
+    ) -> None:
+        for pname in sorted(ref_param_names):
+            if (
+                pname in self.final_ref_bindings
+                and self.final_ref_bindings[pname].term != self.entry_env[pname].term
+                and pname not in declared_writes
+            ):
+                raise self.fail(
+                    "type",
+                    f"callable mutates parameter '{pname}' not declared in effects writes(...)",
+                    eff_clause,
+                )
+        used_var_ids = set(self.free(body_term))
+        for rname in ref_param_names:
+            if (
+                rname in self.final_ref_bindings
+                and self.final_ref_bindings[rname].term != self.entry_env[rname].term
+            ):
+                used_var_ids |= self.free(self.final_ref_bindings[rname].term)
+        if (
+            self_var is not None
+            and cast("int", self_var.value) in used_var_ids
+            and "this" not in declared_reads
+            and "this" not in declared_writes
+        ):
+            raise self.fail(
+                "type",
+                "callable reads parameter 'this' not declared in effects reads(...) or writes(...)",
+                eff_clause,
+            )
+        borrowed_read_candidates: list[tuple[str, int]] = []
+        for p_node in parameters:
+            if p_node["name"] is None:
+                continue
+            pname = self.name(p_node["name"])
+            if pname not in self.entry_env or pname in self.out_param_names:
+                continue
+            p_b = self.entry_env[pname]
+            if p_b.term.kind != "var":
+                continue
+            p_var_id = cast("int", p_b.term.value)
+            p_head, _ = self.spine(self.whnf(p_b.type))
+            is_borrowed_param = (
+                pname in self.readonly_in_params
+                or pname in ref_param_names
+                or (p_head in {_constant("Span"), _constant("Slots")} and p_var_id not in self.owned_parameters)
+            )
+            if is_borrowed_param:
+                borrowed_read_candidates.append((pname, p_var_id))
+        ast_read_names = self._collect_runtime_read_names(
+            body_node, {pname for pname, _ in borrowed_read_candidates}
+        )
+        for pname, p_var_id in borrowed_read_candidates:
+            if (
+                (p_var_id in used_var_ids or pname in ast_read_names)
+                and pname not in declared_reads
+                and pname not in declared_writes
+            ):
+                raise self.fail(
+                    "type",
+                    f"callable reads parameter '{pname}' not declared in effects reads(...) or writes(...)",
+                    eff_clause,
                 )
 
     def declaration(self: _Elaborator, node: Node) -> None:
@@ -2303,47 +2616,16 @@ class _DeclarationsMixin:
         )
         if kind in {"theorem", "lemma"} and self.out_param_names:
             raise self.fail("type", "proof declarations do not accept 'out' initialization parameters", node)
+        if kind in {"theorem", "lemma"} and any(
+            cast("int", v.value) in self.owned_parameters for v in variables[len(generics) :]
+        ):
+            raise self.fail("type", "proof declarations do not accept 'owned' consuming parameters", node)
         ref_param_names = set(self.mutable_locals)
-        declared_effect_writes: set[str] = set()
-        if effects_clauses:
-            eff_clause = effects_clauses[0]
-            for eff_item in self.nodes(eff_clause["values"]):
-                if eff_item["kind"] == "name" and self.name(eff_item["name"]) == "none":
-                    continue
-                if eff_item["kind"] != "call":
-                    raise self.fail(
-                        "type",
-                        "effects clause item must be reads(...), writes(...), calls(...) or none",
-                        eff_item,
-                    )
-                eff_callee = self.node(eff_item["callee"])
-                eff_name = self.name(eff_callee["name"]) if eff_callee["kind"] == "name" else ""
-                if eff_name not in {"reads", "writes", "calls"}:
-                    raise self.fail("type", f"unsupported effect clause item '{eff_name}'", eff_item)
-                eff_args = self.nodes(eff_item["arguments"])
-                if not eff_args:
-                    raise self.fail("type", f"effects {eff_name}(...) requires at least one target", eff_item)
-                for eff_arg in eff_args:
-                    self.node(eff_arg, "argument")
-                    if eff_arg["label"] is not None:
-                        raise self.fail("name", f"effects {eff_name}(...) does not accept labeled arguments", eff_arg)
-                    eff_val = self._unwrap_group(self.node(eff_arg["value"]))
-                    if eff_val["kind"] != "name":
-                        raise self.fail("type", f"effects {eff_name}(...) target must be an identifier", eff_val)
-                    t_ident = self.name(eff_val["name"])
-                    if eff_name in {"reads", "writes"}:
-                        if t_ident not in environment:
-                            raise self.fail("name", f"unknown parameter '{t_ident}' in effects {eff_name}(...)", eff_val)
-                        if eff_name == "writes":
-                            if t_ident not in ref_param_names:
-                                raise self.fail(
-                                    "type",
-                                    f"effects writes('{t_ident}') requires a 'ref' or 'out' parameter",
-                                    eff_val,
-                                )
-                            declared_effect_writes.add(t_ident)
-                    elif t_ident not in environment and t_ident not in self.globals:
-                        raise self.fail("name", f"unknown callable '{t_ident}' in effects calls(...)", eff_val)
+        declared_effect_reads, declared_effect_writes, declared_effect_calls = (
+            self._parse_effects_clause(effects_clauses[0], environment, ref_param_names)
+            if effects_clauses
+            else (set(), set(), set())
+        )
         self.entry_env = dict(environment)
         self.final_ref_bindings = dict(environment)
         where_iface_constraints: list[tuple[_InterfaceInfo, tuple[_Term, ...], Node]] = []
@@ -2543,6 +2825,9 @@ class _DeclarationsMixin:
                 self.used_domain_solver_in_proof = False
                 self.final_theorem_facts = ()
                 self.in_executable_function = kind == "function"
+                prev_effect_calls = self.active_effect_calls
+                if effects_clauses:
+                    self.active_effect_calls = set(declared_effect_calls)
                 try:
                     if is_post_env_theorem:
                         self.in_post_env_theorem = True
@@ -2619,17 +2904,15 @@ class _DeclarationsMixin:
                                 body_node,
                             )
                         if effects_clauses:
-                            for pname in sorted(ref_param_names):
-                                if (
-                                    pname in self.final_ref_bindings
-                                    and self.final_ref_bindings[pname].term != self.entry_env[pname].term
-                                    and pname not in declared_effect_writes
-                                ):
-                                    raise self.fail(
-                                        "type",
-                                        f"callable mutates parameter '{pname}' not declared in effects writes(...)",
-                                        effects_clauses[0],
-                                    )
+                            self._verify_closed_effects(
+                                effects_clauses[0],
+                                parameters,
+                                ref_param_names,
+                                declared_effect_reads,
+                                declared_effect_writes,
+                                body_node,
+                                body,
+                            )
                         for pname in ref_param_names:
                             if pname in self.final_ref_bindings:
                                 fin_b = self.final_ref_bindings[pname]
@@ -2645,6 +2928,7 @@ class _DeclarationsMixin:
                                     )
                         self._check_callable_loans(node)
                 finally:
+                    self.active_effect_calls = prev_effect_calls
                     self.in_executable_function = False
                     self.active_facts = saved_body_facts
                     self.current_rec_var = None
@@ -2657,6 +2941,13 @@ class _DeclarationsMixin:
                     self.smaller_vars = {}
                     self.current_return_type = None
             emitted = f"vela_d{len(self.output)}_{name}"
+            if kind in {"definition", "function", "theorem", "lemma"}:
+                self.callable_source_names[emitted] = name
+                if effects_clauses:
+                    self.callable_has_effects.add(emitted)
+                    self.callable_effect_calls[emitted] = set(declared_effect_calls)
+                elif kind == "function":
+                    self.untracked_effect_functions.add(emitted)
             if kind in {"theorem", "lemma"} and is_post_env_theorem:
                 if not post_env_obligations:
                     raise self.fail("type", "a theorem over mutated parameters requires an ensures clause", node)

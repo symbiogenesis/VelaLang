@@ -2701,6 +2701,12 @@ class _StatementsMixin:
         if expected is not None:
             self.unify(result_type, expected)
         base_unwrapped = self._unwrap_group(base_node)
+        if (
+            base_unwrapped["kind"] == "unary"
+            and isinstance(base_unwrapped.get("operator"), dict)
+            and cast("Node", base_unwrapped["operator"]).get("text") == "move"
+        ):
+            base_unwrapped = self._unwrap_group(self.node(base_unwrapped["value"]))
         base_name = self.name(base_unwrapped["name"]) if base_unwrapped["kind"] == "name" else None
         assign_target = self._in_lifted_target_assignment
         excluded = (

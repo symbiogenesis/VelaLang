@@ -1247,13 +1247,19 @@ def _is_ident(node: dict[str, object]) -> bool:
 
 
 def _extract_borrow_expr(expr: dict[str, object]) -> tuple[str, dict[str, object]] | None:
-    kind = expr.get("kind")
+    curr = expr
+    while curr.get("kind") == "group":
+        inner_g = curr.get("expression") or curr.get("value")
+        if not isinstance(inner_g, dict):
+            break
+        curr = inner_g
+    kind = curr.get("kind")
     if kind == "borrow":
-        return str(expr.get("mode", "in")), _ast_node(expr["value"])
+        return str(curr.get("mode", "in")), _ast_node(curr["value"])
     if kind == "unary":
-        op = _op_text(expr.get("operator"))
+        op = _op_text(curr.get("operator"))
         if op in {"in", "ref", "out", "move"}:
-            inner = expr.get("value") if "value" in expr else expr.get("operand")
+            inner = curr.get("value") if "value" in curr else curr.get("operand")
             return op, _ast_node(inner)
     return None
 
@@ -1624,9 +1630,13 @@ class _FunctionLowerer:
                 ptype = _type_base_name(ptype_node)
                 mods = _type_modifiers(ptype_node)
                 borrowed = (
-                    pmode in {"in", "ref", "out"}
-                    or bool(mods & {"in", "ref", "out"})
-                    or ptype in {"Span", "Slots"}
+                    (
+                        pmode in {"in", "ref", "out"}
+                        or bool(mods & {"in", "ref", "out"})
+                        or ptype in {"Span", "Slots"}
+                    )
+                    and pmode != "owned"
+                    and "owned" not in mods
                 )
                 self._register_owner(pname, borrowed=borrowed, type_name=ptype)
 
@@ -1989,8 +1999,15 @@ class _FunctionLowerer:
 
             if kind in {"update", "with_expression"}:
                 src = _ast_node(expr.get("source") or expr["value"])
-                current, caps = self._lower_expr(current, src)
                 raw_fields = expr.get("fields") if "fields" in expr else expr.get("updates", [])
+                src_borrow = _extract_borrow_expr(src)
+                if src_borrow is not None and src_borrow[0] == "move":
+                    for fitem in _ast_nodes(raw_fields):
+                        fval = _ast_node(fitem["value"])
+                        current, _ = self._lower_expr(current, fval)
+                    current, caps = self._lower_expr(current, src)
+                    return current, caps
+                current, caps = self._lower_expr(current, src)
                 for fitem in _ast_nodes(raw_fields):
                     fval = _ast_node(fitem["value"])
                     current, _ = self._lower_expr(current, fval)
