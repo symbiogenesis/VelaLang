@@ -1428,15 +1428,27 @@ class _StatementsMixin:
                 self.uninitialized_out_params = saved_uninit
                 del self.active_facts[saved_facts_len:]
             post_env = dict(extended)
+            has_break = self._contains_break_statement(body_node)
+            zero_elem = _int_term(elem_spec, 0) if elem_spec is not None else _term("nat", value=0)
             for mname in list(self.mutable_locals):
                 if mname in post_env and mname != var_name and sym_env[mname].term != after_sym.get(mname, sym_env[mname]).term:
                     m_ty = post_env[mname].type
-                    loop_tag = self.serial
-                    self.serial += 1
-                    post_env[mname] = _Binding(
-                        _apps(_constant("LoopState"), m_ty, post_env[mname].term, _term("nat", value=loop_tag)),
-                        m_ty,
-                    )
+                    if (
+                        not has_break
+                        and self.whnf( m_ty ) == self.whnf(elem_type)
+                        and self.whnf(start_term) == zero_elem
+                        and self.whnf(post_env[mname].term) == zero_elem
+                        and self.whnf(after_sym[mname].term)
+                        == self.whnf(_apps(_constant(add_op), sym_env[mname].term, one_term))
+                    ):
+                        post_env[mname] = _Binding(end_term, m_ty)
+                    else:
+                        loop_tag = self.serial
+                        self.serial += 1
+                        post_env[mname] = _Binding(
+                            _apps(_constant("LoopState"), m_ty, post_env[mname].term, _term("nat", value=loop_tag)),
+                            m_ty,
+                        )
             post_env_with_idx = dict(post_env)
             post_env_with_idx[var_name] = _Binding(end_term, elem_type)
             post_assumed = self._assume_loop_invariants(contracts, post_env_with_idx)
@@ -1755,18 +1767,42 @@ class _StatementsMixin:
             if unrolled_concretely:
                 return cur_env
             post_env = dict(extended)
+            has_break = self._contains_break_statement(body_node)
+            cond_head, cond_args = self.spine(self.resolve(sym_cond))
             for mname in list(self.mutable_locals):
                 if mname in post_env and sym_env[mname].term != after_sym.get(mname, sym_env[mname]).term:
                     m_ty = post_env[mname].type
-                    loop_tag = self.serial
-                    self.serial += 1
-                    post_env[mname] = _Binding(
-                        _apps(_constant("LoopState"), m_ty, post_env[mname].term, _term("nat", value=loop_tag)),
-                        m_ty,
-                    )
+                    m_ty_w = self.whnf(m_ty)
+                    m_spec = self._int_spec(m_ty_w)
+                    lt_const = _constant(f"int_lt_{m_spec.name}") if m_spec is not None else (_constant("<") if m_ty_w == _NAT else None)
+                    add_const = _constant(f"int_add_{m_spec.name}") if m_spec is not None else (_constant("+") if m_ty_w == _NAT else None)
+                    zero_t = _int_term(m_spec, 0) if m_spec is not None else (_term("nat", value=0) if m_ty_w == _NAT else None)
+                    one_t = _int_term(m_spec, 1) if m_spec is not None else (_term("nat", value=1) if m_ty_w == _NAT else None)
+                    if (
+                        not has_break
+                        and lt_const is not None
+                        and add_const is not None
+                        and zero_t is not None
+                        and one_t is not None
+                        and cond_head == lt_const
+                        and len(cond_args) == 2
+                        and cond_args[0] == sym_env[mname].term
+                        and cast("int", sym_env[mname].term.value) not in self.free(cond_args[1])
+                        and self.whnf(post_env[mname].term) == zero_t
+                        and self.whnf(after_sym[mname].term)
+                        == self.whnf(_apps(add_const, sym_env[mname].term, one_t))
+                    ):
+                        post_env[mname] = _Binding(cond_args[1], m_ty)
+                    else:
+                        loop_tag = self.serial
+                        self.serial += 1
+                        post_env[mname] = _Binding(
+                            _apps(_constant("LoopState"), m_ty, post_env[mname].term, _term("nat", value=loop_tag)),
+                            m_ty,
+                        )
             post_assumed = self._assume_loop_invariants(contracts, post_env)
             self.active_facts.extend(post_assumed)
-            if not self._contains_break_statement(body_node):
+            if not has_break:
                 post_cond = self.check(cond_node, _BOOL, post_env)
                 self.active_facts.append(self._negate_bool_term(post_cond))
             return post_env

@@ -1139,8 +1139,8 @@ def _case(compiled: vela_parser.Build, case: Fixture, directory: Path, index: in
                        directory, directory / f"{stem}.assumptions.log", steps)
     trusted = solver_ledger.ledger(translated.gallina)
     reported_trust = solver_ledger.audit(assumptions, len(audited), module, trusted)
-    if reported_trust and case.pure:
-        raise ValueError(f"Vela replay {case.name}: pure translation emitted solver-trust axioms")
+    if reported_trust:
+        raise ValueError(f"Vela replay {case.name}: translation emitted solver-trust axioms")
     artifact = directory / f"{stem}.vo"
     row.update({"category": "accepted", "module": translated.module,
                 "gallina": str(target), "gallina_sha256": _sha256(target.read_bytes()),

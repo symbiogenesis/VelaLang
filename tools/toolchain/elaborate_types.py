@@ -441,6 +441,9 @@ _GALLINA = {
     "vela_store_lookup_write_ge": "vela_store_lookup_write_ge",
     "vela_store_lookup_fill_ge": "vela_store_lookup_fill_ge",
     "vela_store_lookup_copy_ge": "vela_store_lookup_copy_ge",
+    "vela_nat_add_assoc": "vela_nat_add_assoc",
+    "vela_gt_add_pos": "vela_gt_add_pos",
+    "vela_int_add_assoc": "vela_int_add_assoc",
     **{
         f"int_{op}_{spec.name}": f"(vela_int_{op} ({spec.tag} : Corelib.Init.Datatypes.nat))"
         for spec in _INT_SPECS.values()
@@ -1830,4 +1833,58 @@ Definition vela_PrefixModel (A : Type@{vela_u0}) (cap : nat) (s : vela_Slots A c
   vela_Slots_Model A cap s.
 
 Definition vela_LoopState (A : Type@{vela_u0}) (x : A) (_ : nat) : A := x.
+
+Fixpoint vela_nat_add_assoc (a b c : nat) {struct a}
+    : @Corelib.Init.Logic.eq nat
+        (Corelib.Init.Nat.add (Corelib.Init.Nat.add a b) c)
+        (Corelib.Init.Nat.add a (Corelib.Init.Nat.add b c)) :=
+  match a as a0 return
+    (@Corelib.Init.Logic.eq nat
+      (Corelib.Init.Nat.add (Corelib.Init.Nat.add a0 b) c)
+      (Corelib.Init.Nat.add a0 (Corelib.Init.Nat.add b c))) with
+  | O => @Corelib.Init.Logic.eq_refl nat (Corelib.Init.Nat.add b c)
+  | S a' =>
+      @Corelib.Init.Logic.f_equal nat nat S
+        (Corelib.Init.Nat.add (Corelib.Init.Nat.add a' b) c)
+        (Corelib.Init.Nat.add a' (Corelib.Init.Nat.add b c))
+        (vela_nat_add_assoc a' b c)
+  end.
+
+Fixpoint vela_gt_add_pos (x k : nat) {struct x}
+    : @Corelib.Init.Logic.eq bool (vela_gt (Corelib.Init.Nat.add x (S k)) x) true :=
+  match x as x0 return (@Corelib.Init.Logic.eq bool (vela_gt (Corelib.Init.Nat.add x0 (S k)) x0) true) with
+  | O => @Corelib.Init.Logic.eq_refl bool true
+  | S x' => vela_gt_add_pos x' k
+  end.
+
+Lemma vela_bits_rev_acc_rev : forall (a acc : vela_bits),
+  vela_bits_rev_acc (vela_bits_rev_acc a acc) vela_bnil = vela_bits_rev_acc acc a.
+Proof.
+  induction a as [|x xs IH]; intros acc; simpl; [reflexivity | apply IH].
+Qed.
+
+Lemma vela_bits_rev_rev : forall (a : vela_bits), vela_bits_rev (vela_bits_rev a) = a.
+Proof.
+  intros a. unfold vela_bits_rev. apply vela_bits_rev_acc_rev.
+Qed.
+
+Lemma vela_bits_add_lsb_assoc_gen : forall (a b c : vela_bits) (c1 c2 d1 d2 : bool),
+  Corelib.Init.Nat.eqb
+    (Corelib.Init.Nat.add (if c1 then 1 else 0) (if c2 then 1 else 0))
+    (Corelib.Init.Nat.add (if d1 then 1 else 0) (if d2 then 1 else 0)) = true ->
+  vela_bits_add_lsb (vela_bits_add_lsb a b c1) c c2 = vela_bits_add_lsb a (vela_bits_add_lsb b c d1) d2.
+Proof.
+  induction a as [|x xs IH]; intros b c c1 c2 d1 d2 Hc;
+  destruct b as [|y ys], c as [|z zs]; simpl; try reflexivity.
+  destruct x, y, z, c1, c2, d1, d2; simpl in Hc; try discriminate Hc;
+  simpl; f_equal; eapply IH; reflexivity.
+Qed.
+
+Lemma vela_int_add_assoc : forall (tag : nat) (a b c : vela_int tag),
+  vela_int_add tag (vela_int_add tag a b) c = vela_int_add tag a (vela_int_add tag b c).
+Proof.
+  intros tag [ba] [bb] [bc]. unfold vela_int_add, vela_bits_add; simpl.
+  f_equal. rewrite !vela_bits_rev_rev. f_equal.
+  eapply vela_bits_add_lsb_assoc_gen. reflexivity.
+Qed.
 """

@@ -989,6 +989,49 @@ class _ProofsMixin:
                         return _apps(_constant("vela_eq_bool_of_eq"), cmp_args[0], cmp_args[1], p_beq)
                     except VelaError:
                         self.metas = saved_beq
+                if allow_refl and cmp_head == _constant(">") and len(cmp_args) == 2:
+                    gt_l_w = self.whnf(cmp_args[0])
+                    gt_r_w = self.whnf(cmp_args[1])
+                    add_h, add_a = self.spine(gt_l_w)
+                    if (
+                        add_h == _constant("+")
+                        and len(add_a) == 2
+                        and self._same_cond_term(add_a[0], gt_r_w)
+                    ):
+                        k_w = self.whnf(add_a[1])
+                        if k_w.kind == "nat" and cast("int", k_w.value) >= 1:
+                            return _apps(
+                                _constant("vela_gt_add_pos"),
+                                cmp_args[1],
+                                _term("nat", value=cast("int", k_w.value) - 1),
+                            )
+            if allow_refl and goal_type_w == _NAT:
+                lhs_w = self.whnf(lhs)
+                rhs_w = self.whnf(rhs)
+                lh_head, lh_args = self.spine(lhs_w)
+                if lh_head == _constant("+") and len(lh_args) == 2:
+                    in_head, in_args = self.spine(self.whnf(lh_args[0]))
+                    if in_head == _constant("+") and len(in_args) == 2:
+                        assoc_rhs = _apps(_constant("+"), in_args[0], _apps(_constant("+"), in_args[1], lh_args[1]))
+                        if self.convertible(assoc_rhs, rhs_w):
+                            return _apps(_constant("vela_nat_add_assoc"), in_args[0], in_args[1], lh_args[1])
+            if allow_refl and (int_spec_eq := self._int_spec(goal_type_w)) is not None:
+                add_const = _constant(f"int_add_{int_spec_eq.name}")
+                lhs_w = self.whnf(lhs)
+                rhs_w = self.whnf(rhs)
+                lh_head, lh_args = self.spine(lhs_w)
+                if lh_head == add_const and len(lh_args) == 2:
+                    in_head, in_args = self.spine(self.whnf(lh_args[0]))
+                    if in_head == add_const and len(in_args) == 2:
+                        assoc_rhs = _apps(add_const, in_args[0], _apps(add_const, in_args[1], lh_args[1]))
+                        if self.convertible(assoc_rhs, rhs_w):
+                            return _apps(
+                                _constant("vela_int_add_assoc"),
+                                _term("nat", value=int_spec_eq.tag),
+                                in_args[0],
+                                in_args[1],
+                                lh_args[1],
+                            )
             if allow_refl and goal_type_w == _U8:
                 span_eq_p = self._prove_span_read_equality(lhs, rhs, all_facts)
                 if span_eq_p is not None:
