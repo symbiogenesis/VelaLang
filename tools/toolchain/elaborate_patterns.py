@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Pattern parsing, dependent pattern typing, and exhaustive match compilation for Vela elaboration."""
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
 
 from toolchain.elaborate_types import (
@@ -19,6 +20,7 @@ from toolchain.elaborate_types import (
     _int_term,
     _parse_numeric_magnitude,
     _Pat,
+    _RecordField,
     _RecordInfo,
     _Row,
     _Term,
@@ -88,67 +90,16 @@ class _PatternsMixin:
                     raise self.fail("name", "constructor 'Succ' does not accept labeled pattern arguments", arguments[0])
                 return _Pat("succ", node, args=(self._parse_pattern(arguments[0], seen),))
             if cname in self.records:
-                record_info = self.records[cname]
-                if len(arguments) != len(record_info.fields):
-                    raise self.fail(
-                        "type",
-                        f"constructor '{cname}' expects {len(record_info.fields)} pattern arguments, got {len(arguments)}",
-                        node,
-                    )
-                labeled = False
-                sub_patterns: list[_Pat] = []
-                for idx, arg_node in enumerate(arguments):
-                    expected_field = record_info.fields[idx]
-                    if arg_node["kind"] == "labeled_pattern":
-                        labeled = True
-                        spelling = self.name(arg_node["label"])
-                        if spelling != expected_field.name:
-                            raise self.fail(
-                                "name",
-                                f"expected pattern field label '{expected_field.name}', got '{spelling}'",
-                                arg_node,
-                            )
-                        sub_patterns.append(self._parse_pattern(self.node(arg_node["pattern"]), seen))
-                    else:
-                        if labeled:
-                            raise self.fail(
-                                "name",
-                                "positional pattern arguments cannot follow a labeled pattern argument",
-                                arg_node,
-                            )
-                        sub_patterns.append(self._parse_pattern(arg_node, seen))
-                return _Pat("record", node, value=cname, args=tuple(sub_patterns))
+                sub_patterns = self._parse_ctor_subpatterns(
+                    cname, arguments, self.records[cname].fields, seen, node
+                )
+                return _Pat("record", node, value=cname, args=sub_patterns)
             if cname in self.union_ctors:
                 _, ctor_info = self.union_ctors[cname]
-                if len(arguments) != len(ctor_info.fields):
-                    raise self.fail(
-                        "type",
-                        f"constructor '{cname}' expects {len(ctor_info.fields)} pattern arguments, got {len(arguments)}",
-                        node,
-                    )
-                labeled = False
-                sub_patterns = []
-                for idx, arg_node in enumerate(arguments):
-                    expected_field = ctor_info.fields[idx]
-                    if arg_node["kind"] == "labeled_pattern":
-                        labeled = True
-                        spelling = self.name(arg_node["label"])
-                        if spelling != expected_field.name:
-                            raise self.fail(
-                                "name",
-                                f"expected pattern field label '{expected_field.name}', got '{spelling}'",
-                                arg_node,
-                            )
-                        sub_patterns.append(self._parse_pattern(self.node(arg_node["pattern"]), seen))
-                    else:
-                        if labeled:
-                            raise self.fail(
-                                "name",
-                                "positional pattern arguments cannot follow a labeled pattern argument",
-                                arg_node,
-                            )
-                        sub_patterns.append(self._parse_pattern(arg_node, seen))
-                return _Pat("union", node, value=cname, args=tuple(sub_patterns))
+                sub_patterns = self._parse_ctor_subpatterns(
+                    cname, arguments, ctor_info.fields, seen, node
+                )
+                return _Pat("union", node, value=cname, args=sub_patterns)
             if cname not in self.globals:
                 raise self.fail(
                     "name",
@@ -163,6 +114,44 @@ class _PatternsMixin:
                 node,
             )
         raise self.fail("protocol", f"unexpected pattern node '{kind}'", node)
+
+    def _parse_ctor_subpatterns(
+        self: _Elaborator,
+        cname: str,
+        arguments: list[Node],
+        fields: tuple[_RecordField, ...],
+        seen: set[str],
+        node: Node,
+    ) -> tuple[_Pat, ...]:
+        if len(arguments) != len(fields):
+            raise self.fail(
+                "type",
+                f"constructor '{cname}' expects {len(fields)} pattern arguments, got {len(arguments)}",
+                node,
+            )
+        labeled = False
+        sub_patterns: list[_Pat] = []
+        for idx, arg_node in enumerate(arguments):
+            expected_field = fields[idx]
+            if arg_node["kind"] == "labeled_pattern":
+                labeled = True
+                spelling = self.name(arg_node["label"])
+                if spelling != expected_field.name:
+                    raise self.fail(
+                        "name",
+                        f"expected pattern field label '{expected_field.name}', got '{spelling}'",
+                        arg_node,
+                    )
+                sub_patterns.append(self._parse_pattern(self.node(arg_node["pattern"]), seen))
+            else:
+                if labeled:
+                    raise self.fail(
+                        "name",
+                        "positional pattern arguments cannot follow a labeled pattern argument",
+                        arg_node,
+                    )
+                sub_patterns.append(self._parse_pattern(arg_node, seen))
+        return tuple(sub_patterns)
 
     def _instantiate_generic_type(
         self: _Elaborator, generic_vars: tuple[_Term, ...], type_args: list[_Term], target_type: _Term
@@ -288,19 +277,9 @@ class _PatternsMixin:
             self.unify(expected_type, _CHAR)
             return _term("char", value=cast("int", pat.value))
         if pat.kind == "string":
-            raw_bytes = cast("str", pat.value).encode("latin1")
-            str_term = _app(_constant("VNil"), _NAT)
-            for index_b, b_val in enumerate(reversed(raw_bytes)):
-                str_term = _apps(
-                    _constant("VCons"),
-                    _NAT,
-                    _term("nat", value=index_b),
-                    _term("nat", value=b_val),
-                    str_term,
-                )
-            str_type = _apps(_constant("Vec"), _NAT, _term("nat", value=len(raw_bytes)))
-            self.unify(expected_type, str_type)
-            return str_term
+            str_b = self._bytes_binding(cast("str", pat.value).encode("latin1"))
+            self.unify(expected_type, str_b.type)
+            return str_b.term
         spec = self._int_spec(expected_type)
         if spec is not None and pat.kind in {"zero", "succ", "int_lit"}:
             if pat.node["kind"] != "nat_pattern":
@@ -892,22 +871,14 @@ class _PatternsMixin:
             col_type = self.whnf(col_type)
             without_index = columns[:index] + columns[index + 1:]
 
-            if first.patterns[index].kind == "string":
-                target_pat = first.patterns[index]
-                target_str = cast("str", target_pat.value)
-                raw_bytes = target_str.encode("latin1")
-                lit_term = _app(_constant("VNil"), _NAT)
-                for index_b, b_val in enumerate(reversed(raw_bytes)):
-                    lit_term = _apps(
-                        _constant("VCons"),
-                        _NAT,
-                        _term("nat", value=index_b),
-                        _term("nat", value=b_val),
-                        lit_term,
-                    )
-                str_vec_type = _apps(_constant("Vec"), _NAT, _term("nat", value=len(raw_bytes)))
-                yes_rows_s: list[_Row] = []
-                no_rows_s: list[_Row] = []
+            def split_literal_column(
+                lit_term: _Term,
+                eq_cond: _Term,
+                ne_cond: _Term,
+                matches_literal: Callable[[_Pat], bool],
+            ) -> _Term:
+                yes_rows: list[_Row] = []
+                no_rows: list[_Row] = []
                 for row in active_rows:
                     pat = row.patterns[index]
                     updated_bindings = tuple(
@@ -922,7 +893,7 @@ class _PatternsMixin:
                     )
                     if pat.kind == "wild":
                         extra = tuple((name, _Binding(lit_term, col_type)) for name in pat.names)
-                        yes_rows_s.append(
+                        yes_rows.append(
                             _Row(
                                 row.patterns[:index] + row.patterns[index + 1:],
                                 updated_bindings + extra,
@@ -930,9 +901,9 @@ class _PatternsMixin:
                                 row.arm_index,
                             )
                         )
-                        no_rows_s.append(row)
-                    elif pat.kind == "string" and pat.value == target_str:
-                        yes_rows_s.append(
+                        no_rows.append(row)
+                    elif matches_literal(pat):
+                        yes_rows.append(
                             _Row(
                                 row.patterns[:index] + row.patterns[index + 1:],
                                 updated_bindings,
@@ -941,92 +912,48 @@ class _PatternsMixin:
                             )
                         )
                     else:
-                        no_rows_s.append(row)
-                eq_cond = self._structural_eq_bool(str_vec_type, col_scrutinee, lit_term, node)
-                ne_cond = _app(_constant("!"), eq_cond)
+                        no_rows.append(row)
                 self.active_facts.append(eq_cond)
                 try:
                     yes_branch = compile_matrix(
                         subst_cols(without_index, col_var_id, lit_term),
-                        yes_rows_s,
+                        yes_rows,
                         self.substitute(pattern_term, col_var_id, lit_term),
                     )
                 finally:
                     self.active_facts.pop()
                 self.active_facts.append(ne_cond)
                 try:
-                    no_branch = compile_matrix(columns, no_rows_s, pattern_term)
+                    no_branch = compile_matrix(columns, no_rows, pattern_term)
                 finally:
                     self.active_facts.pop()
                 ret_ty = (
                     self.substitute(motive_body, root_var_id, pattern_term)
                     if motive_body is not None
-                    else cast("_Term", inferred_result[0])
+                    else inferred_result[0]
                 )
                 return _term("if", ret_ty, eq_cond, yes_branch, no_branch)
 
-            if col_type == _CHAR:
-                target_pat = first.patterns[index]
-                target_cp = cast("int", target_pat.value)
-                lit_term = _term("char", value=target_cp)
-                yes_rows_c: list[_Row] = []
-                no_rows_c: list[_Row] = []
-                for row in active_rows:
-                    pat = row.patterns[index]
-                    updated_bindings = tuple(
-                        (
-                            bname,
-                            _Binding(
-                                self.substitute(bval.term, col_var_id, lit_term),
-                                self.substitute(bval.type, col_var_id, lit_term),
-                            ),
-                        )
-                        for bname, bval in row.bindings
-                    )
-                    if pat.kind == "wild":
-                        extra = tuple((name, _Binding(lit_term, col_type)) for name in pat.names)
-                        yes_rows_c.append(
-                            _Row(
-                                row.patterns[:index] + row.patterns[index + 1:],
-                                updated_bindings + extra,
-                                row.arm,
-                                row.arm_index,
-                            )
-                        )
-                        no_rows_c.append(row)
-                    elif pat.kind == "char" and pat.value == target_cp:
-                        yes_rows_c.append(
-                            _Row(
-                                row.patterns[:index] + row.patterns[index + 1:],
-                                updated_bindings,
-                                row.arm,
-                                row.arm_index,
-                            )
-                        )
-                    else:
-                        no_rows_c.append(row)
-                eq_cond = _apps(_constant("char_eq"), col_scrutinee, lit_term)
-                ne_cond = _apps(_constant("char_ne"), col_scrutinee, lit_term)
-                self.active_facts.append(eq_cond)
-                try:
-                    yes_branch = compile_matrix(
-                        subst_cols(without_index, col_var_id, lit_term),
-                        yes_rows_c,
-                        self.substitute(pattern_term, col_var_id, lit_term),
-                    )
-                finally:
-                    self.active_facts.pop()
-                self.active_facts.append(ne_cond)
-                try:
-                    no_branch = compile_matrix(columns, no_rows_c, pattern_term)
-                finally:
-                    self.active_facts.pop()
-                ret_ty = (
-                    self.substitute(motive_body, root_var_id, pattern_term)
-                    if motive_body is not None
-                    else cast("_Term", inferred_result[0])
+            if first.patterns[index].kind == "string":
+                target_str = cast("str", first.patterns[index].value)
+                str_b = self._bytes_binding(target_str.encode("latin1"))
+                eq_cond = self._structural_eq_bool(str_b.type, col_scrutinee, str_b.term, node)
+                return split_literal_column(
+                    str_b.term,
+                    eq_cond,
+                    _app(_constant("!"), eq_cond),
+                    lambda pat: pat.kind == "string" and pat.value == target_str,
                 )
-                return _term("if", ret_ty, eq_cond, yes_branch, no_branch)
+
+            if col_type == _CHAR:
+                target_cp = cast("int", first.patterns[index].value)
+                lit_term = _term("char", value=target_cp)
+                return split_literal_column(
+                    lit_term,
+                    _apps(_constant("char_eq"), col_scrutinee, lit_term),
+                    _apps(_constant("char_ne"), col_scrutinee, lit_term),
+                    lambda pat: pat.kind == "char" and pat.value == target_cp,
+                )
 
             if col_type == _UNIT:
                 unit_term = _term("unit")
@@ -1083,69 +1010,14 @@ class _PatternsMixin:
 
             col_int_spec = self._int_spec(col_type)
             if col_int_spec is not None:
-                target_pat = first.patterns[index]
-                target_val = _parse_numeric_magnitude(cast("str", target_pat.node["value"]))
+                target_val = _parse_numeric_magnitude(cast("str", first.patterns[index].node["value"]))
                 lit_term = _int_term(col_int_spec, target_val)
-                yes_rows: list[_Row] = []
-                no_rows: list[_Row] = []
-                for row in active_rows:
-                    pat = row.patterns[index]
-                    updated_bindings = tuple(
-                        (
-                            bname,
-                            _Binding(
-                                self.substitute(bval.term, col_var_id, lit_term),
-                                self.substitute(bval.type, col_var_id, lit_term),
-                            ),
-                        )
-                        for bname, bval in row.bindings
-                    )
-                    if pat.kind == "wild":
-                        extra = tuple((name, _Binding(lit_term, col_type)) for name in pat.names)
-                        yes_rows.append(
-                            _Row(
-                                row.patterns[:index] + row.patterns[index + 1:],
-                                updated_bindings + extra,
-                                row.arm,
-                                row.arm_index,
-                            )
-                        )
-                        no_rows.append(row)
-                    else:
-                        row_val = _parse_numeric_magnitude(cast("str", pat.node["value"]))
-                        if row_val == target_val:
-                            yes_rows.append(
-                                _Row(
-                                    row.patterns[:index] + row.patterns[index + 1:],
-                                    updated_bindings,
-                                    row.arm,
-                                    row.arm_index,
-                                )
-                            )
-                        else:
-                            no_rows.append(row)
-                eq_cond = _apps(_constant(f"int_eq_{col_int_spec.name}"), col_scrutinee, lit_term)
-                ne_cond = _apps(_constant(f"int_ne_{col_int_spec.name}"), col_scrutinee, lit_term)
-                self.active_facts.append(eq_cond)
-                try:
-                    yes_branch = compile_matrix(
-                        subst_cols(without_index, col_var_id, lit_term),
-                        yes_rows,
-                        self.substitute(pattern_term, col_var_id, lit_term),
-                    )
-                finally:
-                    self.active_facts.pop()
-                self.active_facts.append(ne_cond)
-                try:
-                    no_branch = compile_matrix(columns, no_rows, pattern_term)
-                finally:
-                    self.active_facts.pop()
-                ret_ty = (
-                    self.substitute(motive_body, root_var_id, pattern_term)
-                    if motive_body is not None
-                    else cast("_Term", inferred_result[0])
+                return split_literal_column(
+                    lit_term,
+                    _apps(_constant(f"int_eq_{col_int_spec.name}"), col_scrutinee, lit_term),
+                    _apps(_constant(f"int_ne_{col_int_spec.name}"), col_scrutinee, lit_term),
+                    lambda pat: _parse_numeric_magnitude(cast("str", pat.node["value"])) == target_val,
                 )
-                return _term("if", ret_ty, eq_cond, yes_branch, no_branch)
 
             if col_type.kind == "prod":
                 left_type, right_type = col_type.args
