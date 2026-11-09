@@ -2270,7 +2270,7 @@ class _DeclarationsMixin:
         try:
             is_recursive = False
             is_post_env_theorem = False
-            post_env_obligations: list[tuple[_Term, Node]] = []
+            post_env_obligations: list[tuple[_Term, _Term | None, Node]] = []
             post_env_binders: list[_Term] = []
             post_env_facts: list[_Term] = []
             post_state_images: list[tuple[_Term, _Term]] = []
@@ -2472,7 +2472,6 @@ class _DeclarationsMixin:
                             for ens_contract in ensures_clauses:
                                 self.reset_budget()
                                 ens_prop = self.proposition(self.node(ens_contract["value"]), post_env)
-                                post_env_obligations.append((ens_prop, ens_contract))
                                 try:
                                     self._prove_proposition(
                                         ens_prop,
@@ -2483,10 +2482,27 @@ class _DeclarationsMixin:
                                         include_env=False,
                                     )
                                 except VelaError:
+                                    self.reset_budget()
                                     if not self._entailed_by_theorem_facts(ens_prop, post_env):
                                         raise self.fail(
                                             "type", "could not discharge theorem postcondition", ens_contract
                                         ) from None
+                                self.reset_budget()
+                                saved_ens_p = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+                                ens_proof: _Term | None = None
+                                try:
+                                    ens_proof = self._prove_proposition(
+                                        ens_prop,
+                                        post_env,
+                                        req_fact_bindings,
+                                        ens_contract,
+                                        allow_refl=True,
+                                        include_env=False,
+                                    )
+                                except VelaError:
+                                    self.metas = saved_ens_p
+                                self.reset_budget()
+                                post_env_obligations.append((ens_prop, ens_proof, ens_contract))
                         finally:
                             self.post_env = {}
                         body = _apps(_constant("Refl"), _BOOL, _term("bool", value=1))
@@ -2552,13 +2568,23 @@ class _DeclarationsMixin:
             if kind in {"theorem", "lemma"} and is_post_env_theorem:
                 if not post_env_obligations:
                     raise self.fail("type", "a theorem over mutated parameters requires an ensures clause", node)
-                first_prop, first_contract = post_env_obligations[0]
-                signature, generalized = self._solver_statement(post_env_binders, first_prop, post_env_facts)
-                reason = "theorem over mutated parameters discharged by the untrusted solver"
-                if generalized:
-                    reason = f"{reason}; generalized over elaboration-local state with its facts"
-                definition = self._emit_solver_trusted(emitted, signature, first_contract, reason, len(generics))
-                result = signature
+                first_prop, first_proof, first_contract = post_env_obligations[0]
+                bound_ids = {cast("int", v.value) for v in post_env_binders}
+                if (
+                    first_proof is not None
+                    and self.free(first_prop) <= bound_ids
+                    and self.free(first_proof) <= bound_ids
+                ):
+                    signature = self.wrap("pi", post_env_binders, first_prop)
+                    definition = self.wrap("lam", post_env_binders, first_proof)
+                    result = signature
+                else:
+                    signature, generalized = self._solver_statement(post_env_binders, first_prop, post_env_facts)
+                    reason = "theorem over mutated parameters discharged by the untrusted solver"
+                    if generalized:
+                        reason = f"{reason}; generalized over elaboration-local state with its facts"
+                    definition = self._emit_solver_trusted(emitted, signature, first_contract, reason, len(generics))
+                    result = signature
             elif kind in {"theorem", "lemma"} and self.used_domain_solver_in_proof:
                 definition = self._emit_solver_trusted(
                     emitted, signature, node, "theorem proof step discharged by the untrusted solver", len(generics)
@@ -2596,12 +2622,12 @@ class _DeclarationsMixin:
             # Generated references never become names in the source namespace.
             self.constants[emitted] = binding
             self.definitions[emitted] = definition
-            for post_idx, (post_prop, post_contract) in enumerate(post_env_obligations[1:], start=1):
+            for post_idx, (post_prop, post_proof, post_contract) in enumerate(post_env_obligations[1:], start=1):
                 self._emit_obligation(
                     f"{emitted}_ensures_{post_idx}",
                     post_env_binders,
                     post_prop,
-                    None,
+                    post_proof,
                     post_contract,
                     "theorem over mutated parameters discharged by the untrusted solver",
                     len(generics),
@@ -2624,9 +2650,7 @@ class _DeclarationsMixin:
                             fin_t = self.final_ref_bindings[pname].term
                             if self.free(fin_t) <= all_var_ids:
                                 idx_to_term[p_idx] = fin_t
-                if idx_to_term:
-                    self.callable_ref_updates[emitted] = (base_param_ids, idx_to_term)
-                for p_idx, fin_t in idx_to_term.items():
+                for p_idx, fin_t in list(idx_to_term.items()):
                     pname = self.name(parameters[p_idx]["name"])
                     post_name = f"{emitted}_post_{pname}"
                     post_type = self.final_ref_bindings[pname].type
@@ -2638,7 +2662,16 @@ class _DeclarationsMixin:
                     self.output.append(f"Definition {post_name} : {self.render(post_sig)} :=\n  {self.render(post_def)}.")
                     self.constants[post_name] = _Binding(_constant(post_name), post_sig, len(generics))
                     self.definitions[post_name] = post_def
-                    post_state_images.append((fin_t, _apps(_constant(post_name), *variables)))
+                    post_call = _apps(_constant(post_name), *variables)
+                    post_state_images.append((fin_t, post_call))
+                    if (
+                        not witness_vars
+                        and pname not in self.out_param_names
+                        and self.whnf(post_type) == _app(_constant("Span"), _U8)
+                    ):
+                        idx_to_term[p_idx] = post_call
+                if idx_to_term:
+                    self.callable_ref_updates[emitted] = (base_param_ids, idx_to_term)
             if kind in {"theorem", "lemma"} and len(ensures_clauses) > 1 and not is_post_env_theorem:
                 init_candidates = (
                     candidates
@@ -2755,6 +2788,7 @@ class _DeclarationsMixin:
                 post_env["result"] = _Binding(call_term, result)
                 post_vars = [*variables, *req_vars]
                 post_var_ids = {cast("int", v.value) for v in post_vars}
+                post_req_facts = tuple(_Binding(rv, self.types[cast("int", rv.value)]) for rv in req_vars)
                 saved_post_facts = list(self.active_facts)
                 self.active_facts.extend(
                     [
@@ -2799,7 +2833,7 @@ class _DeclarationsMixin:
                             rest_prop = self.asserted_proposition(rest_val_node, post_env)
                             rest_proof: _Term | None
                             try:
-                                rest_proof = self._prove_proposition(rest_prop, post_env, (), rest_contract)
+                                rest_proof = self._prove_proposition(rest_prop, post_env, post_req_facts, rest_contract)
                             except VelaError:
                                 extracted = self._extract_equality(rest_prop)
                                 proved_rest = False
@@ -2872,7 +2906,7 @@ class _DeclarationsMixin:
                         ens_prop = self.asserted_proposition(ens_val_node, post_env)
                         ens_proof: _Term | None
                         try:
-                            ens_proof = self._prove_proposition(ens_prop, post_env, (), ens_contract)
+                            ens_proof = self._prove_proposition(ens_prop, post_env, post_req_facts, ens_contract)
                         except VelaError:
                             self.reset_budget()
                             peeled_prop = ens_prop

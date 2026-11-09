@@ -631,6 +631,12 @@ class _SolverMixin:
                 repl = read_rewrites[resolved]
                 memo[tid] = (cur, repl, True)
                 return repl, True
+            if self.spine(resolved)[0] == _constant("Span_Read"):
+                w_read = self.whnf(resolved)
+                if w_read in read_rewrites:
+                    repl = read_rewrites[w_read]
+                    memo[tid] = (cur, repl, True)
+                    return repl, True
             if resolved.kind in {"pi", "lam", "let", "fix"} or not resolved.args:
                 memo[tid] = (cur, resolved, False)
                 return resolved, False
@@ -643,9 +649,13 @@ class _SolverMixin:
             if not changed:
                 memo[tid] = (cur, resolved, False)
                 return resolved, False
-            rebuilt = _Term(resolved.kind, resolved.value, tuple(new_args))
+            rebuilt = self.whnf(_Term(resolved.kind, resolved.value, tuple(new_args)))
             if rebuilt in read_rewrites:
                 rebuilt = read_rewrites[rebuilt]
+            elif self.spine(rebuilt)[0] == _constant("Span_Read"):
+                w_reb = self.whnf(rebuilt)
+                if w_reb in read_rewrites:
+                    rebuilt = read_rewrites[w_reb]
             memo[tid] = (cur, rebuilt, True)
             memo[id(rebuilt)] = (rebuilt, rebuilt, False)
             return rebuilt, True

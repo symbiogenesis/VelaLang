@@ -413,6 +413,34 @@ _GALLINA = {
     "eq_nat": "Corelib.Init.Nat.eqb", "ne_nat": "vela_ne_nat",
     "eq_bool": "vela_eq_bool", "ne_bool": "vela_ne_bool",
     "&&": "vela_and", "||": "vela_or", "!": "vela_not", "==>": "vela_implies", "<==>": "vela_eq_bool",
+    "vela_false_elim": "vela_false_elim",
+    "vela_false_true_elim": "vela_false_true_elim",
+    "vela_and_intro": "vela_and_intro",
+    "vela_and_left": "vela_and_left",
+    "vela_and_right": "vela_and_right",
+    "vela_or_false_l": "vela_or_false_l",
+    "vela_or_false_r": "vela_or_false_r",
+    "vela_eq_bool_refl": "vela_eq_bool_refl",
+    "vela_eq_bool_of_eq": "vela_eq_bool_of_eq",
+    "vela_eq_bool_true": "vela_eq_bool_true",
+    "vela_int_eq_refl": "vela_int_eq_refl",
+    "vela_int_eq_of_eq": "vela_int_eq_of_eq",
+    "vela_int_eq_true": "vela_int_eq_true",
+    "vela_int_le_of_gt_false": "vela_int_le_of_gt_false",
+    "vela_Span_Store": "vela_Span_Store",
+    "vela_bs_empty": "vela_bs_empty",
+    "vela_bs_slice": "vela_bs_slice",
+    "vela_bs_fill": "vela_bs_fill",
+    "vela_bs_write": "vela_bs_write",
+    "vela_bs_copy": "vela_bs_copy",
+    "vela_store_lookup": "vela_store_lookup",
+    "vela_store_slice_offset": "vela_store_slice_offset",
+    "vela_bs_shift": "vela_bs_shift",
+    "vela_Span_Read_write_same": "vela_Span_Read_write_same",
+    "vela_Span_Read_write_other_ne": "vela_Span_Read_write_other_ne",
+    "vela_store_lookup_write_ge": "vela_store_lookup_write_ge",
+    "vela_store_lookup_fill_ge": "vela_store_lookup_fill_ge",
+    "vela_store_lookup_copy_ge": "vela_store_lookup_copy_ge",
     **{
         f"int_{op}_{spec.name}": f"(vela_int_{op} ({spec.tag} : Corelib.Init.Datatypes.nat))"
         for spec in _INT_SPECS.values()
@@ -534,16 +562,18 @@ Fixpoint vela_bits_not (a : vela_bits) : vela_bits :=
 
 Fixpoint vela_bits_ult (a b : vela_bits) : bool :=
   match a, b with
+  | _, vela_bnil => false
+  | vela_bnil, vela_bcons _ _ => true
   | vela_bcons x xs, vela_bcons y ys =>
       if vela_eq_bool x y then vela_bits_ult xs ys else y
-  | _, _ => false
   end.
 
 Fixpoint vela_bits_ule (a b : vela_bits) : bool :=
   match a, b with
+  | vela_bnil, _ => true
+  | vela_bcons _ _, vela_bnil => false
   | vela_bcons x xs, vela_bcons y ys =>
       if vela_eq_bool x y then vela_bits_ule xs ys else y
-  | _, _ => true
   end.
 
 Fixpoint vela_bits_rev_acc (a acc : vela_bits) : vela_bits :=
@@ -1038,6 +1068,199 @@ Definition vela_char_try_from_Nat (n : nat)
 Definition vela_u8_zero : vela_int (0 : nat) :=
   vela_mk_int (0 : nat) (vela_bits_pad 8 false vela_bnil).
 
+Definition vela_usize_zero : vela_int (4 : nat) :=
+  vela_mk_int (4 : nat) (vela_bits_pad 64 false vela_bnil).
+
+Definition vela_false_elim (P : Type@{vela_u0}) (h : @Corelib.Init.Logic.eq bool true false) : P :=
+  match h in (@Corelib.Init.Logic.eq _ _ b) return (if b then unit else P) with
+  | @Corelib.Init.Logic.eq_refl _ _ => tt
+  end.
+
+Definition vela_false_true_elim (P : Type@{vela_u0}) (h : @Corelib.Init.Logic.eq bool false true) : P :=
+  vela_false_elim P (@Corelib.Init.Logic.eq_sym bool false true h).
+
+Definition vela_and_intro (a b : bool)
+    (ha : @Corelib.Init.Logic.eq bool a true)
+    (hb : @Corelib.Init.Logic.eq bool b true)
+    : @Corelib.Init.Logic.eq bool (vela_and a b) true :=
+  @Corelib.Init.Logic.eq_trans bool (vela_and a b) (vela_and true b) true
+    (@Corelib.Init.Logic.f_equal bool bool (fun x : bool => vela_and x b) a true ha)
+    hb.
+
+Definition vela_and_left (a b : bool)
+    (h : @Corelib.Init.Logic.eq bool (vela_and a b) true)
+    : @Corelib.Init.Logic.eq bool a true :=
+  match a as a0 return (@Corelib.Init.Logic.eq bool (vela_and a0 b) true -> @Corelib.Init.Logic.eq bool a0 true) with
+  | true => fun _ => @Corelib.Init.Logic.eq_refl bool true
+  | false => fun h0 => h0
+  end h.
+
+Definition vela_and_right (a b : bool)
+    (h : @Corelib.Init.Logic.eq bool (vela_and a b) true)
+    : @Corelib.Init.Logic.eq bool b true :=
+  match a as a0 return (@Corelib.Init.Logic.eq bool (vela_and a0 b) true -> @Corelib.Init.Logic.eq bool b true) with
+  | true => fun h0 => h0
+  | false => fun h0 => vela_false_true_elim (@Corelib.Init.Logic.eq bool b true) h0
+  end h.
+
+Definition vela_or_false_l (a b : bool)
+    (h : @Corelib.Init.Logic.eq bool (vela_or a b) false)
+    : @Corelib.Init.Logic.eq bool a false :=
+  match a as a0 return (@Corelib.Init.Logic.eq bool (vela_or a0 b) false -> @Corelib.Init.Logic.eq bool a0 false) with
+  | true => fun h0 => vela_false_elim (@Corelib.Init.Logic.eq bool true false) h0
+  | false => fun _ => @Corelib.Init.Logic.eq_refl bool false
+  end h.
+
+Definition vela_or_false_r (a b : bool)
+    (h : @Corelib.Init.Logic.eq bool (vela_or a b) false)
+    : @Corelib.Init.Logic.eq bool b false :=
+  match a as a0 return (@Corelib.Init.Logic.eq bool (vela_or a0 b) false -> @Corelib.Init.Logic.eq bool b false) with
+  | true => fun h0 => vela_false_elim (@Corelib.Init.Logic.eq bool b false) h0
+  | false => fun h0 => h0
+  end h.
+
+Definition vela_eq_bool_refl (b : bool) : @Corelib.Init.Logic.eq bool (vela_eq_bool b b) true :=
+  match b as b0 return (@Corelib.Init.Logic.eq bool (vela_eq_bool b0 b0) true) with
+  | true => @Corelib.Init.Logic.eq_refl bool true
+  | false => @Corelib.Init.Logic.eq_refl bool true
+  end.
+
+Definition vela_eq_bool_of_eq (a b : bool) (p : @Corelib.Init.Logic.eq bool a b)
+    : @Corelib.Init.Logic.eq bool (vela_eq_bool a b) true :=
+  match p in (@Corelib.Init.Logic.eq _ _ b') return (@Corelib.Init.Logic.eq bool (vela_eq_bool a b') true) with
+  | @Corelib.Init.Logic.eq_refl _ _ => vela_eq_bool_refl a
+  end.
+
+Definition vela_eq_bool_true (a b : bool) (h : @Corelib.Init.Logic.eq bool (vela_eq_bool a b) true)
+    : @Corelib.Init.Logic.eq bool a b :=
+  match a as a0, b as b0 return (@Corelib.Init.Logic.eq bool (vela_eq_bool a0 b0) true -> @Corelib.Init.Logic.eq bool a0 b0) with
+  | true, true => fun _ => @Corelib.Init.Logic.eq_refl bool true
+  | true, false => fun h0 => @Corelib.Init.Logic.eq_sym bool false true h0
+  | false, true => fun h0 => h0
+  | false, false => fun _ => @Corelib.Init.Logic.eq_refl bool false
+  end h.
+
+Fixpoint vela_bits_eqb_refl (a : vela_bits) {struct a} : @Corelib.Init.Logic.eq bool (vela_bits_eqb a a) true :=
+  match a as a0 return (@Corelib.Init.Logic.eq bool (vela_bits_eqb a0 a0) true) with
+  | vela_bnil => @Corelib.Init.Logic.eq_refl bool true
+  | vela_bcons x xs => vela_and_intro (vela_eq_bool x x) (vela_bits_eqb xs xs) (vela_eq_bool_refl x) (vela_bits_eqb_refl xs)
+  end.
+
+Fixpoint vela_bits_eqb_true (a b : vela_bits) {struct a}
+    : @Corelib.Init.Logic.eq bool (vela_bits_eqb a b) true -> @Corelib.Init.Logic.eq vela_bits a b :=
+  match a as a0, b as b0 return (@Corelib.Init.Logic.eq bool (vela_bits_eqb a0 b0) true -> @Corelib.Init.Logic.eq vela_bits a0 b0) with
+  | vela_bnil, vela_bnil => fun _ => @Corelib.Init.Logic.eq_refl vela_bits vela_bnil
+  | vela_bnil, vela_bcons y ys => fun h => vela_false_true_elim (@Corelib.Init.Logic.eq vela_bits vela_bnil (vela_bcons y ys)) h
+  | vela_bcons x xs, vela_bnil => fun h => vela_false_true_elim (@Corelib.Init.Logic.eq vela_bits (vela_bcons x xs) vela_bnil) h
+  | vela_bcons x xs, vela_bcons y ys => fun h =>
+      match vela_eq_bool_true x y (vela_and_left (vela_eq_bool x y) (vela_bits_eqb xs ys) h) in (@Corelib.Init.Logic.eq _ _ y0)
+        return (@Corelib.Init.Logic.eq vela_bits (vela_bcons x xs) (vela_bcons y0 ys)) with
+      | @Corelib.Init.Logic.eq_refl _ _ =>
+          @Corelib.Init.Logic.f_equal vela_bits vela_bits (vela_bcons x) xs ys
+            (vela_bits_eqb_true xs ys (vela_and_right (vela_eq_bool x y) (vela_bits_eqb xs ys) h))
+      end
+  end.
+
+Definition vela_int_eq_refl (tag : nat) (x : vela_int tag)
+    : @Corelib.Init.Logic.eq bool (vela_int_eq tag x x) true :=
+  vela_bits_eqb_refl (vela_int_bits tag x).
+
+Definition vela_int_eq_of_eq (tag : nat) (x y : vela_int tag)
+    (p : @Corelib.Init.Logic.eq (vela_int tag) x y)
+    : @Corelib.Init.Logic.eq bool (vela_int_eq tag x y) true :=
+  match p in (@Corelib.Init.Logic.eq _ _ y') return (@Corelib.Init.Logic.eq bool (vela_int_eq tag x y') true) with
+  | @Corelib.Init.Logic.eq_refl _ _ => vela_int_eq_refl tag x
+  end.
+
+Definition vela_int_eq_true (tag : nat) (x y : vela_int tag)
+    (h : @Corelib.Init.Logic.eq bool (vela_int_eq tag x y) true)
+    : @Corelib.Init.Logic.eq (vela_int tag) x y :=
+  match x as x0, y as y0 return (@Corelib.Init.Logic.eq bool (vela_int_eq tag x0 y0) true -> @Corelib.Init.Logic.eq (vela_int tag) x0 y0) with
+  | vela_mk_int _ bx, vela_mk_int _ by0 => fun h0 =>
+      @Corelib.Init.Logic.f_equal vela_bits (vela_int tag) (vela_mk_int tag) bx by0
+        (vela_bits_eqb_true bx by0 h0)
+  end h.
+
+Definition vela_int_ne_false (tag : nat) (x y : vela_int tag)
+    (h : @Corelib.Init.Logic.eq bool (vela_int_ne tag x y) true)
+    : @Corelib.Init.Logic.eq bool (vela_int_eq tag x y) false :=
+  match vela_int_eq tag x y as b return (@Corelib.Init.Logic.eq bool (vela_not b) true -> @Corelib.Init.Logic.eq bool b false) with
+  | true => fun h0 => @Corelib.Init.Logic.eq_sym bool false true h0
+  | false => fun _ => @Corelib.Init.Logic.eq_refl bool false
+  end h.
+
+Definition vela_int_eq_sym_false (tag : nat) (x y : vela_int tag)
+    (h : @Corelib.Init.Logic.eq bool (vela_int_eq tag x y) false)
+    : @Corelib.Init.Logic.eq bool (vela_int_eq tag y x) false :=
+  match vela_int_eq tag y x as b return (@Corelib.Init.Logic.eq bool (vela_int_eq tag y x) b -> @Corelib.Init.Logic.eq bool b false) with
+  | true => fun hyx =>
+      vela_false_elim (@Corelib.Init.Logic.eq bool true false)
+        (@Corelib.Init.Logic.eq_trans bool true (vela_int_eq tag x y) false
+          (@Corelib.Init.Logic.eq_sym bool (vela_int_eq tag x y) true
+            (vela_int_eq_of_eq tag x y (@Corelib.Init.Logic.eq_sym (vela_int tag) y x (vela_int_eq_true tag y x hyx))))
+          h)
+  | false => fun _ => @Corelib.Init.Logic.eq_refl bool false
+  end (@Corelib.Init.Logic.eq_refl bool (vela_int_eq tag y x)).
+
+Fixpoint vela_bits_ult_ule_false (P : Type@{vela_u0}) (a b : vela_bits) {struct a}
+    : @Corelib.Init.Logic.eq bool (vela_bits_ult a b) true ->
+      @Corelib.Init.Logic.eq bool (vela_bits_ule b a) true -> P :=
+  match a as a0, b as b0 return (@Corelib.Init.Logic.eq bool (vela_bits_ult a0 b0) true -> @Corelib.Init.Logic.eq bool (vela_bits_ule b0 a0) true -> P) with
+  | vela_bnil, vela_bnil => fun h1 _ => vela_false_true_elim P h1
+  | vela_bnil, vela_bcons _ _ => fun _ h2 => vela_false_true_elim P h2
+  | vela_bcons _ _, vela_bnil => fun h1 _ => vela_false_true_elim P h1
+  | vela_bcons x xs, vela_bcons y ys =>
+      match x as x0, y as y0 return (@Corelib.Init.Logic.eq bool (if vela_eq_bool x0 y0 then vela_bits_ult xs ys else y0) true -> @Corelib.Init.Logic.eq bool (if vela_eq_bool y0 x0 then vela_bits_ule ys xs else x0) true -> P) with
+      | true, true => fun h1 h2 => vela_bits_ult_ule_false P xs ys h1 h2
+      | false, false => fun h1 h2 => vela_bits_ult_ule_false P xs ys h1 h2
+      | true, false => fun h1 _ => vela_false_true_elim P h1
+      | false, true => fun _ h2 => vela_false_true_elim P h2
+      end
+  end.
+
+Fixpoint vela_bits_ult_ule_trans (a b c : vela_bits) {struct a}
+    : @Corelib.Init.Logic.eq bool (vela_bits_ult a b) true ->
+      @Corelib.Init.Logic.eq bool (vela_bits_ule b c) true ->
+      @Corelib.Init.Logic.eq bool (vela_bits_ult a c) true :=
+  match a as a0, b as b0, c as c0 return (@Corelib.Init.Logic.eq bool (vela_bits_ult a0 b0) true -> @Corelib.Init.Logic.eq bool (vela_bits_ule b0 c0) true -> @Corelib.Init.Logic.eq bool (vela_bits_ult a0 c0) true) with
+  | vela_bnil, vela_bnil, _ => fun h1 _ => vela_false_true_elim _ h1
+  | vela_bcons _ _, vela_bnil, _ => fun h1 _ => vela_false_true_elim _ h1
+  | vela_bnil, vela_bcons _ _, vela_bnil => fun _ h2 => vela_false_true_elim _ h2
+  | vela_bnil, vela_bcons _ _, vela_bcons _ _ => fun _ _ => @Corelib.Init.Logic.eq_refl bool true
+  | vela_bcons _ _, vela_bcons _ _, vela_bnil => fun _ h2 => vela_false_true_elim _ h2
+  | vela_bcons x xs, vela_bcons y ys, vela_bcons z zs =>
+      match x as x0, y as y0, z as z0 return (@Corelib.Init.Logic.eq bool (if vela_eq_bool x0 y0 then vela_bits_ult xs ys else y0) true -> @Corelib.Init.Logic.eq bool (if vela_eq_bool y0 z0 then vela_bits_ule ys zs else z0) true -> @Corelib.Init.Logic.eq bool (if vela_eq_bool x0 z0 then vela_bits_ult xs zs else z0) true) with
+      | true, true, true => fun h1 h2 => vela_bits_ult_ule_trans xs ys zs h1 h2
+      | false, false, false => fun h1 h2 => vela_bits_ult_ule_trans xs ys zs h1 h2
+      | false, false, true => fun _ _ => @Corelib.Init.Logic.eq_refl bool true
+      | false, true, true => fun _ _ => @Corelib.Init.Logic.eq_refl bool true
+      | true, false, false => fun h1 _ => vela_false_true_elim _ h1
+      | true, false, true => fun h1 _ => vela_false_true_elim _ h1
+      | false, true, false => fun _ h2 => vela_false_true_elim _ h2
+      | true, true, false => fun _ h2 => vela_false_true_elim _ h2
+      end
+  end.
+
+Fixpoint vela_bits_ule_of_ult_false (a b : vela_bits) {struct a}
+    : @Corelib.Init.Logic.eq bool (vela_bits_ult b a) false ->
+      @Corelib.Init.Logic.eq bool (vela_bits_ule a b) true :=
+  match a as a0, b as b0 return (@Corelib.Init.Logic.eq bool (vela_bits_ult b0 a0) false -> @Corelib.Init.Logic.eq bool (vela_bits_ule a0 b0) true) with
+  | vela_bnil, _ => fun _ => @Corelib.Init.Logic.eq_refl bool true
+  | vela_bcons _ _, vela_bnil => fun h => vela_false_elim (@Corelib.Init.Logic.eq bool false true) h
+  | vela_bcons x xs, vela_bcons y ys =>
+      match x as x0, y as y0 return (@Corelib.Init.Logic.eq bool (if vela_eq_bool y0 x0 then vela_bits_ult ys xs else x0) false -> @Corelib.Init.Logic.eq bool (if vela_eq_bool x0 y0 then vela_bits_ule xs ys else y0) true) with
+      | true, true => fun h => vela_bits_ule_of_ult_false xs ys h
+      | false, false => fun h => vela_bits_ule_of_ult_false xs ys h
+      | false, true => fun _ => @Corelib.Init.Logic.eq_refl bool true
+      | true, false => fun h => vela_false_elim (@Corelib.Init.Logic.eq bool false true) h
+      end
+  end.
+
+Definition vela_int_le_of_gt_false (tag : nat) (x y : vela_int tag)
+    (h : @Corelib.Init.Logic.eq bool (vela_int_gt tag x y) false)
+    : @Corelib.Init.Logic.eq bool (vela_int_le tag x y) true :=
+  vela_bits_ule_of_ult_false (vela_int_key tag x) (vela_int_key tag y) h.
+
 Definition vela_in_extent (addr base len : vela_int (4 : nat)) : bool :=
   vela_and
     (vela_int_le (4 : nat) base addr)
@@ -1045,6 +1268,7 @@ Definition vela_in_extent (addr base len : vela_int (4 : nat)) : bool :=
 
 Inductive vela_ByteStore : Type@{vela_u0} :=
 | vela_bs_empty : vela_ByteStore
+| vela_bs_slice : vela_int (4 : nat) -> vela_int (4 : nat) -> vela_ByteStore -> vela_ByteStore
 | vela_bs_fill : vela_int (4 : nat) -> vela_int (4 : nat) -> vela_int (0 : nat) -> vela_ByteStore -> vela_ByteStore
 | vela_bs_write : vela_int (4 : nat) -> vela_int (0 : nat) -> vela_ByteStore -> vela_ByteStore
 | vela_bs_copy : vela_int (4 : nat) -> vela_int (4 : nat) -> vela_int (4 : nat) -> vela_ByteStore -> vela_ByteStore -> vela_ByteStore.
@@ -1052,6 +1276,8 @@ Inductive vela_ByteStore : Type@{vela_u0} :=
 Fixpoint vela_store_lookup (st : vela_ByteStore) (addr : vela_int (4 : nat)) {struct st} : vela_int (0 : nat) :=
   match st with
   | vela_bs_empty => vela_u8_zero
+  | vela_bs_slice off _ parent_st =>
+      vela_store_lookup parent_st (vela_int_add (4 : nat) off addr)
   | vela_bs_fill base len val rest =>
       if vela_in_extent addr base len then val else vela_store_lookup rest addr
   | vela_bs_write waddr val rest =>
@@ -1061,6 +1287,27 @@ Fixpoint vela_store_lookup (st : vela_ByteStore) (addr : vela_int (4 : nat)) {st
         vela_store_lookup src_st (vela_int_add (4 : nat) sbase (vela_int_sub (4 : nat) addr dbase))
       else
         vela_store_lookup rest addr
+  end.
+
+Fixpoint vela_store_slice_offset (st : vela_ByteStore) {struct st} : vela_int (4 : nat) :=
+  match st with
+  | vela_bs_empty => vela_usize_zero
+  | vela_bs_slice off _ _ => off
+  | vela_bs_fill _ _ _ rest => vela_store_slice_offset rest
+  | vela_bs_write _ _ rest => vela_store_slice_offset rest
+  | vela_bs_copy _ _ _ _ rest => vela_store_slice_offset rest
+  end.
+
+Fixpoint vela_bs_shift (off : vela_int (4 : nat)) (st : vela_ByteStore) {struct st} : vela_ByteStore :=
+  match st with
+  | vela_bs_empty => vela_bs_empty
+  | vela_bs_slice _ _ parent_st => parent_st
+  | vela_bs_fill foff len val rest =>
+      vela_bs_fill (vela_int_add (4 : nat) off foff) len val (vela_bs_shift off rest)
+  | vela_bs_write widx val rest =>
+      vela_bs_write (vela_int_add (4 : nat) off widx) val (vela_bs_shift off rest)
+  | vela_bs_copy doff soff count src_st rest =>
+      vela_bs_copy (vela_int_add (4 : nat) off doff) soff count src_st (vela_bs_shift off rest)
   end.
 
 Inductive vela_Span (A : Type@{vela_u0}) : Type@{vela_u0} :=
@@ -1140,7 +1387,7 @@ Definition vela_Span_Disjoint (A : Type@{vela_u0}) (a b : vela_Span A) : bool :=
       (vela_Span_Base A a)).
 
 Definition vela_Span_Read (A : Type@{vela_u0}) (s : vela_Span A) (idx : vela_int (4 : nat)) : vela_int (0 : nat) :=
-  vela_store_lookup (vela_Span_Store A s) (vela_int_add (4 : nat) (vela_Span_Base A s) idx).
+  vela_store_lookup (vela_Span_Store A s) idx.
 
 Definition vela_Span_Write (A : Type@{vela_u0}) (s : vela_Span A) (idx : vela_int (4 : nat)) (val : vela_int (0 : nat)) : vela_Span A :=
   vela_mk_span A
@@ -1149,7 +1396,7 @@ Definition vela_Span_Write (A : Type@{vela_u0}) (s : vela_Span A) (idx : vela_in
     (vela_Span_Tag A s)
     (vela_Span_PermRead A s)
     (vela_Span_PermWrite A s)
-    (vela_bs_write (vela_int_add (4 : nat) (vela_Span_Base A s) idx) val (vela_Span_Store A s)).
+    (vela_bs_write idx val (vela_Span_Store A s)).
 
 Definition vela_Span_Fill (A : Type@{vela_u0}) (s : vela_Span A) (off count : vela_int (4 : nat)) (val : vela_int (0 : nat)) : vela_Span A :=
   vela_mk_span A
@@ -1158,7 +1405,7 @@ Definition vela_Span_Fill (A : Type@{vela_u0}) (s : vela_Span A) (off count : ve
     (vela_Span_Tag A s)
     (vela_Span_PermRead A s)
     (vela_Span_PermWrite A s)
-    (vela_bs_fill (vela_int_add (4 : nat) (vela_Span_Base A s) off) count val (vela_Span_Store A s)).
+    (vela_bs_fill off count val (vela_Span_Store A s)).
 
 Definition vela_Span_Slice (A : Type@{vela_u0}) (s : vela_Span A) (off count : vela_int (4 : nat)) : vela_Span A :=
   vela_mk_span A
@@ -1167,7 +1414,7 @@ Definition vela_Span_Slice (A : Type@{vela_u0}) (s : vela_Span A) (off count : v
     (vela_Span_Tag A s)
     (vela_Span_PermRead A s)
     (vela_Span_PermWrite A s)
-    (vela_Span_Store A s).
+    (vela_bs_slice off count (vela_Span_Store A s)).
 
 Definition vela_Span_CopyPrefix (A : Type@{vela_u0}) (dst src : vela_Span A) (count : vela_int (4 : nat)) : vela_Span A :=
   vela_mk_span A
@@ -1176,7 +1423,7 @@ Definition vela_Span_CopyPrefix (A : Type@{vela_u0}) (dst src : vela_Span A) (co
     (vela_Span_Tag A dst)
     (vela_Span_PermRead A dst)
     (vela_Span_PermWrite A dst)
-    (vela_bs_copy (vela_Span_Base A dst) (vela_Span_Base A src) count (vela_Span_Store A src) (vela_Span_Store A dst)).
+    (vela_bs_copy vela_usize_zero vela_usize_zero count (vela_Span_Store A src) (vela_Span_Store A dst)).
 
 Definition vela_Span_Restore (A : Type@{vela_u0}) (parent view : vela_Span A) : vela_Span A :=
   vela_mk_span A
@@ -1185,7 +1432,111 @@ Definition vela_Span_Restore (A : Type@{vela_u0}) (parent view : vela_Span A) : 
     (vela_Span_Tag A parent)
     (vela_Span_PermRead A parent)
     (vela_Span_PermWrite A parent)
-    (vela_Span_Store A view).
+    (vela_bs_shift (vela_store_slice_offset (vela_Span_Store A view)) (vela_Span_Store A view)).
+
+Definition vela_Span_Read_write_same (A : Type@{vela_u0}) (s : vela_Span A) (idx : vela_int (4 : nat)) (val : vela_int (0 : nat))
+    : @Corelib.Init.Logic.eq (vela_int (0 : nat))
+        (vela_Span_Read A (vela_Span_Write A s idx val) idx)
+        val :=
+  @Corelib.Init.Logic.f_equal bool (vela_int (0 : nat))
+    (fun b : bool => if b then val else vela_store_lookup (vela_Span_Store A s) idx)
+    (vela_int_eq (4 : nat) idx idx)
+    true
+    (vela_int_eq_refl (4 : nat) idx).
+
+Definition vela_Span_Read_write_other_ne (A : Type@{vela_u0}) (s : vela_Span A) (widx ridx : vela_int (4 : nat)) (val : vela_int (0 : nat))
+    (hne : @Corelib.Init.Logic.eq bool (vela_int_ne (4 : nat) widx ridx) true)
+    : @Corelib.Init.Logic.eq (vela_int (0 : nat))
+        (vela_Span_Read A (vela_Span_Write A s widx val) ridx)
+        (vela_Span_Read A s ridx) :=
+  @Corelib.Init.Logic.f_equal bool (vela_int (0 : nat))
+    (fun b : bool => if b then val else vela_store_lookup (vela_Span_Store A s) ridx)
+    (vela_int_eq (4 : nat) ridx widx)
+    false
+    (vela_int_eq_sym_false (4 : nat) widx ridx (vela_int_ne_false (4 : nat) widx ridx hne)).
+
+Definition vela_int_lt_ge_false (P : Type@{vela_u0}) (a b c : vela_int (4 : nat))
+    (hab : @Corelib.Init.Logic.eq bool (vela_int_lt (4 : nat) a b) true)
+    (hcb : @Corelib.Init.Logic.eq bool (vela_int_ge (4 : nat) c b) true)
+    (hca : @Corelib.Init.Logic.eq bool (vela_int_eq (4 : nat) c a) true) : P :=
+  vela_bits_ult_ule_false P (vela_int_bits (4 : nat) a) (vela_int_bits (4 : nat) b) hab
+    (match vela_int_eq_true (4 : nat) c a hca in (@Corelib.Init.Logic.eq _ _ a0)
+       return (@Corelib.Init.Logic.eq bool (vela_int_ge (4 : nat) a0 b) true) with
+     | @Corelib.Init.Logic.eq_refl _ _ => hcb
+     end).
+
+Definition vela_store_lookup_write_ge (widx hi idx : vela_int (4 : nat)) (val : vela_int (0 : nat)) (rest : vela_ByteStore)
+    (hw : @Corelib.Init.Logic.eq bool (vela_int_lt (4 : nat) widx hi) true)
+    (hge : @Corelib.Init.Logic.eq bool (vela_int_ge (4 : nat) idx hi) true)
+    : @Corelib.Init.Logic.eq (vela_int (0 : nat))
+        (vela_store_lookup (vela_bs_write widx val rest) idx)
+        (vela_store_lookup rest idx) :=
+  match vela_int_eq (4 : nat) idx widx as b
+    return (@Corelib.Init.Logic.eq bool (vela_int_eq (4 : nat) idx widx) b ->
+            @Corelib.Init.Logic.eq (vela_int (0 : nat))
+              (if b then val else vela_store_lookup rest idx)
+              (vela_store_lookup rest idx)) with
+  | true => fun heq =>
+      vela_int_lt_ge_false
+        (@Corelib.Init.Logic.eq (vela_int (0 : nat)) val (vela_store_lookup rest idx))
+        widx hi idx hw hge heq
+  | false => fun _ => @Corelib.Init.Logic.eq_refl (vela_int (0 : nat)) (vela_store_lookup rest idx)
+  end (@Corelib.Init.Logic.eq_refl bool (vela_int_eq (4 : nat) idx widx)).
+
+Definition vela_in_extent_ge_elim (P : Type@{vela_u0}) (base len hi idx : vela_int (4 : nat))
+    (hbound : @Corelib.Init.Logic.eq bool (vela_int_le (4 : nat) (vela_int_add (4 : nat) base len) hi) true)
+    (hge : @Corelib.Init.Logic.eq bool (vela_int_ge (4 : nat) idx hi) true)
+    (hext : @Corelib.Init.Logic.eq bool (vela_in_extent idx base len) true) : P :=
+  vela_bits_ult_ule_false P (vela_int_bits (4 : nat) idx) (vela_int_bits (4 : nat) hi)
+    (vela_bits_ult_ule_trans
+      (vela_int_bits (4 : nat) idx)
+      (vela_int_bits (4 : nat) (vela_int_add (4 : nat) base len))
+      (vela_int_bits (4 : nat) hi)
+      (vela_and_right
+        (vela_int_le (4 : nat) base idx)
+        (vela_int_lt (4 : nat) idx (vela_int_add (4 : nat) base len))
+        hext)
+      hbound)
+    hge.
+
+Definition vela_store_lookup_fill_ge (base len hi idx : vela_int (4 : nat)) (val : vela_int (0 : nat)) (rest : vela_ByteStore)
+    (hbound : @Corelib.Init.Logic.eq bool (vela_int_le (4 : nat) (vela_int_add (4 : nat) base len) hi) true)
+    (hge : @Corelib.Init.Logic.eq bool (vela_int_ge (4 : nat) idx hi) true)
+    : @Corelib.Init.Logic.eq (vela_int (0 : nat))
+        (vela_store_lookup (vela_bs_fill base len val rest) idx)
+        (vela_store_lookup rest idx) :=
+  match vela_in_extent idx base len as b
+    return (@Corelib.Init.Logic.eq bool (vela_in_extent idx base len) b ->
+            @Corelib.Init.Logic.eq (vela_int (0 : nat))
+              (if b then val else vela_store_lookup rest idx)
+              (vela_store_lookup rest idx)) with
+  | true => fun hext =>
+      vela_in_extent_ge_elim
+        (@Corelib.Init.Logic.eq (vela_int (0 : nat)) val (vela_store_lookup rest idx))
+        base len hi idx hbound hge hext
+  | false => fun _ => @Corelib.Init.Logic.eq_refl (vela_int (0 : nat)) (vela_store_lookup rest idx)
+  end (@Corelib.Init.Logic.eq_refl bool (vela_in_extent idx base len)).
+
+Definition vela_store_lookup_copy_ge (dbase sbase count hi idx : vela_int (4 : nat)) (src_st rest : vela_ByteStore)
+    (hbound : @Corelib.Init.Logic.eq bool (vela_int_le (4 : nat) (vela_int_add (4 : nat) dbase count) hi) true)
+    (hge : @Corelib.Init.Logic.eq bool (vela_int_ge (4 : nat) idx hi) true)
+    : @Corelib.Init.Logic.eq (vela_int (0 : nat))
+        (vela_store_lookup (vela_bs_copy dbase sbase count src_st rest) idx)
+        (vela_store_lookup rest idx) :=
+  match vela_in_extent idx dbase count as b
+    return (@Corelib.Init.Logic.eq bool (vela_in_extent idx dbase count) b ->
+            @Corelib.Init.Logic.eq (vela_int (0 : nat))
+              (if b then vela_store_lookup src_st (vela_int_add (4 : nat) sbase (vela_int_sub (4 : nat) idx dbase))
+               else vela_store_lookup rest idx)
+              (vela_store_lookup rest idx)) with
+  | true => fun hext =>
+      vela_in_extent_ge_elim
+        (@Corelib.Init.Logic.eq (vela_int (0 : nat))
+          (vela_store_lookup src_st (vela_int_add (4 : nat) sbase (vela_int_sub (4 : nat) idx dbase)))
+          (vela_store_lookup rest idx))
+        dbase count hi idx hbound hge hext
+  | false => fun _ => @Corelib.Init.Logic.eq_refl (vela_int (0 : nat)) (vela_store_lookup rest idx)
+  end (@Corelib.Init.Logic.eq_refl bool (vela_in_extent idx dbase count)).
 
 Definition vela_Congr (A B : Type@{vela_u0}) (x y : A) (f : A -> B)
     (p : @Corelib.Init.Logic.eq A x y) : @Corelib.Init.Logic.eq B (f x) (f y) :=

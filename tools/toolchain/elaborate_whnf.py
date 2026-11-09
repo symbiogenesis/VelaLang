@@ -817,18 +817,23 @@ class _WhnfMixin:
                 inner, off, count, val = s_args[1], s_args[2], s_args[3], s_args[4]
                 off_w = self.whnf(off)
                 cnt_w = self.whnf(count)
-                if off_w.kind == "int" and cnt_w.kind == "int":
+                if off_w.kind == "int":
                     lo = _wrap_int(_INT_SPECS["usize"], cur_off + cast("int", off_w.value))
-                    hi = lo + cast("int", cnt_w.value)
-                    if lo <= target_off < hi:
-                        return self.whnf(val)
-                    return self._lookup_span_at_root_offset(elem, inner, target_root, target_off, orig_span)
+                    if target_off < lo:
+                        return self._lookup_span_at_root_offset(elem, inner, target_root, target_off, orig_span)
+                    if cnt_w.kind == "int":
+                        hi = lo + cast("int", cnt_w.value)
+                        if lo <= target_off < hi:
+                            return self.whnf(val)
+                        return self._lookup_span_at_root_offset(elem, inner, target_root, target_off, orig_span)
                 return None
             if sname == "Span_CopyPrefix" and len(s_args) == 4:
                 dst_s, src_s, count = s_args[1], s_args[2], s_args[3]
                 cnt_w = self.whnf(count)
+                lo = cur_off
+                if target_off < lo:
+                    return self._lookup_span_at_root_offset(elem, dst_s, target_root, target_off, orig_span)
                 if cnt_w.kind == "int":
-                    lo = cur_off
                     hi = lo + cast("int", cnt_w.value)
                     if lo <= target_off < hi:
                         src_ro = self._span_root_and_const_offset(elem, src_s)
@@ -947,6 +952,19 @@ class _WhnfMixin:
                 self.tick(True)
                 return _int_term(_INT_SPECS["u8"], 0)
             if idx_w.kind != "int":
+                if s_head in {_constant("Span_ReadOnly"), _constant("Span_Invalidate")} and len(s_args) == 2:
+                    self.tick(True)
+                    return self.whnf(_apps(_constant("Span_Read"), elem, s_args[1], idx_w))
+                if s_head == _constant("Span_Slice") and len(s_args) == 4:
+                    self.tick(True)
+                    return self.whnf(
+                        _apps(
+                            _constant("Span_Read"),
+                            elem,
+                            s_args[1],
+                            _apps(_constant("int_add_usize"), s_args[2], idx_w),
+                        )
+                    )
                 if s_w != s or idx_w != idx:
                     self.tick(True)
                     return _apps(_constant("Span_Read"), elem, s_w, idx_w)

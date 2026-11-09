@@ -11,6 +11,7 @@ from toolchain.elaborate_types import (
     _NAT,
     _PROP,
     _SORT,
+    _U8,
     _UNIT,
     MAX_DEPTH,
     Node,
@@ -18,6 +19,7 @@ from toolchain.elaborate_types import (
     _apps,
     _Binding,
     _constant,
+    _int_term,
     _Meta,
     _Term,
     _term,
@@ -231,7 +233,9 @@ class _ProofsMixin:
                 and self._try_unify(self.infer(eq_type), _SORT)):
             self.metas = saved
             return None
-        ctx_l, rep_l = self._replace_subterm(lhs, eq_type, u, z)
+        ctx_l, rep_l = (
+            self._replace_subterm(lhs, eq_type, u, z) if u.kind != "bool" else (lhs, False)
+        )
         if rep_l and ctx_l != z and self._try_unify(self.substitute(ctx_l, z_id, v), rhs):
             fn = _term("lam", eq_type, ctx_l, value=z.value)
             return _apps(_constant("Congr"), eq_type, goal_type, u, v, fn, proof_term)
@@ -240,7 +244,9 @@ class _ProofsMixin:
                 and self._try_unify(self.infer(eq_type), _SORT)):
             self.metas = saved
             return None
-        ctx_r, rep_r = self._replace_subterm(rhs, eq_type, v, z)
+        ctx_r, rep_r = (
+            self._replace_subterm(rhs, eq_type, v, z) if v.kind != "bool" else (rhs, False)
+        )
         if rep_r and ctx_r != z and self._try_unify(self.substitute(ctx_r, z_id, u), lhs):
             fn = _term("lam", eq_type, ctx_r, value=z.value)
             return _apps(_constant("Congr"), eq_type, goal_type, u, v, fn, proof_term)
@@ -386,6 +392,350 @@ class _ProofsMixin:
             acc_v = next_v
         return acc_term
 
+    def _expand_fact_bindings(
+        self: _Elaborator, facts: tuple[_Binding, ...]
+    ) -> tuple[_Binding, ...]:
+        expanded: list[_Binding] = []
+
+        def add_fact(fact: _Binding, depth: int = 0) -> None:
+            expanded.append(fact)
+            if depth > 8:
+                return
+            extracted = self._extract_equality(fact.type)
+            if extracted is None:
+                return
+            eq_type, lhs, rhs = extracted
+            if self.whnf(eq_type) != _BOOL:
+                return
+            rhs_w = self.whnf(rhs)
+            lhs_r = self.resolve(lhs)
+            head, args = self.spine(lhs_r)
+            if rhs_w == _term("bool", value=1):
+                if head != _constant("&&") or len(args) != 2:
+                    lhs_w = self.whnf(lhs_r)
+                    head_w, args_w = self.spine(lhs_w)
+                    if head_w == _constant("&&") and len(args_w) == 2:
+                        head, args = head_w, args_w
+                if head == _constant("&&") and len(args) == 2:
+                    a, b = args
+                    left_fact = _Binding(
+                        _apps(_constant("vela_and_left"), a, b, fact.term),
+                        _apps(_constant("Eq"), _BOOL, a, _term("bool", value=1)),
+                    )
+                    right_fact = _Binding(
+                        _apps(_constant("vela_and_right"), a, b, fact.term),
+                        _apps(_constant("Eq"), _BOOL, b, _term("bool", value=1)),
+                    )
+                    add_fact(left_fact, depth + 1)
+                    add_fact(right_fact, depth + 1)
+                    return
+                if (
+                    head.kind == "const"
+                    and isinstance(head.value, str)
+                    and head.value.startswith("int_eq_")
+                    and len(args) == 2
+                ):
+                    spec = _INT_SPECS.get(head.value[len("int_eq_") :])
+                    if spec is not None:
+                        tag = _term("nat", value=spec.tag)
+                        expanded.append(
+                            _Binding(
+                                _apps(_constant("vela_int_eq_true"), tag, args[0], args[1], fact.term),
+                                _apps(_constant("Eq"), spec.const, args[0], args[1]),
+                            )
+                        )
+                elif head in {_constant("eq_bool"), _constant("<==>")} and len(args) == 2:
+                    expanded.append(
+                        _Binding(
+                            _apps(_constant("vela_eq_bool_true"), args[0], args[1], fact.term),
+                            _apps(_constant("Eq"), _BOOL, args[0], args[1]),
+                        )
+                    )
+            elif rhs_w == _term("bool", value=0):
+                if head != _constant("||") or len(args) != 2:
+                    lhs_w = self.whnf(lhs_r)
+                    head_w, args_w = self.spine(lhs_w)
+                    if head_w == _constant("||") and len(args_w) == 2:
+                        head, args = head_w, args_w
+                if head == _constant("||") and len(args) == 2:
+                    a, b = args
+                    left_fact = _Binding(
+                        _apps(_constant("vela_or_false_l"), a, b, fact.term),
+                        _apps(_constant("Eq"), _BOOL, a, _term("bool", value=0)),
+                    )
+                    right_fact = _Binding(
+                        _apps(_constant("vela_or_false_r"), a, b, fact.term),
+                        _apps(_constant("Eq"), _BOOL, b, _term("bool", value=0)),
+                    )
+                    add_fact(left_fact, depth + 1)
+                    add_fact(right_fact, depth + 1)
+                    return
+                if (
+                    head.kind == "const"
+                    and isinstance(head.value, str)
+                    and head.value.startswith("int_gt_")
+                    and len(args) == 2
+                ):
+                    spec_name = head.value[len("int_gt_") :]
+                    spec = _INT_SPECS.get(spec_name)
+                    if spec is not None:
+                        tag = _term("nat", value=spec.tag)
+                        expanded.append(
+                            _Binding(
+                                _apps(_constant("vela_int_le_of_gt_false"), tag, args[0], args[1], fact.term),
+                                _apps(
+                                    _constant("Eq"),
+                                    _BOOL,
+                                    _apps(_constant(f"int_le_{spec_name}"), args[0], args[1]),
+                                    _term("bool", value=1),
+                                ),
+                            )
+                        )
+
+        for f in facts:
+            add_fact(f)
+        return tuple(expanded)
+
+    def _coq_store_slice_offset(self: _Elaborator, st: _Term, depth: int = 0) -> _Term:
+        if depth > MAX_DEPTH:
+            return _app(_constant("vela_store_slice_offset"), st)
+        st_r = self.resolve(st)
+        head, args = self.spine(st_r)
+        if head == _constant("vela_bs_empty") and not args:
+            return _int_term(_INT_SPECS["usize"], 0)
+        if head == _constant("vela_bs_slice") and len(args) == 3:
+            return args[0]
+        if head == _constant("vela_bs_write") and len(args) == 3:
+            return self._coq_store_slice_offset(args[2], depth + 1)
+        if head == _constant("vela_bs_fill") and len(args) == 4:
+            return self._coq_store_slice_offset(args[3], depth + 1)
+        if head == _constant("vela_bs_copy") and len(args) == 5:
+            return self._coq_store_slice_offset(args[4], depth + 1)
+        return _app(_constant("vela_store_slice_offset"), st_r)
+
+    def _coq_store_shift(self: _Elaborator, off: _Term, st: _Term, depth: int = 0) -> _Term:
+        if depth > MAX_DEPTH:
+            return _apps(_constant("vela_bs_shift"), off, st)
+        st_r = self.resolve(st)
+        head, args = self.spine(st_r)
+        if head == _constant("vela_bs_empty") and not args:
+            return _constant("vela_bs_empty")
+        if head == _constant("vela_bs_slice") and len(args) == 3:
+            return args[2]
+        if head == _constant("vela_bs_write") and len(args) == 3:
+            return _apps(
+                _constant("vela_bs_write"),
+                self.whnf(_apps(_constant("int_add_usize"), off, args[0])),
+                args[1],
+                self._coq_store_shift(off, args[2], depth + 1),
+            )
+        if head == _constant("vela_bs_fill") and len(args) == 4:
+            return _apps(
+                _constant("vela_bs_fill"),
+                self.whnf(_apps(_constant("int_add_usize"), off, args[0])),
+                args[1],
+                args[2],
+                self._coq_store_shift(off, args[3], depth + 1),
+            )
+        if head == _constant("vela_bs_copy") and len(args) == 5:
+            return _apps(
+                _constant("vela_bs_copy"),
+                self.whnf(_apps(_constant("int_add_usize"), off, args[0])),
+                args[1],
+                args[2],
+                args[3],
+                self._coq_store_shift(off, args[4], depth + 1),
+            )
+        return _apps(_constant("vela_bs_shift"), off, st_r)
+
+    def _coq_store_term(self: _Elaborator, span: _Term, depth: int = 0) -> _Term:
+        if depth > MAX_DEPTH:
+            return _apps(_constant("vela_Span_Store"), _U8, span)
+        span_r = self.resolve(span)
+        head, args = self.spine(span_r)
+        if head in {_constant("Span_ReadOnly"), _constant("Span_Invalidate")} and len(args) == 2:
+            return self._coq_store_term(args[1], depth + 1)
+        if head == _constant("LoopState") and len(args) == 3:
+            return self._coq_store_term(args[1], depth + 1)
+        if head == _constant("Span_AllocZeroed") and len(args) == 3:
+            return _constant("vela_bs_empty")
+        if head == _constant("Span_Slice") and len(args) == 4:
+            return _apps(
+                _constant("vela_bs_slice"),
+                args[2],
+                args[3],
+                self._coq_store_term(args[1], depth + 1),
+            )
+        if head == _constant("Span_Write") and len(args) == 4:
+            return _apps(
+                _constant("vela_bs_write"),
+                args[2],
+                args[3],
+                self._coq_store_term(args[1], depth + 1),
+            )
+        if head == _constant("Span_Fill") and len(args) == 5:
+            return _apps(
+                _constant("vela_bs_fill"),
+                args[2],
+                args[3],
+                args[4],
+                self._coq_store_term(args[1], depth + 1),
+            )
+        if head == _constant("Span_CopyPrefix") and len(args) == 4:
+            zero_usize = _int_term(_INT_SPECS["usize"], 0)
+            return _apps(
+                _constant("vela_bs_copy"),
+                zero_usize,
+                zero_usize,
+                args[3],
+                self._coq_store_term(args[2], depth + 1),
+                self._coq_store_term(args[1], depth + 1),
+            )
+        if head == _constant("Span_Restore") and len(args) == 3:
+            view_st = self._coq_store_term(args[2], depth + 1)
+            off = self._coq_store_slice_offset(view_st)
+            return self._coq_store_shift(off, view_st)
+        return _apps(_constant("vela_Span_Store"), _U8, span_r)
+
+    def _prove_span_read_equality(
+        self: _Elaborator, lhs: _Term, rhs: _Term, all_facts: tuple[_Binding, ...]
+    ) -> _Term | None:
+        lhs_r = self.resolve(lhs)
+        rhs_r = self.resolve(rhs)
+        l_head, l_args = self.spine(lhs_r)
+        if l_head != _constant("Span_Read") or len(l_args) != 3:
+            lhs_w = self.whnf(lhs_r)
+            l_head, l_args = self.spine(lhs_w)
+        if l_head != _constant("Span_Read") or len(l_args) != 3:
+            return None
+        elem_l, span_l, idx_l = l_args
+        if self.whnf(elem_l) != _U8:
+            return None
+        span_l_r = self.resolve(span_l)
+        sl_head, sl_args = self.spine(span_l_r)
+        if sl_head == _constant("Span_Write") and len(sl_args) == 4:
+            base_s, widx, val = sl_args[1], sl_args[2], sl_args[3]
+            if self._same_cond_term(widx, idx_l) and self._same_cond_term(val, rhs_r):
+                return _apps(_constant("vela_Span_Read_write_same"), _U8, base_s, idx_l, val)
+            r_head, r_args = self.spine(rhs_r)
+            if r_head != _constant("Span_Read") or len(r_args) != 3:
+                rhs_w = self.whnf(rhs_r)
+                r_head, r_args = self.spine(rhs_w)
+            if (
+                r_head == _constant("Span_Read")
+                and len(r_args) == 3
+                and self._same_cond_term(base_s, r_args[1])
+                and self._same_cond_term(idx_l, r_args[2])
+            ):
+                for fact in reversed(all_facts):
+                    ext = self._extract_equality(fact.type)
+                    if ext is None or self.whnf(ext[0]) != _BOOL or self.whnf(ext[2]) != _term("bool", value=1):
+                        continue
+                    fh, fa = self.spine(self.resolve(ext[1]))
+                    if (
+                        fh == _constant("int_ne_usize")
+                        and len(fa) == 2
+                        and self._same_cond_term(fa[0], widx)
+                        and self._same_cond_term(fa[1], idx_l)
+                    ):
+                        return _apps(
+                            _constant("vela_Span_Read_write_other_ne"),
+                            _U8,
+                            base_s,
+                            widx,
+                            idx_l,
+                            val,
+                            fact.term,
+                        )
+        r_head, r_args = self.spine(rhs_r)
+        if r_head != _constant("Span_Read") or len(r_args) != 3:
+            rhs_w = self.whnf(rhs_r)
+            r_head, r_args = self.spine(rhs_w)
+        if r_head != _constant("Span_Read") or len(r_args) != 3 or not self._same_cond_term(idx_l, r_args[2]):
+            return None
+        span_r = self.resolve(r_args[1])
+        if sl_head == _constant("LoopState") and len(sl_args) == 3 and self._same_cond_term(sl_args[1], span_r):
+            target_eq1 = _apps(_constant("int_eq_u8"), lhs_r, rhs_r)
+            target_eq2 = _apps(_constant("int_eq_u8"), rhs_r, lhs_r)
+            if any(
+                self._same_cond_term(bf, target_eq1) or self._same_cond_term(bf, target_eq2)
+                for bf in (*self.active_facts, *self.final_return_facts)
+            ):
+                return _apps(_constant("Refl"), _U8, rhs_r)
+        cur_st_init = self._coq_store_term(span_l_r)
+        target_st = self._coq_store_term(span_r)
+        if cur_st_init == target_st:
+            return None
+        for fact in reversed(all_facts):
+            ext = self._extract_equality(fact.type)
+            if ext is None or self.whnf(ext[0]) != _BOOL or self.whnf(ext[2]) != _term("bool", value=1):
+                continue
+            fh, fa = self.spine(self.resolve(ext[1]))
+            if fh != _constant("int_ge_usize") or len(fa) != 2 or not self._same_cond_term(fa[0], idx_l):
+                continue
+            hi = fa[1]
+            hge_term = fact.term
+            cur_st = cur_st_init
+            steps: list[tuple[_Term, _Term, _Term]] = []
+            while cur_st != target_st and len(steps) <= 32:
+                st_head, st_args = self.spine(cur_st)
+                if st_head == _constant("vela_bs_write") and len(st_args) == 3:
+                    widx, val, rest = st_args
+                    if self.whnf(_apps(_constant("int_lt_usize"), widx, hi)) != _term("bool", value=1):
+                        break
+                    hw = _apps(_constant("Refl"), _BOOL, _term("bool", value=1))
+                    step_p = _apps(
+                        _constant("vela_store_lookup_write_ge"), widx, hi, idx_l, val, rest, hw, hge_term
+                    )
+                    u_term = _apps(_constant("vela_store_lookup"), cur_st, idx_l)
+                    v_term = _apps(_constant("vela_store_lookup"), rest, idx_l)
+                    steps.append((u_term, v_term, step_p))
+                    cur_st = rest
+                elif st_head == _constant("vela_bs_fill") and len(st_args) == 4:
+                    base, length, val, rest = st_args
+                    end_off = self.whnf(_apps(_constant("int_add_usize"), base, length))
+                    if self.whnf(_apps(_constant("int_le_usize"), end_off, hi)) != _term("bool", value=1):
+                        break
+                    hbound = _apps(_constant("Refl"), _BOOL, _term("bool", value=1))
+                    step_p = _apps(
+                        _constant("vela_store_lookup_fill_ge"), base, length, hi, idx_l, val, rest, hbound, hge_term
+                    )
+                    u_term = _apps(_constant("vela_store_lookup"), cur_st, idx_l)
+                    v_term = _apps(_constant("vela_store_lookup"), rest, idx_l)
+                    steps.append((u_term, v_term, step_p))
+                    cur_st = rest
+                elif st_head == _constant("vela_bs_copy") and len(st_args) == 5:
+                    dbase, sbase, count, src_st, rest = st_args
+                    end_off = self.whnf(_apps(_constant("int_add_usize"), dbase, count))
+                    if self.whnf(_apps(_constant("int_le_usize"), end_off, hi)) != _term("bool", value=1):
+                        break
+                    hbound = _apps(_constant("Refl"), _BOOL, _term("bool", value=1))
+                    step_p = _apps(
+                        _constant("vela_store_lookup_copy_ge"),
+                        dbase,
+                        sbase,
+                        count,
+                        hi,
+                        idx_l,
+                        src_st,
+                        rest,
+                        hbound,
+                        hge_term,
+                    )
+                    u_term = _apps(_constant("vela_store_lookup"), cur_st, idx_l)
+                    v_term = _apps(_constant("vela_store_lookup"), rest, idx_l)
+                    steps.append((u_term, v_term, step_p))
+                    cur_st = rest
+                else:
+                    break
+            if cur_st == target_st and steps:
+                acc_u, acc_v, acc_p = steps[0]
+                for _, next_v, next_p in steps[1:]:
+                    acc_p = _apps(_constant("Trans"), _U8, acc_u, acc_v, next_v, acc_p, next_p)
+                    acc_v = next_v
+                return acc_p
+        return None
+
     def _prove_proposition(
         self: _Elaborator,
         goal: _Term,
@@ -395,6 +745,7 @@ class _ProofsMixin:
         *,
         allow_refl: bool = True,
         include_env: bool = True,
+        split_depth: int = 0,
     ) -> _Term:
         self.tick()
         self.site = node
@@ -408,15 +759,36 @@ class _ProofsMixin:
             if include_env
             else ()
         )
-        all_facts = (*facts, *env_facts)
+        all_facts = self._expand_fact_bindings((*facts, *env_facts))
         for fact in reversed(all_facts):
             if fact.type == goal:
                 return fact.term
+        if allow_refl:
+            for fact in reversed(all_facts):
+                ext_f = self._extract_equality(fact.type)
+                if ext_f is not None and self.whnf(ext_f[0]) == _BOOL:
+                    u_w = self.whnf(ext_f[1])
+                    v_w = self.whnf(ext_f[2])
+                    if u_w == _term("bool", value=0) and v_w == _term("bool", value=1):
+                        return _apps(_constant("vela_false_true_elim"), goal, fact.term)
+                    if u_w == _term("bool", value=1) and v_w == _term("bool", value=0):
+                        return _apps(_constant("vela_false_elim"), goal, fact.term)
         goal_whnf = self.whnf(goal)
         if goal_whnf.kind == "pi" and cast("int", goal_whnf.value) not in self.nullary_parameters:
             for fact in reversed(all_facts):
                 if self._try_unify(fact.type, goal):
                     return fact.term
+            if allow_refl and split_depth <= 8 and self._find_if_condition(goal_whnf.args[0]) is not None:
+                pi_split = self._try_if_split_goal(
+                    goal,
+                    environment,
+                    facts,
+                    node,
+                    include_env=include_env,
+                    split_depth=split_depth,
+                )
+                if pi_split is not None:
+                    return pi_split
             var_id = cast("int", goal_whnf.value)
             domain = goal_whnf.args[0]
             var = self.fresh(domain)
@@ -439,6 +811,7 @@ class _ProofsMixin:
                     node,
                     allow_refl=allow_refl,
                     include_env=include_env,
+                    split_depth=split_depth,
                 )
             finally:
                 for _ in dom_bool_facts:
@@ -507,12 +880,155 @@ class _ProofsMixin:
                             if v2 == u3 and v3 == rhs and i3 not in {i1, i2}:
                                 step12 = _apps(_constant("Trans"), goal_type, lhs, v1, v2, p1, p2)
                                 return _apps(_constant("Trans"), goal_type, lhs, v2, rhs, step12, p3)
+            if all(m.solution is not None for m in self.metas[self.decl_first_meta :]):
+                if allow_refl and self._try_unify(lhs, rhs):
+                    return _apps(_constant("Refl"), goal_type, lhs)
+                for _, u, v, p in reversed(edges):
+                    if self._try_unify(u, lhs) and self._try_unify(v, rhs):
+                        return p
+            goal_type_w = self.whnf(goal_type)
+            if goal_type_w == _BOOL and self.whnf(rhs) == _term("bool", value=1):
+                lhs_r = self.resolve(lhs)
+                lhs_head, lhs_args = self.spine(lhs_r)
+                if lhs_head != _constant("&&") or len(lhs_args) != 2:
+                    lhs_w = self.whnf(lhs_r)
+                    hw, aw = self.spine(lhs_w)
+                    if hw == _constant("&&") and len(aw) == 2:
+                        lhs_head, lhs_args = hw, aw
+                if lhs_head == _constant("&&") and len(lhs_args) == 2:
+                    if allow_refl:
+                        pa = self._prove_proposition(
+                            _apps(_constant("Eq"), _BOOL, lhs_args[0], _term("bool", value=1)),
+                            environment,
+                            facts,
+                            node,
+                            allow_refl=allow_refl,
+                            include_env=include_env,
+                            split_depth=split_depth,
+                        )
+                        pb = self._prove_proposition(
+                            _apps(_constant("Eq"), _BOOL, lhs_args[1], _term("bool", value=1)),
+                            environment,
+                            facts,
+                            node,
+                            allow_refl=allow_refl,
+                            include_env=include_env,
+                            split_depth=split_depth,
+                        )
+                        return _apps(_constant("vela_and_intro"), lhs_args[0], lhs_args[1], pa, pb)
+                    saved_and = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+                    try:
+                        pa = self._prove_proposition(
+                            _apps(_constant("Eq"), _BOOL, lhs_args[0], _term("bool", value=1)),
+                            environment,
+                            facts,
+                            node,
+                            allow_refl=allow_refl,
+                            include_env=include_env,
+                            split_depth=split_depth,
+                        )
+                        pb = self._prove_proposition(
+                            _apps(_constant("Eq"), _BOOL, lhs_args[1], _term("bool", value=1)),
+                            environment,
+                            facts,
+                            node,
+                            allow_refl=allow_refl,
+                            include_env=include_env,
+                            split_depth=split_depth,
+                        )
+                        return _apps(_constant("vela_and_intro"), lhs_args[0], lhs_args[1], pa, pb)
+                    except VelaError:
+                        self.metas = saved_and
+                cmp_head, cmp_args = self.spine(lhs_r)
+                if not (
+                    cmp_head.kind == "const"
+                    and isinstance(cmp_head.value, str)
+                    and (cmp_head.value.startswith("int_eq_") or cmp_head.value in {"eq_bool", "<==>"})
+                    and len(cmp_args) == 2
+                ):
+                    cmp_head, cmp_args = self.spine(self.whnf(lhs_r))
+                if (
+                    cmp_head.kind == "const"
+                    and isinstance(cmp_head.value, str)
+                    and cmp_head.value.startswith("int_eq_")
+                    and len(cmp_args) == 2
+                ):
+                    spec = _INT_SPECS.get(cmp_head.value[len("int_eq_") :])
+                    if spec is not None:
+                        tag = _term("nat", value=spec.tag)
+                        if allow_refl and self._try_unify(cmp_args[0], cmp_args[1]):
+                            return _apps(_constant("vela_int_eq_refl"), tag, cmp_args[0])
+                        saved_ieq = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+                        try:
+                            p_eq = self._prove_proposition(
+                                _apps(_constant("Eq"), spec.const, cmp_args[0], cmp_args[1]),
+                                environment,
+                                facts,
+                                node,
+                                allow_refl=allow_refl,
+                                include_env=include_env,
+                                split_depth=split_depth,
+                            )
+                            return _apps(_constant("vela_int_eq_of_eq"), tag, cmp_args[0], cmp_args[1], p_eq)
+                        except VelaError:
+                            self.metas = saved_ieq
+                if cmp_head in {_constant("eq_bool"), _constant("<==>")} and len(cmp_args) == 2:
+                    if allow_refl and self._try_unify(cmp_args[0], cmp_args[1]):
+                        return _app(_constant("vela_eq_bool_refl"), cmp_args[0])
+                    saved_beq = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+                    try:
+                        p_beq = self._prove_proposition(
+                            _apps(_constant("Eq"), _BOOL, cmp_args[0], cmp_args[1]),
+                            environment,
+                            facts,
+                            node,
+                            allow_refl=allow_refl,
+                            include_env=include_env,
+                            split_depth=split_depth,
+                        )
+                        return _apps(_constant("vela_eq_bool_of_eq"), cmp_args[0], cmp_args[1], p_beq)
+                    except VelaError:
+                        self.metas = saved_beq
+            if allow_refl and goal_type_w == _U8:
+                span_eq_p = self._prove_span_read_equality(lhs, rhs, all_facts)
+                if span_eq_p is not None:
+                    return span_eq_p
+                span_eq_sym = self._prove_span_read_equality(rhs, lhs, all_facts)
+                if span_eq_sym is not None:
+                    return _apps(_constant("Symm"), _U8, rhs, lhs, span_eq_sym)
+            if allow_refl and split_depth <= 8:
+                lhs_kind = self.whnf(lhs).kind
+                rhs_w = self.whnf(rhs)
+                if goal_type_w == _BOOL and rhs_w == _term("bool", value=1) and lhs_kind in {"if", "sum_match", "pair_match"}:
+                    early_split = self._try_if_split_goal(
+                        goal,
+                        environment,
+                        facts,
+                        node,
+                        include_env=include_env,
+                        split_depth=split_depth,
+                    )
+                    if early_split is not None:
+                        return early_split
+                elif lhs_kind in {"if", "sum_match", "pair_match"} or rhs_w.kind in {"if", "sum_match", "pair_match"}:
+                    eq_split = self._try_if_split_equality(goal_type, lhs, rhs)
+                    if eq_split is not None:
+                        return eq_split
             for _, u, v, p in reversed(edges):
-                if u != lhs or v != rhs:
+                if u.kind != "bool" and (u != lhs or v != rhs):
                     congr = self._try_congruence(goal_type, lhs, rhs, goal_type, u, v, p)
                     if congr is not None:
                         return congr
-            for fact in reversed(all_facts):
+            congr_facts = (
+                *facts,
+                *env_facts,
+                *(
+                    f
+                    for f in all_facts[len(facts) + len(env_facts) :]
+                    if (ext := self._extract_equality(f.type)) is not None and self.whnf(ext[0]) != _BOOL
+                ),
+            )
+            for fact in reversed(congr_facts):
                 extracted = self._extract_equality(fact.type)
                 if extracted is None:
                     continue
@@ -526,7 +1042,7 @@ class _ProofsMixin:
                         congr_sym = self._try_congruence(goal_type, lhs, rhs, eq_type, v, u, sym_p)
                         if congr_sym is not None:
                             return congr_sym
-            for fact in reversed(all_facts):
+            for fact in reversed(congr_facts):
                 extracted = self._extract_equality(fact.type)
                 if extracted is None:
                     continue
@@ -563,6 +1079,17 @@ class _ProofsMixin:
                 split_proof = self._try_if_split_equality(goal_type, lhs, rhs)
                 if split_proof is not None:
                     return split_proof
+                if split_depth <= 8:
+                    goal_split = self._try_if_split_goal(
+                        goal,
+                        environment,
+                        facts,
+                        node,
+                        include_env=include_env,
+                        split_depth=split_depth,
+                    )
+                    if goal_split is not None:
+                        return goal_split
 
         for fact in reversed(all_facts):
             if self._try_unify(fact.type, goal):
@@ -573,6 +1100,27 @@ class _ProofsMixin:
             "assertion could not be established; terms or dependent indices are not definitionally equal",
             node,
         )
+
+    def _same_cond_term(self: _Elaborator, a: _Term, b: _Term) -> bool:
+        a = self.resolve(a)
+        b = self.resolve(b)
+        if a == b:
+            return True
+        if a.kind == "meta" or b.kind == "meta":
+            return False
+        ah, a_args = self.spine(a)
+        bh, b_args = self.spine(b)
+        if ah != bh or len(a_args) != len(b_args) or ah.kind == "meta":
+            return False
+        saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+        try:
+            self.unify(a, b)
+        except VelaError:
+            self.metas = saved
+            return False
+        else:
+            self.metas = saved
+            return True
 
     def _find_if_condition(self: _Elaborator, term: _Term, depth: int = 0) -> _Term | None:
         if depth > MAX_DEPTH:
@@ -590,6 +1138,15 @@ class _ProofsMixin:
             found = self._find_if_condition(w.args[1], depth + 1)
             if found is not None and b_id not in self.free(found):
                 return found
+        if w.kind == "pi":
+            b_id = cast("int", w.value)
+            found_dom = self._find_if_condition(w.args[0], depth + 1)
+            if found_dom is not None:
+                return found_dom
+            found_cod = self._find_if_condition(w.args[1], depth + 1)
+            if found_cod is not None and b_id not in self.free(found_cod):
+                return found_cod
+            return None
         if w.kind == "app":
             _, args = self.spine(w)
             for child in args:
@@ -620,20 +1177,61 @@ class _ProofsMixin:
         if depth > MAX_DEPTH:
             return term, False
         term = self.resolve(term)
-        if term == cond:
+        if self._same_cond_term(term, cond):
             return repl, True
+        cond_head, cond_args = self.spine(self.resolve(cond))
+        ne_head: _Term | None = None
+        if (
+            cond_head.kind == "const"
+            and isinstance(cond_head.value, str)
+            and cond_head.value.startswith("int_eq_")
+            and len(cond_args) == 2
+        ):
+            ne_head = _constant("int_ne_" + cond_head.value[len("int_eq_") :])
+        t_head, t_args = self.spine(term)
+        if (
+            ne_head is not None
+            and t_head == ne_head
+            and len(t_args) == 2
+            and self._same_cond_term(t_args[0], cond_args[0])
+            and self._same_cond_term(t_args[1], cond_args[1])
+        ):
+            return _app(_constant("!"), repl), True
+        if t_head in {_constant("Span_CanRead"), _constant("Span_CanWrite")} and len(t_args) == 2:
+            s_rep, did_s = self._expose_and_replace_if(t_args[1], cond, repl, depth + 1)
+            if did_s:
+                return _apps(t_head, t_args[0], s_rep), True
+            return term, False
         w = self.whnf(term)
-        if w == cond:
+        if self._same_cond_term(w, cond):
             return repl, True
+        w_head, w_args = self.spine(w)
+        if (
+            ne_head is not None
+            and w_head == ne_head
+            and len(w_args) == 2
+            and self._same_cond_term(w_args[0], cond_args[0])
+            and self._same_cond_term(w_args[1], cond_args[1])
+        ):
+            return _app(_constant("!"), repl), True
         if w.kind == "if":
+            if self._same_cond_term(w.args[1], cond):
+                return _term("if", w.args[0], repl, w.args[2], w.args[3]), True
+            cond_w1 = self.whnf(w.args[1])
+            w1_head, w1_args = self.spine(cond_w1)
+            if (
+                ne_head is not None
+                and w1_head == ne_head
+                and len(w1_args) == 2
+                and self._same_cond_term(w1_args[0], cond_args[0])
+                and self._same_cond_term(w1_args[1], cond_args[1])
+            ):
+                return _term("if", w.args[0], _app(_constant("!"), repl), w.args[2], w.args[3]), True
             t_rep, did_t = self._expose_and_replace_if(w.args[2], cond, repl, depth + 1)
             e_rep, did_e = self._expose_and_replace_if(w.args[3], cond, repl, depth + 1)
-            if w.args[1] == cond:
-                return _term("if", w.args[0], repl, t_rep, e_rep), True
-            c_rep, did_c = self._expose_and_replace_if(w.args[1], cond, repl, depth + 1)
-            if did_c or did_t or did_e:
-                return _term("if", w.args[0], c_rep, t_rep, e_rep), True
-            return w, False
+            if did_t or did_e:
+                return _term("if", w.args[0], w.args[1], t_rep, e_rep), True
+            return term, False
         if w.kind in {"sum_match", "pair_match", "unit_match", "sigT_match"} and len(w.args) >= 2:
             s_rep, did_s = self._expose_and_replace_if(w.args[1], cond, repl, depth + 1)
             new_branches: list[_Term] = []
@@ -644,14 +1242,24 @@ class _ProofsMixin:
                 did_b = did_b or rb
             if did_s or did_b:
                 return _Term(w.kind, w.value, (w.args[0], s_rep, *new_branches)), True
-            return w, False
+            return term, False
         if w.kind == "lam":
             b_id = cast("int", w.value)
             if b_id not in self.free(cond) and b_id not in self.free(repl):
                 body_rep, did_body = self._expose_and_replace_if(w.args[1], cond, repl, depth + 1)
                 if did_body:
                     return _term("lam", w.args[0], body_rep, value=b_id), True
-            return w, False
+            return term, False
+        if w.kind == "pi":
+            b_id = cast("int", w.value)
+            dom_rep, did_dom = self._expose_and_replace_if(w.args[0], cond, repl, depth + 1)
+            if b_id not in self.free(cond) and b_id not in self.free(repl):
+                cod_rep, did_cod = self._expose_and_replace_if(w.args[1], cond, repl, depth + 1)
+            else:
+                cod_rep, did_cod = w.args[1], False
+            if did_dom or did_cod:
+                return _term("pi", dom_rep, cod_rep, value=b_id), True
+            return term, False
         if w.kind == "app":
             head, args = self.spine(w)
             new_args: list[_Term] = []
@@ -664,6 +1272,95 @@ class _ProofsMixin:
                 return _apps(head, *new_args), True
         return term, False
 
+    def _try_if_split_goal(
+        self: _Elaborator,
+        goal: _Term,
+        environment: dict[str, _Binding],
+        facts: tuple[_Binding, ...],
+        node: Node,
+        *,
+        include_env: bool = True,
+        split_depth: int = 0,
+    ) -> _Term | None:
+        if split_depth > 8:
+            return None
+        raw_cond = self._find_if_condition(goal)
+        if raw_cond is None:
+            return None
+        raw_cond_w = self.whnf(raw_cond)
+        cond_head, cond_args = self.spine(raw_cond_w)
+        if (
+            cond_head.kind == "const"
+            and isinstance(cond_head.value, str)
+            and cond_head.value.startswith("int_ne_")
+            and len(cond_args) == 2
+        ):
+            eq_name = "int_eq_" + cond_head.value[len("int_ne_") :]
+            cond = _apps(_constant(eq_name), cond_args[0], cond_args[1])
+        else:
+            cond = raw_cond_w
+        b_var = self.fresh(_BOOL)
+        b_id = cast("int", b_var.value)
+        goal_b, did_rep = self._expose_and_replace_if(goal, cond, b_var)
+        if not did_rep:
+            return None
+        true_term = _term("bool", value=1)
+        false_term = _term("bool", value=0)
+        goal_true = self.substitute(goal_b, b_id, true_term)
+        goal_false = self.substitute(goal_b, b_id, false_term)
+        eq_true_type = _apps(_constant("Eq"), _BOOL, cond, true_term)
+        eq_false_type = _apps(_constant("Eq"), _BOOL, cond, false_term)
+        h_true = self.fresh(eq_true_type)
+        h_false = self.fresh(eq_false_type)
+        saved = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
+        true_bool_facts = self._fact_bool_terms((_Binding(h_true, eq_true_type),), environment)
+        self.active_facts.extend(true_bool_facts)
+        try:
+            yes_proof = self._prove_proposition(
+                goal_true,
+                environment,
+                (*facts, _Binding(h_true, eq_true_type)),
+                node,
+                allow_refl=True,
+                include_env=include_env,
+                split_depth=split_depth + 1,
+            )
+        except VelaError:
+            self.metas = saved
+            return None
+        finally:
+            for _ in true_bool_facts:
+                self.active_facts.pop()
+        false_bool_facts = self._fact_bool_terms((_Binding(h_false, eq_false_type),), environment)
+        self.active_facts.extend(false_bool_facts)
+        try:
+            no_proof = self._prove_proposition(
+                goal_false,
+                environment,
+                (*facts, _Binding(h_false, eq_false_type)),
+                node,
+                allow_refl=True,
+                include_env=include_env,
+                split_depth=split_depth + 1,
+            )
+        except VelaError:
+            self.metas = saved
+            return None
+        finally:
+            for _ in false_bool_facts:
+                self.active_facts.pop()
+        h_true_id = cast("int", h_true.value)
+        h_false_id = cast("int", h_false.value)
+        if h_true_id not in self.free(yes_proof) and h_false_id not in self.free(no_proof):
+            motive_lam = _term("lam", _BOOL, goal_b, value=b_id)
+            return _term("bool_match", motive_lam, cond, yes_proof, no_proof)
+        eq_b_type = _apps(_constant("Eq"), _BOOL, cond, b_var)
+        motive_lam = _term("lam", _BOOL, self.pi(eq_b_type, goal_b), value=b_id)
+        yes_lam = _term("lam", eq_true_type, yes_proof, value=h_true_id)
+        no_lam = _term("lam", eq_false_type, no_proof, value=h_false_id)
+        match_term = _term("bool_match", motive_lam, cond, yes_lam, no_lam)
+        return _app(match_term, _apps(_constant("Refl"), _BOOL, cond))
+
     def _try_if_split_equality(
         self: _Elaborator, goal_type: _Term, lhs: _Term, rhs: _Term, depth: int = 0
     ) -> _Term | None:
@@ -673,11 +1370,30 @@ class _ProofsMixin:
         if self._try_unify(lhs, rhs):
             return _apps(_constant("Refl"), goal_type, self.whnf(rhs))
         self.metas = saved
-        cond = self._find_if_condition(lhs)
-        if cond is None:
-            cond = self._find_if_condition(rhs)
-        if cond is None:
+        lhs_is_branch = self.whnf(lhs).kind in {"if", "sum_match", "pair_match"}
+        rhs_is_branch = self.whnf(rhs).kind in {"if", "sum_match", "pair_match"}
+        if rhs_is_branch and not lhs_is_branch:
+            raw_cond = self._find_if_condition(rhs)
+            if raw_cond is None:
+                raw_cond = self._find_if_condition(lhs)
+        else:
+            raw_cond = self._find_if_condition(lhs)
+            if raw_cond is None:
+                raw_cond = self._find_if_condition(rhs)
+        if raw_cond is None:
             return None
+        raw_cond_w = self.whnf(raw_cond)
+        cond_head, cond_args = self.spine(raw_cond_w)
+        if (
+            cond_head.kind == "const"
+            and isinstance(cond_head.value, str)
+            and cond_head.value.startswith("int_ne_")
+            and len(cond_args) == 2
+        ):
+            eq_name = "int_eq_" + cond_head.value[len("int_ne_") :]
+            cond = _apps(_constant(eq_name), cond_args[0], cond_args[1])
+        else:
+            cond = raw_cond_w
         b_var = self.fresh(_BOOL)
         b_id = cast("int", b_var.value)
         lhs_b, rep_l = self._expose_and_replace_if(lhs, cond, b_var)
@@ -1020,9 +1736,11 @@ class _ProofsMixin:
                 solved = self._try_domain_solver_goal(node, goal, environment, facts)
                 if solved is not None:
                     return solved
+            saved_prove_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
             try:
                 term = self._prove_proposition(goal, environment, facts, node)
             except VelaError:
+                self.metas = saved_prove_m
                 has_span_env = self.in_post_env_theorem or any(
                     self.spine(self.whnf(b.type))[0] == _constant("Span") for b in environment.values()
                 )
