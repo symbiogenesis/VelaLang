@@ -28,10 +28,12 @@ laws; it does not claim a closed mechanized Sail-to-Clight/CompCert refinement t
 or replace user-managed hosted CI.
 """
 
+import copy
 import hashlib
 import json
 import re
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +43,7 @@ from filelock import FileLock
 
 from toolchain import (
     VelaError,
+    corpus,
     env,
     proofenv,
     solver_ledger,
@@ -49,13 +52,16 @@ from toolchain import compiler_diff as cd
 from toolchain import (
     elaborate as vela_elaborate,
 )
+from toolchain import elaboration_check as replay
 from toolchain import (
     parser as vela_parser,
 )
 from toolchain.atomic import atomic_path
+from toolchain.jsonutil import unique_object
 
 TIMEOUT: Final = 120
 EXAMPLE: Final = "examples/first_slice.vela"
+RECEIPT_BYTES: Final = 16 * 1024 * 1024
 
 DEFAULT_CCOMP_CANDIDATES: Final[tuple[str, ...]] = (
     "/root/build/lane-scalar-effects-20260926/kernel-protected-final/plain/ccomp",
@@ -331,6 +337,54 @@ proof {
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
+def _inputs(root: Path) -> dict[str, str]:
+    """Bind the local producer implementation, syntax, locks and encoding data."""
+    paths = {EXAMPLE, "tools/run.py", "tools/pyproject.toml", "tools/uv.lock",
+             "tools/opam/rocq.lock", "tools/opam/sail.lock",
+             "tools/generated/dialect-table.json"}
+    paths.update(f"tools/toolchain/parser/{name}" for name in vela_parser.SOURCES)
+    paths.update(path.relative_to(root).as_posix()
+                 for path in (root / "tools/toolchain").rglob("*.py"))
+    return {name: _sha256((root / name).read_bytes()) for name in sorted(paths)}
+
+
+def _revision(root: Path) -> str:
+    revisions = corpus._git(root, "log", "-1", "--format=%H%x00")
+    if len(revisions) != 1 or re.fullmatch(r"[0-9a-f]{40,64}", revisions[0]) is None:
+        raise ValueError("first-slice producer revision is unavailable")
+    return revisions[0]
+
+
+def _execution_inputs(ccomp_path: Path | None) -> dict[str, object]:
+    loaded = env.load(toolchain=False)
+    compiler = _resolve_ccomp(ccomp_path)
+    files = {"simulator": loaded.simulator, "profile": loaded.profile,
+             "python": Path(sys.executable)}
+    if compiler is not None:
+        files["ccomp"] = compiler
+    return {"files": {name: {"path": str(path.resolve()), "sha256": _sha256(path.read_bytes())}
+                      for name, path in files.items()},
+            "compcert_available": compiler is not None, "python_version": sys.version}
+
+
+def _artifacts(directory: Path) -> dict[str, str]:
+    """Inventory retained outputs without including the self-referential journal."""
+    files: dict[str, str] = {}
+    for path in sorted(directory.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("first-slice output contains an alias")
+        if path.is_file() and path != directory / "attempt.json":
+            files[str(path)] = _sha256(path.read_bytes())
+    if not files:
+        raise ValueError("first-slice output inventory is empty")
+    return files
 
 
 def _write(path: Path, payload: object) -> None:
@@ -1448,10 +1502,10 @@ def _qualify_attempt(
     directory: Path,
     steps: list[dict[str, object]],
     ccomp_path: Path | None,
+    compiled: vela_parser.Build,
 ) -> dict[str, object]:
     source_path = root / EXAMPLE
     source = vela_parser.read_source(source_path)
-    compiled = vela_parser.build(root)
     parsed = vela_parser.parse_source(compiled, source, surface=True)
 
     # 1. Elaborate first_slice.vela and verify determinism + exported obligations
@@ -1522,6 +1576,11 @@ def _qualify_attempt(
     )
     if corrupt_proc.returncode == 0:
         raise ValueError("proof-corruption control was unexpectedly accepted by rocq c")
+    corruption_log = directory / "FirstSliceCorrupted.compile.log"
+    corruption_log.write_text(corrupt_proc.stdout + corrupt_proc.stderr, encoding="utf-8", newline="")
+    steps.append({"command": corrupt_proc.args, "cwd": str(directory),
+                  "returncode": corrupt_proc.returncode, "expected_refusal": True,
+                  "log": str(corruption_log), "log_sha256": _sha256(corruption_log.read_bytes())})
 
     # 3. Capacity-invariance gate (8usize vs 1_000_000_000usize)
     cap_gate = _run_capacity_invariance_gate(compiled, directory, steps)
@@ -1660,7 +1719,7 @@ def _qualify_attempt(
 
 
 def qualify(root: Path, *, ccomp_path: Path | None = None) -> dict[str, object]:
-    """Qualify the concrete `Span<byte>` carrier and `vela-first-slice` end to end."""
+    """Qualify the development harness without a source or machine admission verdict."""
     work = _work_root(root)
     with FileLock(work / "qualification.lock", timeout=5):
         latest = work / "qualification.json"
@@ -1668,22 +1727,49 @@ def qualify(root: Path, *, ccomp_path: Path | None = None) -> dict[str, object]:
         directory = Path(tempfile.mkdtemp(prefix="slice-", dir=work))
         steps: list[dict[str, object]] = []
         attempt: dict[str, object] = {
-            "schema": 1,
+            "schema": 2,
             "scope": "vela-first-slice-qualification",
             "status": "running",
             "directory": str(directory),
             "steps": steps,
             "full_machine_refinement_closed": False,
+            "source_correspondence": False,
+            "artifact_accepted": False,
+            "production_admission": False,
             "remaining_chain_owners": ["Q35o", "Q35p", "Q35k", "Q35l", "Q35d", "M1.2g"],
             "inventory": build_foundation_inventory(),
         }
         _write(directory / "attempt.json", attempt)
         try:
-            attempt.update(_qualify_attempt(root, directory, steps, ccomp_path))
+            inputs = _inputs(root)
+            revision = _revision(root)
+            tools = replay._toolchain(root, directory, steps)
+            runtime = replay._runtime(directory, steps)
+            execution = _execution_inputs(ccomp_path)
+            compiled = vela_parser.build(root)
+            parser_receipt = copy.deepcopy(compiled.receipt)
+            outputs = replay._parser_outputs(compiled)
+            attempt.update({"inputs": inputs, "producer_revision": revision,
+                            "toolchain": tools, "runtime": runtime,
+                            "execution_inputs": execution, "parser": parser_receipt,
+                            "parser_outputs": outputs})
+            _write(directory / "attempt.json", attempt)
+            attempt.update(_qualify_attempt(root, directory, steps, ccomp_path, compiled))
+            _require(_inputs(root) == inputs and _revision(root) == revision
+                     and replay._toolchain(root, directory, steps) == tools
+                     and replay._runtime(directory, steps) == runtime
+                     and _execution_inputs(ccomp_path) == execution,
+                     "first-slice inputs, toolchain or runtime changed during qualification")
+            _require(compiled.receipt == parser_receipt and replay._parser_outputs(compiled) == outputs
+                     and vela_parser._toolchain(root) == parser_receipt["toolchain"],
+                     "first-slice parser identity changed during qualification")
+            replay._observations([], steps)
+            attempt["artifacts_sha256"] = _artifacts(directory)
         except Exception as error:
             attempt.update({
                 "status": "failed",
                 "kernel_checked": False,
+                "accepted": False,
                 "error": f"{type(error).__name__}: {error}",
             })
             _write(directory / "attempt.json", attempt)
@@ -1692,3 +1778,57 @@ def qualify(root: Path, *, ccomp_path: Path | None = None) -> dict[str, object]:
             _write(directory / "attempt.json", attempt)
             _write(latest, attempt)
             return attempt
+
+
+def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
+    """Check retained identities; this supplies no proof replay or admission verdict."""
+    with receipt_path.open("rb") as stream:
+        raw = stream.read(RECEIPT_BYTES + 1)
+    if len(raw) > RECEIPT_BYTES:
+        raise ValueError("first-slice receipt exceeds its size bound")
+    try:
+        value = json.loads(raw, object_pairs_hook=unique_object)
+    except (ValueError, RecursionError) as error:
+        raise ValueError("first-slice receipt is malformed") from error
+    if (not isinstance(value, dict) or type(value.get("schema")) is not int or value["schema"] != 2
+            or value.get("scope") != "vela-first-slice-qualification" or value.get("status") != "passed"
+            or any(value.get(key) is not False for key in (
+                "artifact_accepted", "source_correspondence", "production_admission",
+                "full_machine_refinement_closed"))):
+        raise ValueError("first-slice receipt has unsupported scope, schema or status")
+    receipt = cast("dict[str, object]", value)
+    if receipt.get("inputs") != _inputs(root) or receipt.get("producer_revision") != _revision(root):
+        raise ValueError("first-slice receipt source inputs or producer revision changed")
+    execution = receipt.get("execution_inputs")
+    if not isinstance(execution, dict) or not isinstance(execution.get("files"), dict):
+        raise TypeError("first-slice receipt execution identities are malformed")
+    ccomp = execution["files"].get("ccomp")
+    if ccomp is not None and (not isinstance(ccomp, dict) or not isinstance(ccomp.get("path"), str)):
+        raise ValueError("first-slice receipt compiler identity is malformed")
+    compiler = None if ccomp is None else Path(ccomp["path"])
+    if _execution_inputs(compiler) != execution:
+        raise ValueError("first-slice receipt execution inputs changed")
+    parser_receipt = receipt.get("parser")
+    if (not isinstance(parser_receipt, dict) or not isinstance(parser_receipt.get("directory"), str)
+            or not isinstance(parser_receipt.get("generated_sha256"), dict)):
+        raise TypeError("first-slice receipt parser identity is malformed")
+    directory = Path(parser_receipt["directory"])
+    compiled = vela_parser.Build(directory, directory / "vela-parser", parser_receipt)
+    if (parser_receipt.get("inputs") != vela_parser._inputs(root)
+            or parser_receipt.get("toolchain") != vela_parser._toolchain(root)
+            or replay._parser_outputs(compiled) != receipt.get("parser_outputs")):
+        raise ValueError("first-slice receipt parser identities changed")
+    artifacts = receipt.get("artifacts_sha256")
+    directory_name = receipt.get("directory")
+    if not isinstance(directory_name, str) or not isinstance(artifacts, dict):
+        raise TypeError("first-slice receipt output inventory is malformed")
+    if _artifacts(Path(directory_name)) != artifacts:
+        raise ValueError("first-slice receipt outputs changed")
+    with tempfile.TemporaryDirectory(prefix="bindings-", dir=_work_root(root)) as temporary:
+        steps: list[dict[str, object]] = []
+        if (replay._toolchain(root, Path(temporary), steps) != receipt.get("toolchain")
+                or replay._runtime(Path(temporary), steps) != receipt.get("runtime")):
+            raise ValueError("first-slice receipt prover or runtime changed")
+    return {"schema": 1, "scope": "vela-first-slice-binding-check", "status": "matched",
+            "receipt": str(receipt_path), "receipt_sha256": _sha256(raw),
+            "proof_replayed": False, "artifact_accepted": False, "production_admission": False}
