@@ -98,7 +98,11 @@ The supported increment includes:
   early-exit `let Pattern = expr else { return ...; }` (`let_else`) guards in
   blocks and `assert ... by { ... }` proof blocks, and postfix `expr?`
   early-return propagation over 2-variant `Option<T>` (`None`, `Some(v)`) and
-  `Result<T, E>` (`Err(e)`, `Ok(v)`) unions.
+  `Result<T, E>` (`Err(e)`, `Ok(v)`) unions. Propagation inside the right
+  operand of `&&` or `||` remains under that operand's Boolean guard:
+  `Some(false && absent?)` returns `Some(false)` and
+  `Some(true || absent?)` returns `Some(true)` when `absent` is `None`.
+  Left-operand and nested propagation preserve the same evaluation order.
 - Nominal `record Name(T1 Field1, ...)` and `union Name { Case1(...); ... }`
   declarations with primary-constructor fields and tagged sum variants (lowering
   non-dependent field telescopes to `@Corelib.Init.Datatypes.prod` and dependent
