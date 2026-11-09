@@ -1610,11 +1610,13 @@ isolated pure compiler producer. Source, URI, compiler/dependency, configuration
 target and cross-snapshot handle changes refuse; limited results report partial
 status. Unsupported and failed/timed-out analysis cannot report reference absence.
 
-Eleven [independent consumer cases](../../tools/tests/test_vela_inspection.py)
+Twelve [independent consumer cases](../../tools/tests/test_vela_inspection.py)
 validate the machine-checkable response schema, exact Unicode/CRLF reconstruction,
 structured types and sibling scopes, query/export bounds, invalidation and read-only
 CLI behavior. Worker checks refuse malformed types, inconsistent declaration
-labels and missing type records; version-1 queries are explicitly refused.
+labels, missing type records, omitted callable parameters and orphan parameter
+facts; version-1 queries are explicitly refused. Independent review found and
+corrected coordinated signature/parameter omissions.
 Combined local gate and behavioral validation cover integration.
 Q25ch remains open for concrete syntax/typed-tree, imports, generated/proof and
 lowering views and their qualified producers. No whole-cell completion credit
