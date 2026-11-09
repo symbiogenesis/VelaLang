@@ -2958,6 +2958,60 @@ def _early_return_propagation() -> None:
     _refuses(bad_ret, "type", "enclosing callable")
 
 
+def _short_circuit_propagation() -> None:
+    fixture = _Fixture("ShortCircuitPropagation")
+    fixture.union("Option", (("None", ()), ("Some", (("Value", _T),))), generics=_POLY)
+    fixture.union(
+        "Result", (("Err", (("Error", _type("E")),)), ("Ok", (("Value", _T),))),
+        generics=(*_POLY, ("type", "E", None)),
+    )
+    for union_name, constructor, failure, result_type in (
+        ("Option", "Some", _variable("None", _BOOL), _type("Option", _BOOL)),
+        ("Result", "Ok", _call("Err", _natural(7), generics=(_BOOL, _NAT)), _type("Result", _BOOL, _NAT)),
+    ):
+        for op_name, operator in (("And", "&&"), ("Or", "||")):
+            name = union_name + op_name
+            fixture.function(
+                name, result_type, (("left", _BOOL), ("right", result_type)),
+                _block_stmts(
+                    _let_stmt("value", _binary(operator, _variable("left"), _propagate(_variable("right")))),
+                    _return_stmt(_call(constructor, _variable("value"))),
+                ), block=True,
+            )
+            for left in (False, True):
+                for right in (None, False, True):
+                    argument = failure if right is None else _call(constructor, _boolean(right))
+                    if (operator == "&&" and not left) or (operator == "||" and left):
+                        expected = _call(constructor, _boolean(left))
+                    else:
+                        expected = failure if right is None else _call(constructor, _boolean(right))
+                    claim = _binary("==", _call(name, _boolean(left), argument), expected)
+                    fixture.theorem(f"{name}{left}{right}", (), claim, _assert(claim))
+        nested_name = union_name + "Nested"
+        fixture.definition(
+            nested_name, result_type,
+            (("left", result_type), ("middle", result_type), ("right", result_type)),
+            _call(constructor, _unary_op("!", _binary(
+                "&&", _propagate(_variable("left")),
+                _binary("||", _propagate(_variable("middle")), _propagate(_variable("right"))),
+            ))),
+        )
+        for index, (left, middle, right, expected) in enumerate((
+            (False, None, None, True),
+            (True, True, None, False),
+            (True, False, None, None),
+            (None, True, True, None),
+            (True, False, False, True),
+        )):
+            arguments = tuple(failure if value is None else _call(constructor, _boolean(value))
+                              for value in (left, middle, right))
+            outcome = failure if expected is None else _call(constructor, _boolean(expected))
+            claim = _binary("==", _call(nested_name, *arguments), outcome)
+            fixture.theorem(f"{nested_name}{index}", (), claim, _assert(claim))
+    source, response = fixture.response()
+    elaborate(source, response)
+
+
 def _int_lit(value: str, suffix: str = "") -> Form:
     def form(fixture: _Fixture) -> Node:
         start = fixture.offset
@@ -6196,6 +6250,7 @@ def cases() -> list[Case]:
             Case("inductive-proofs-and-equational-rewriting", _inductive_proofs_and_equational_rewriting),
             Case("dependent-records-and-existential-propositions", _dependent_records_and_existential_propositions),
             Case("early-return-propagation-for-option-and-result", _early_return_propagation),
+            Case("short-circuit-option-and-result-propagation", _short_circuit_propagation),
             Case("represented-integers-preconditions-and-conversions", _represented_integers_and_conversions),
             Case("pure-sequences-and-model-reasoning", _pure_sequences_and_model_reasoning),
             Case("mutable-locals-assignments-and-bounded-loops", _mutable_locals_assignments_and_bounded_loops),

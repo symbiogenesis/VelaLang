@@ -100,6 +100,9 @@ class _StatementsMixin:
                 return prop, lambda repl: self._with_node_field(node, "left", inner_rebuild(repl))
             res_r = self._split_first_propagate(self.node(node["right"]))
             if res_r is not None:
+                if self.operator(node["operator"]) in {"&&", "||"}:
+                    # The RHS early exit belongs inside the Boolean guard.
+                    return node, lambda repl: repl
                 prop, inner_rebuild = res_r
                 return prop, lambda repl: self._with_node_field(node, "right", inner_rebuild(repl))
             return None
@@ -177,6 +180,10 @@ class _StatementsMixin:
         continuation: Callable[[str, _Binding, dict[str, _Binding]], _Term],
     ) -> _Term:
         self.site = prop_node
+        if prop_node["kind"] == "binary":
+            return self._elaborate_short_circuit_propagate(
+                prop_node, environment, target_return_type, continuation
+            )
         if self.active_lift_scopes > 0:
             raise self.fail(
                 "type",
@@ -268,6 +275,64 @@ class _StatementsMixin:
             left_lam = _term("lam", inst_payload_types[0], early_return_term, value=err_var.value)
             right_lam = _term("lam", ok_type, ok_branch_term, value=ok_var.value)
         return _term("sum_match", motive_lam, scrutinee.term, left_lam, right_lam)
+
+    def _elaborate_short_circuit_propagate(
+        self: _Elaborator,
+        node: Node,
+        environment: dict[str, _Binding],
+        target_return_type: _Term,
+        continuation: Callable[[str, _Binding, dict[str, _Binding]], _Term],
+    ) -> _Term:
+        condition = self.check(self.node(node["left"]), _BOOL, environment)
+        branch_env = dict(environment)
+        self._consume_call_updates(branch_env, node)
+
+        def resume(value: _Term, extended: dict[str, _Binding]) -> _Term:
+            variable = self.fresh(_BOOL)
+            name = f"__vela_bool_{variable.value}"
+            binding = _Binding(variable, _BOOL)
+            next_env = {**extended, name: binding}
+            body = continuation(name, binding, next_env)
+            return _term("let", _BOOL, value, body, value=variable.value)
+
+        def evaluate_right(value_node: Node, extended: dict[str, _Binding]) -> _Term:
+            split = self._split_first_propagate(value_node)
+            if split is None:
+                return resume(self.check(value_node, _BOOL, extended), extended)
+            prop, rebuild = split
+            return self._elaborate_propagate(
+                prop, extended, target_return_type,
+                lambda name, _binding, next_env: evaluate_right(
+                    rebuild({"kind": "name", "span": prop["span"],
+                             "name": {"text": name, "span": prop["span"]}}),
+                    next_env,
+                ),
+            )
+
+        saved_uninit = set(self.uninitialized_out_params)
+        branches: list[_Term] = []
+        branch_refs: list[dict[str, _Binding]] = []
+        branch_uninit: list[set[str]] = []
+        for truth in (True, False):
+            self.uninitialized_out_params = set(saved_uninit)
+            self.active_facts.append(condition if truth else _app(_constant("!"), condition))
+            try:
+                if truth == (self.operator(node["operator"]) == "&&"):
+                    branches.append(evaluate_right(self.node(node["right"]), dict(branch_env)))
+                else:
+                    branches.append(resume(_term("bool", value=int(truth)), dict(branch_env)))
+                branch_refs.append(dict(self.final_ref_bindings))
+                branch_uninit.append(set(self.uninitialized_out_params))
+            finally:
+                self.active_facts.pop()
+        self.uninitialized_out_params = branch_uninit[0] | branch_uninit[1]
+        self.final_ref_bindings = dict(branch_env)
+        for name in branch_refs[0].keys() & branch_refs[1].keys():
+            yes, no = branch_refs[0][name], branch_refs[1][name]
+            self.final_ref_bindings[name] = (yes if yes.term == no.term else _Binding(
+                self.whnf(_term("if", yes.type, condition, yes.term, no.term)), yes.type
+            ))
+        return _term("if", target_return_type, condition, *branches)
 
     def _check_record_invariants(
         self: _Elaborator,
