@@ -329,9 +329,19 @@ Independent delta controls cover exact integer edits and reconstruction,
 negotiation, unknown and foreign IDs, bounded history, source refusal/recovery,
 producer and lifecycle invalidation, malformed capabilities/parameters, and
 publication failure. A real stdio session reconstructs tokens after an unsaved
-edit inserting supplementary text and CRLF. Existing pinned-client observation
-checks accept well-formed optional result IDs and compare the complete token data;
-live delta interoperability remains part of Q25ci's two-client qualification.
+edit inserting supplementary text and CRLF. The pinned Neovim and Vim client RPC
+sessions also request a full base, a delta after replacing the unsaved buffer with
+a supplementary-comment/CRLF source, and an unchanged-source delta. Independent
+consumer checks reconstruct the exact expected integer stream and require full
+fallbacks for unknown bases and configuration invalidation. Background highlighting
+requests are suspended during these explicit probes so they cannot evict the
+single retained base. Both full and incremental Vim synchronization are covered.
+Wire checks independently reconstruct UTF-16 source edits, require negotiated
+deltas and the actual Unicode/CRLF snapshot, and compare reconstructed tokens
+with the expected stream. They track the latest published base and lifecycle
+invalidation, then join all five observed responses to their exact wire result IDs,
+source snapshots and request/base chains. Missing delta traffic, changed token
+integers and stale-base edits refuse qualification.
 
 These requests require `initialized` and a synchronized open document. Retain the
 navigation errors for malformed parameters, unopened/closed documents, refused
@@ -384,6 +394,11 @@ pinned independent editor clients recorded in
 incremental sync) — against `vela-lsp --transcript`, verifying bidirectional
 wire transcripts and client observations against independent expected oracles in
 [`test_vela_lsp_clients.py`](../../tools/tests/test_vela_lsp_clients.py).
+The schema-2 qualification report embeds each session's exact observation and
+transcript JSON text alongside its SHA-256 digest and traffic summary, preserving
+reviewable evidence after temporary editor staging is removed. Use `--output FILE`
+to retain the report. This qualifies the existing pure token-delta transport;
+Q25ci's wider producer and editor-operation prerequisites remain open.
 User-managed Host CI and Guest CI verdicts remain separate from local client
 qualification for Q25n, Q25o, and Q25u. Broader asynchronous services require
 explicit cancellation and deliberately late-result controls before advertising

@@ -6,6 +6,7 @@ import io
 import json
 import os
 import platform
+import re
 import shutil
 import stat
 import subprocess
@@ -200,6 +201,9 @@ RECOVERED_SOURCE = UNSUPPORTED_ERROR_SOURCE.replace(
     "    const Nat start = Square(base);",
     "    const Nat start = Square(multiplier);",
 )
+
+DELTA_SOURCE = "// \U0001f600 delta\r\nmodule Delta;\r\npublic Nat Id(Nat value) => value;\r\n"
+DELTA_TOKEN_DATA = [2, 11, 2, 0, 1, 0, 7, 5, 1, 3, 0, 10, 5, 1, 2]
 
 NEOVIM_SCRIPT = r"""
 local target_path = vim.env.VELA_TARGET_FILE
@@ -460,12 +464,35 @@ local recovered_definition_multiplier = sync_request("textDocument/definition", 
 local recovered_inlay_hints = sync_request("textDocument/inlayHint", range_params(0, 0, 25, 0))
 local recovered_semantic_tokens = sync_request("textDocument/semanticTokens/full", { textDocument = { uri = uri } })
 
+-- Suspend background requests while probing exact published bases through this client.
+vim.lsp.semantic_tokens.stop(bufnr, client_id)
+local delta_base = sync_request("textDocument/semanticTokens/full", { textDocument = { uri = uri } })
+prev_diag_count = #diag_events
+vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+  "// 😀 delta\r", "module Delta;\r", "public Nat Id(Nat value) => value;\r",
+})
+local ok_delta_diag = vim.wait(10000, function() return #diag_events > prev_diag_count end, 10)
+if not ok_delta_diag then fail("timed out waiting for unsaved CRLF delta edit") end
+local function delta_request(previous)
+  return sync_request("textDocument/semanticTokens/full/delta", {
+    textDocument = { uri = uri }, previousResultId = previous,
+  })
+end
+local delta_changed = delta_request(delta_base.resultId)
+local delta_unchanged = delta_request(delta_changed.resultId)
+local delta_unknown = delta_request("unknown-client-base")
+
 prev_diag_count = #diag_events
 client:notify("workspace/didChangeConfiguration", { settings = {} })
 local ok_cfg_diag = vim.wait(10000, function() return #diag_events > prev_diag_count end, 10)
 if not ok_cfg_diag then
   fail("timed out waiting for didChangeConfiguration diagnostics")
 end
+local delta_invalidated = delta_request(delta_unknown.resultId)
+local delta = {
+  base = delta_base, changed = delta_changed, unchanged = delta_unchanged,
+  unknown = delta_unknown, invalidated = delta_invalidated,
+}
 
 prev_diag_count = #diag_events
 client:notify("workspace/didChangeWatchedFiles", {
@@ -500,6 +527,7 @@ local out = {
   stage4 = stage4,
   stage5 = stage5,
   stage6 = stage6,
+  delta = delta,
 }
 
 client:stop()
@@ -740,7 +768,21 @@ def RunQualification()
   var recovered_inlay_hints = RpcResult(lserver, 'textDocument/inlayHint', RangeParams(0, 0, 25, 0))
   var recovered_semantic_tokens = RpcResult(lserver, 'textDocument/semanticTokens/full', {textDocument: {uri: uri}})
 
+  # Suspend background requests while probing exact published bases through this client.
+  lserver.isSemanticTokensProvider = false
+  var delta_base = RpcResult(lserver, 'textDocument/semanticTokens/full', {textDocument: {uri: uri}})
+  setline(1, ["// 😀 delta\r", "module Delta;\r", "public Nat Id(Nat value) => value;\r"])
+  deletebufline(bnr, 4, '$')
+  listener_flush()
+  var DeltaRequest = (previous: string): dict<any> => RpcResult(lserver, 'textDocument/semanticTokens/full/delta', {
+    textDocument: {uri: uri}, previousResultId: previous,
+  })
+  var delta_changed = DeltaRequest(delta_base.resultId)
+  var delta_unchanged = DeltaRequest(delta_changed.resultId)
+  var delta_unknown = DeltaRequest('unknown-client-base')
+
   lserver.sendNotification('workspace/didChangeConfiguration', {settings: {}})
+  var delta_invalidated = DeltaRequest(delta_unknown.resultId)
   lserver.sendNotification('workspace/didChangeWatchedFiles', {
     changes: [{uri: uri .. '.deleted', type: 3}],
   })
@@ -776,6 +818,10 @@ def RunQualification()
       recovered_definition_multiplier: recovered_definition_multiplier,
       recovered_inlay_hints: recovered_inlay_hints,
       recovered_semantic_tokens: recovered_semantic_tokens,
+    },
+    delta: {
+      base: delta_base, changed: delta_changed, unchanged: delta_unchanged,
+      unknown: delta_unknown, invalidated: delta_invalidated,
     },
   }
   writefile([json_encode(out)], out_path)
@@ -1228,7 +1274,84 @@ def _token_observation(key: str, value: object) -> object:
     return {field: item for field, item in value.items() if field != "resultId"}
 
 
-def verify_client_observation(observation: dict[str, object], oracle: dict[str, object]) -> None:
+def _token_integers(value: object) -> list[int]:
+    items = _array(value)
+    _require(len(items) <= 4096 * 5
+             and all(type(item) is int and 0 <= item <= 0x7FFFFFFF for item in items),
+             "token response contains invalid integers")
+    return [cast("int", item) for item in items]
+
+
+def _token_response_data(value: object, previous: list[int], *, delta: bool) -> list[int]:
+    response = _object(value, "semantic token response")
+    _token_observation("semantic_tokens", response)
+    _require("resultId" in response, "delta-capable response has no resultId")
+    field = "edits" if delta else "data"
+    _require(set(response) == {"resultId", field}, f"expected token {field} response")
+    data = previous.copy() if delta else _token_integers(response["data"])
+    if delta:
+        edits = _array(response["edits"])
+        last_start = len(previous) + 1
+        for raw_edit in reversed(edits):
+            edit = _object(raw_edit)
+            _require(set(edit) in ({"start", "deleteCount"}, {"start", "deleteCount", "data"}),
+                     "invalid token edit fields")
+            start, count = edit.get("start"), edit.get("deleteCount")
+            _require(type(start) is int and type(count) is int, "non-integer token edit")
+            start, count = cast("int", start), cast("int", count)
+            _require(0 <= start <= start + count <= len(previous) and start + count < last_start,
+                     "overlapping or out-of-bounds token edit")
+            data[start:start + count] = _token_integers(edit.get("data", []))
+            last_start = start
+    _require(len(data) <= 4096 * 5 and len(data) % 5 == 0,
+             "token response is not a bounded complete stream")
+    return data
+
+
+def _verify_delta_observation(value: object, base_data: list[int]) -> None:
+    observation = _object(value, "delta observation")
+    _require(set(observation) == {"base", "changed", "unchanged", "unknown", "invalidated"},
+             "incomplete delta observation")
+    base = _token_response_data(observation["base"], [], delta=False)
+    _require(base == base_data, "delta base differs from recovered compiler facts")
+    changed = _token_response_data(observation["changed"], base, delta=True)
+    _require(changed == DELTA_TOKEN_DATA, "unsaved Unicode/CRLF delta reconstructed wrong tokens")
+    unchanged = _token_response_data(observation["unchanged"], changed, delta=True)
+    _require(unchanged == changed and _object(observation["unchanged"])["edits"] == [],
+             "unchanged source did not return an empty delta")
+    for key in ("unknown", "invalidated"):
+        _require(_token_response_data(observation[key], [], delta=False) == DELTA_TOKEN_DATA,
+                 f"{key} token base did not fall back to current full tokens")
+    identities = [_object(item)["resultId"] for item in observation.values()]
+    _require(len(set(identities)) == len(identities), "token response reused a published resultId")
+
+
+def _wire_source_edit(text: str, change: dict[str, object]) -> str:
+    replacement = change.get("text")
+    _require(isinstance(replacement, str), "wire edit has no source text")
+    if "range" not in change:
+        return cast("str", replacement)
+    span = _object(change["range"])
+    breaks = list(re.finditer(r"\r\n|\r|\n", text))
+    offsets: list[int] = []
+    for name in ("start", "end"):
+        position = _object(span.get(name))
+        line, character = position.get("line"), position.get("character")
+        _require(type(line) is int and type(character) is int, "wire edit has invalid coordinates")
+        line, character = cast("int", line), cast("int", character)
+        _require(0 <= line <= len(breaks) and character >= 0, "wire edit lies outside source")
+        start = 0 if line == 0 else breaks[line - 1].end()
+        end = len(text) if line == len(breaks) else breaks[line].start()
+        encoded = text[start:end].encode("utf-16-le")
+        _require(2 * character <= len(encoded), "wire edit exceeds its UTF-16 line")
+        prefix = encoded[:2 * character].decode("utf-16-le")
+        offsets.append(start + len(prefix))
+    _require(offsets[0] <= offsets[1], "wire edit has reversed coordinates")
+    return text[:offsets[0]] + cast("str", replacement) + text[offsets[1]:]
+
+
+def verify_client_observation(observation: dict[str, object], oracle: dict[str, object], *,
+                              require_token_deltas: bool = False) -> None:
     """Verify a client's recorded scenario observations against the independent oracle."""
     label = str(observation.get("client", "unknown"))
     _require(observation.get("offset_encoding") == "utf-16", f"{label}: offset_encoding is not utf-16")
@@ -1297,12 +1420,17 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     _require(stage6.get("diagnostics") == [], f"{label}: stage6 recovery diagnostics not empty")
     for key, expected in oracle6.items():
         _require(_token_observation(key, stage6.get(key)) == expected, f"{label}: stage6.{key} mismatch")
+    if require_token_deltas:
+        recovered = _object(oracle6["recovered_semantic_tokens"])
+        _verify_delta_observation(observation.get("delta"), cast("list[int]", recovered["data"]))
 
 
 def verify_wire_transcript(
     transcript_payload: dict[str, object],
     *,
     require_ranged_change: bool,
+    require_token_deltas: bool = False,
+    delta_observation: object = None,
 ) -> dict[str, object]:
     """Verify a server-recorded bidirectional JSON-RPC wire transcript."""
     _require(
@@ -1319,6 +1447,21 @@ def verify_wire_transcript(
     ranged_change_count = 0
     same_line_unicode_ranged_change = False
     published_codes: list[list[str]] = []
+    token_requests: dict[object, dict[str, object]] = {}
+    token_request_sources: dict[object, str | None] = {}
+    token_streams: dict[str, tuple[object, list[int]]] = {}
+    latest_token_ids: dict[str, str] = {}
+    delta_responses = 0
+    full_fallbacks = 0
+    empty_deltas = 0
+    crlf_delta_edit = False
+    delta_negotiated = False
+    sources: dict[str, str] = {}
+    observed = {} if delta_observation is None else _object(delta_observation)
+    if observed:
+        _require(set(observed) == {"base", "changed", "unchanged", "unknown", "invalidated"},
+                 "wire join has an incomplete delta observation")
+    observed_on_wire: set[str] = set()
 
     for expected_index, item in enumerate(frames):
         frame = _object(item, f"frame[{expected_index}]")
@@ -1335,11 +1478,34 @@ def verify_wire_transcript(
                 req_id = message["id"]
                 _require(req_id not in request_by_id, f"duplicate client request id {req_id!r}")
                 request_by_id[req_id] = method
+                if method.startswith("textDocument/semanticTokens/full"):
+                    token_requests[req_id] = _object(message.get("params"))
+                    uri = str(_object(token_requests[req_id].get("textDocument")).get("uri"))
+                    token_request_sources[req_id] = sources.get(uri)
+            if method == "initialize":
+                caps = _object(_object(message.get("params")).get("capabilities"))
+                document = _object(caps.get("textDocument", {}))
+                semantic = _object(document.get("semanticTokens", {}))
+                full = _object(semantic.get("requests", {})).get("full")
+                delta_negotiated = isinstance(full, dict) and full.get("delta") is True
+            if method == "textDocument/didOpen":
+                document = _object(_object(message.get("params")).get("textDocument"))
+                sources[str(document.get("uri"))] = str(document.get("text"))
+            if method in {"workspace/didChangeConfiguration", "workspace/didChangeWatchedFiles"}:
+                latest_token_ids.clear()
+            if method in {"textDocument/didSave", "textDocument/didClose"}:
+                document = _object(_object(message.get("params")).get("textDocument"))
+                latest_token_ids.pop(str(document.get("uri")), None)
             if method == "textDocument/didChange":
                 params = _object(message.get("params"))
                 changes = _array(params.get("contentChanges"))
+                uri = str(_object(params.get("textDocument")).get("uri"))
                 for raw_change in changes:
                     change = _object(raw_change)
+                    if require_token_deltas:
+                        _require(uri in sources, "wire edit has no open source")
+                        sources[uri] = _wire_source_edit(sources[uri], change)
+                        crlf_delta_edit |= sources[uri] == DELTA_SOURCE
                     if "range" in change:
                         ranged_change_count += 1
                         span = _object(change["range"])
@@ -1371,6 +1537,55 @@ def verify_wire_transcript(
                 _require(req_id in request_by_id, f"uncorrelated server response id {req_id!r}")
                 _require("error" not in message, f"unexpected error reply on wire: {message!r}")
                 correlated_responses += 1
+                if req_id in token_requests and require_token_deltas:
+                    params = token_requests[req_id]
+                    response = _object(message.get("result"))
+                    uri = _object(params.get("textDocument")).get("uri")
+                    delta = "edits" in response
+                    delta_request = request_by_id[req_id].endswith("/delta")
+                    if delta_request:
+                        valid_base = latest_token_ids.get(str(uri)) == params.get("previousResultId")
+                        _require(delta == valid_base,
+                                 "wire token response violates current-base or invalidation semantics")
+                    else:
+                        _require(not delta, "wire full-token request returned edits")
+                    previous: list[int] = []
+                    if delta:
+                        prior = token_streams.get(str(params.get("previousResultId")))
+                        _require(prior is not None and prior[0] == uri,
+                                 "wire delta references an unknown or foreign stream")
+                        previous = cast("tuple[object, list[int]]", prior)[1]
+                    data = _token_response_data(response, previous, delta=delta)
+                    identity = str(response["resultId"])
+                    _require(identity not in token_streams, "wire response reused a token resultId")
+                    if token_request_sources[req_id] == DELTA_SOURCE:
+                        _require(data == DELTA_TOKEN_DATA, "wire delta reconstructed wrong current tokens")
+                    for key, raw_observed in observed.items():
+                        expected = _object(raw_observed)
+                        if expected.get("resultId") != identity:
+                            continue
+                        _require(response == expected, "observed token response differs from wire evidence")
+                        expected_source = RECOVERED_SOURCE if key == "base" else DELTA_SOURCE
+                        _require(token_request_sources[req_id] == expected_source,
+                                 "observed token response was bound to the wrong source")
+                        if key == "base":
+                            expected_previous = None
+                        elif key == "unknown":
+                            expected_previous = "unknown-client-base"
+                        else:
+                            prior_key = {"changed": "base", "unchanged": "changed",
+                                         "invalidated": "unknown"}[key]
+                            expected_previous = _object(observed[prior_key])["resultId"]
+                        _require(params.get("previousResultId") == expected_previous
+                                 and delta_request == (key != "base"),
+                                 "observed token response was bound to the wrong request/base")
+                        observed_on_wire.add(key)
+                    token_streams[str(response["resultId"])] = (uri, data)
+                    latest_token_ids[str(uri)] = str(response["resultId"])
+                    if delta_request:
+                        delta_responses += int(delta)
+                        full_fallbacks += int(not delta)
+                        empty_deltas += int(delta and response["edits"] == [])
         else:
             raise ValueError(f"invalid frame direction: {direction!r}")
 
@@ -1417,6 +1632,13 @@ def verify_wire_transcript(
             same_line_unicode_ranged_change,
             "incremental client session did not send a ranged edit after 😀 on line 5",
         )
+    if require_token_deltas:
+        _require(delta_negotiated and crlf_delta_edit,
+                 f"wire session omitted delta negotiation ({delta_negotiated}) "
+                 f"or unsaved Unicode/CRLF edit ({crlf_delta_edit})")
+        _require(delta_responses >= 2 and full_fallbacks >= 2 and empty_deltas >= 1,
+                 "wire session omitted changed/unchanged deltas or full fallbacks")
+        _require(observed_on_wire == set(observed), "observed token responses are absent from wire evidence")
     return {
         "frame_count": len(frames),
         "client_frame_count": len(client_methods),
@@ -1425,6 +1647,10 @@ def verify_wire_transcript(
         "ranged_did_change_count": ranged_change_count,
         "same_line_unicode_ranged_change": same_line_unicode_ranged_change,
         "diagnostic_publications": len(published_codes),
+        "semantic_delta_responses": delta_responses,
+        "semantic_full_fallbacks": full_fallbacks,
+        "semantic_empty_deltas": empty_deltas,
+        "unsaved_unicode_crlf_delta_edit": crlf_delta_edit,
     }
 
 
@@ -1436,16 +1662,18 @@ def _verify_editor_session_artifacts(
     label: str,
     sentinel_error: str,
     require_ranged_change: bool,
-) -> tuple[str, str, dict[str, object]]:
+) -> tuple[str, str, dict[str, object], str, str]:
     _require(target_file.read_text(encoding="utf-8") == DISK_SENTINEL, sentinel_error)
     observation_raw = client_out_file.read_bytes()
     transcript_raw = transcript_file.read_bytes()
     observation = _object(json.loads(observation_raw), f"{label} observation")
     transcript = _object(json.loads(transcript_raw), f"{label} transcript")
     oracle = expected_scenario_oracle(str(observation.get("uri", "")))
-    verify_client_observation(observation, oracle)
-    summary = verify_wire_transcript(transcript, require_ranged_change=require_ranged_change)
-    return _sha256(observation_raw), _sha256(transcript_raw), summary
+    verify_client_observation(observation, oracle, require_token_deltas=True)
+    summary = verify_wire_transcript(transcript, require_ranged_change=require_ranged_change,
+                                     require_token_deltas=True, delta_observation=observation["delta"])
+    return (_sha256(observation_raw), _sha256(transcript_raw), summary,
+            observation_raw.decode("utf-8"), transcript_raw.decode("utf-8"))
 
 
 def _run_neovim_session(
@@ -1487,7 +1715,7 @@ def _run_neovim_session(
         done.returncode == 0,
         f"Neovim headless session exited {done.returncode}: {done.stderr.strip() or done.stdout.strip()}",
     )
-    obs_sha, tx_sha, summary = _verify_editor_session_artifacts(
+    obs_sha, tx_sha, summary, observation_json, transcript_json = _verify_editor_session_artifacts(
         target_file,
         client_out_file,
         transcript_file,
@@ -1501,6 +1729,8 @@ def _run_neovim_session(
         "seconds": elapsed,
         "observation_sha256": obs_sha,
         "transcript_sha256": tx_sha,
+        "observation_json": observation_json,
+        "transcript_json": transcript_json,
         "summary": summary,
     }
 
@@ -1569,7 +1799,7 @@ def _run_vim_session(
         done.returncode == 0 and client_out_file.is_file(),
         f"Vim ({mode_tag}) session exited {done.returncode}: {err_detail or done.stderr.strip() or done.stdout.strip()}",
     )
-    obs_sha, tx_sha, summary = _verify_editor_session_artifacts(
+    obs_sha, tx_sha, summary, observation_json, transcript_json = _verify_editor_session_artifacts(
         target_file,
         client_out_file,
         transcript_file,
@@ -1585,6 +1815,8 @@ def _run_vim_session(
         "seconds": elapsed,
         "observation_sha256": obs_sha,
         "transcript_sha256": tx_sha,
+        "observation_json": observation_json,
+        "transcript_json": transcript_json,
         "summary": summary,
     }
 
@@ -1624,7 +1856,7 @@ def qualify_clients(*, cache_root: Path | None = None) -> dict[str, object]:
             )
             key = _platform_key()
             return {
-                "schema": 1,
+                "schema": 2,
                 "scope": "vela-lsp-two-client-interoperability",
                 "status": "passed",
                 "platform": {"os": key[0], "arch": key[1]},
