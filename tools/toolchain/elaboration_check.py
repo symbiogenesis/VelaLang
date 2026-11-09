@@ -640,6 +640,56 @@ public u32 ReborrowAndMutate()
     return x;
 }
 """),
+        ("consuming-ownership-general-loans-and-closed-effects", """module ConsumingOwnershipLoansEffectsReplay;
+public record Token(Nat Id, Nat Quota);
+public record Envelope(owned Token Item, u32 Tag);
+public union Ticket {
+    Empty();
+    Issued(owned Token Item);
+}
+public Nat ConsumeToken(owned Token tok)
+    effects none
+    ensures result == tok.Id + tok.Quota
+{
+    let moved = move tok;
+    return moved.Id + moved.Quota;
+}
+public Token RebrandToken(owned Token tok, Nat newId)
+    effects none
+    ensures result.Id == newId
+    ensures result.Quota == tok.Quota
+{
+    return move tok with { Id = newId };
+}
+public Nat InspectEnvelopeAndAdjust(in Envelope env, ref u32 counter, in Seq<u32> items)
+    effects reads(env, items), writes(counter)
+    requires env.Tag <= 10u32 && counter <= 100u32
+    ensures counter == old(counter) + env.Tag
+    ensures result == items.Count
+{
+    counter = counter + env.Tag;
+    return items.Count;
+}
+public u32 HelperEffect(u32 x)
+    requires x <= 50u32
+{
+    return x + 1u32;
+}
+public u32 CallerWithEffects(in u32 base, Fn(u32) -> u32 cb)
+    effects reads(base), calls(HelperEffect, cb)
+    requires base <= 10u32
+{
+    let stepped = HelperEffect(base);
+    return cb(stepped);
+}
+public Nat RoundTripOwned()
+    ensures result == 15
+{
+    let t0 = Token(3, 5);
+    let t1 = RebrandToken(move t0, 10);
+    return ConsumeToken(move t1);
+}
+"""),
     )
     negatives = (
         ("static-parameter-runtime-input", "Nat F(const Nat value) => value; Nat Wrong(Nat runtime) => F(runtime);", "type"),
@@ -704,7 +754,7 @@ public u32 ReborrowAndMutate()
         ("labeled-false-equality", "definition Nat Id(Nat value) => value; "
          "lemma Wrong() ensures Id(value: 1) == 2 proof { assert Id(value: 1) == 2; }", "type"),
         ("unsupported-use-grade", "definition Nat Graded(Nat value @ 1) => value;", "unsupported"),
-        ("unsupported-source-loan", "definition Nat Loan(ref Nat value) => value;", "unsupported"),
+        ("unsupported-source-loan", "definition Nat Loan(tracked Nat value) => value;", "unsupported"),
         ("constant-runtime-input", "Nat Wrong(Nat runtime) { const Nat value = runtime; return value; }", "type"),
         ("constant-ordinary-let-input", "Nat Wrong() { let runtime = 3; const Nat value = runtime; return value; }", "type"),
         ("constant-ignored-runtime-input", "definition Nat Ignore(Nat unused) => 0; "
@@ -857,6 +907,24 @@ public u32 ReborrowAndMutate()
          "public u32 Wrong() { var x = 5u32; assert x == 5u32; x = 6u32; assert x == 5u32; return x; }", "type"),
         ("mutation-invalidates-shortened-span-length",
          "public byte Wrong() { var s = Span.AllocZeroed(4usize); s = Span.Slice(s, 0usize, 1usize); return s[2usize]; }", "type"),
+        ("owned-missing-call-move",
+         "public u32 Consume(owned u32 x) => x; public u32 Wrong() { let a = 5u32; return Consume(a); }", "type"),
+        ("move-use-after-owner-move",
+         "public u32 Wrong() { let a = 5u32; let b = move a; return a + b; }", "type"),
+        ("move-while-shared-loan-live",
+         "public u32 Wrong() { var a = 5u32; let r = in a; let b = move a; return r + b; }", "type"),
+        ("move-projected-field-unsupported",
+         "public record Pair(u32 A, u32 B); public u32 Wrong(Pair p) { return move p.A; }", "type"),
+        ("move-through-loan-unsupported",
+         "public u32 Wrong() { var a = 5u32; let r = in a; return move r; }", "type"),
+        ("move-borrowed-in-parameter",
+         "public u32 Wrong(in u32 x) { return move x; }", "type"),
+        ("effects-missing-read",
+         "public u32 Wrong(in u32 x) effects none { return x; }", "type"),
+        ("effects-missing-write",
+         "public Unit Wrong(ref u32 x) effects none { x = 1u32; return; }", "type"),
+        ("effects-missing-call",
+         "public u32 Helper(u32 x) { return x; } public u32 Wrong(u32 x) effects none { return Helper(x); }", "type"),
     )
     pure = Fixture("pure-expression-operators", b"""module PureExpressions;
 public Nat Difference(Nat left, Nat right) => left - right;

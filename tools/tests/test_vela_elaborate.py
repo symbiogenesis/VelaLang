@@ -5740,6 +5740,270 @@ def _source_bound_borrows_and_constructive_postconditions() -> None:
     _refuses(stale_prewrite, "type", "assert")
 
 
+def _move_arg(value: Form) -> Form:
+    def form(fixture: _Fixture) -> Node:
+        start = fixture.offset
+        op = fixture.name("move")
+        fixture.write(" ")
+        inner = value(fixture)
+        return fixture.node("unary", start, operator=op, value=inner)
+
+    return form
+
+
+def _effects_clause(*items: Form) -> Form:
+    def form(fixture: _Fixture) -> Node:
+        start = fixture.offset
+        fixture.write("effects ")
+        values = fixture.forms(items)
+        return fixture.node("effects", start, values=values)
+
+    return form
+
+
+def _consuming_ownership_general_loans_and_closed_effects() -> None:
+    fixture = _Fixture("ConsumingOwnershipLoansAndEffects")
+    fixture.record("Token", (("Id", _NAT), ("Quota", _NAT)))
+    fixture.record("Envelope", (("Item", _modified("owned", _type("Token"))), ("Tag", _type("u32"))))
+    fixture.union(
+        "Ticket",
+        (
+            ("Empty", ()),
+            ("Issued", (("Item", _modified("owned", _type("Token"))),)),
+        ),
+    )
+    fixture.function(
+        "ConsumeToken",
+        _NAT,
+        (("tok", _modified("owned", _type("Token"))),),
+        _block_stmts(
+            _let_stmt("moved", _move_arg(_variable("tok"))),
+            _return_stmt(_binary("+", _member(_variable("moved"), "Id"), _member(_variable("moved"), "Quota"))),
+        ),
+        block=True,
+        contracts=(
+            _effects_clause(_variable("none")),
+            _contract(
+                "ensures",
+                _binary(
+                    "==",
+                    _variable("result"),
+                    _binary("+", _member(_variable("tok"), "Id"), _member(_variable("tok"), "Quota")),
+                ),
+            ),
+        ),
+    )
+    fixture.function(
+        "RebrandToken",
+        _type("Token"),
+        (("tok", _modified("owned", _type("Token"))), ("newId", _NAT)),
+        _block_stmts(
+            _return_stmt(_with_expr(_move_arg(_variable("tok")), (("Id", _variable("newId")),))),
+        ),
+        block=True,
+        contracts=(
+            _effects_clause(_variable("none")),
+            _contract("ensures", _binary("==", _member(_variable("result"), "Id"), _variable("newId"))),
+            _contract("ensures", _binary("==", _member(_variable("result"), "Quota"), _member(_variable("tok"), "Quota"))),
+        ),
+    )
+    fixture.function(
+        "InspectEnvelopeAndAdjust",
+        _NAT,
+        (
+            ("env", _modified("in", _type("Envelope"))),
+            ("counter", _modified("ref", _type("u32"))),
+            ("items", _modified("in", _type("Seq", _type("u32")))),
+        ),
+        _block_stmts(
+            _assign_stmt(_variable("counter"), "=", _binary("+", _variable("counter"), _member(_variable("env"), "Tag"))),
+            _return_stmt(_member(_variable("items"), "Count")),
+        ),
+        block=True,
+        contracts=(
+            _effects_clause(
+                _call("reads", _variable("env"), _variable("items")),
+                _call("writes", _variable("counter")),
+            ),
+            _contract(
+                "requires",
+                _binary(
+                    "&&",
+                    _binary("<=", _member(_variable("env"), "Tag"), _int_lit("10", "u32")),
+                    _binary("<=", _variable("counter"), _int_lit("100", "u32")),
+                ),
+            ),
+            _contract(
+                "ensures",
+                _binary(
+                    "==",
+                    _variable("counter"),
+                    _binary("+", _call("old", _variable("counter")), _member(_variable("env"), "Tag")),
+                ),
+            ),
+            _contract(
+                "ensures",
+                _binary("==", _variable("result"), _member(_variable("items"), "Count")),
+            ),
+        ),
+    )
+    fixture.function(
+        "HelperStep",
+        _type("u32"),
+        (("x", _type("u32")),),
+        _block_stmts(_return_stmt(_binary("+", _variable("x"), _int_lit("1", "u32")))),
+        block=True,
+        contracts=(_contract("requires", _binary("<=", _variable("x"), _int_lit("50", "u32"))),),
+    )
+    fixture.function(
+        "CallerWithEffects",
+        _type("u32"),
+        (("base", _modified("in", _type("u32"))), ("cb", _function_type((("v", _type("u32")),), _type("u32")))),
+        _block_stmts(
+            _let_stmt("stepped", _call("HelperStep", _variable("base"))),
+            _return_stmt(_call("cb", _variable("stepped"))),
+        ),
+        block=True,
+        contracts=(
+            _effects_clause(_call("reads", _variable("base")), _call("calls", _variable("HelperStep"), _variable("cb"))),
+            _contract("requires", _binary("<=", _variable("base"), _int_lit("10", "u32"))),
+        ),
+    )
+    fixture.function(
+        "RoundTripOwned",
+        _NAT,
+        (),
+        _block_stmts(
+            _let_stmt("t0", _call("Token", _natural(3), _natural(5))),
+            _let_stmt("t1", _call("RebrandToken", _move_arg(_variable("t0")), _natural(10))),
+            _return_stmt(_call("ConsumeToken", _move_arg(_variable("t1")))),
+        ),
+        block=True,
+        contracts=(_contract("ensures", _binary("==", _variable("result"), _natural(15))),),
+    )
+    source, response = fixture.response()
+    emitted = elaborate(source, response).gallina
+    ensure("Axiom vela_solver_" not in emitted, f"unexpected solver axiom in emitted Gallina:\n{emitted}")
+
+    missing_move = _Fixture("OwnedMissingMove")
+    missing_move.function("Consume", _type("u32"), (("x", _modified("owned", _type("u32"))),), _variable("x"))
+    missing_move.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _let_stmt("a", _int_lit("5", "u32")),
+            _return_stmt(_call("Consume", _variable("a"))),
+        ),
+        block=True,
+    )
+    _refuses(missing_move, "type", "requires a 'move' call-site argument modifier")
+
+    use_after_move = _Fixture("MoveUseAfterMove")
+    use_after_move.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _let_stmt("a", _int_lit("5", "u32")),
+            _let_stmt("b", _move_arg(_variable("a"))),
+            _return_stmt(_binary("+", _variable("a"), _variable("b"))),
+        ),
+        block=True,
+    )
+    _refuses(use_after_move, "type", "use-after-owner-move")
+
+    move_while_loaned = _Fixture("MoveWhileLoaned")
+    move_while_loaned.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("a", _int_lit("5", "u32")),
+            _let_stmt("r", _in_arg(_variable("a"))),
+            _let_stmt("b", _move_arg(_variable("a"))),
+            _return_stmt(_binary("+", _variable("r"), _variable("b"))),
+        ),
+        block=True,
+    )
+    _refuses(move_while_loaned, "type", "suspended-parent")
+
+    partial_move = _Fixture("PartialOwnerMove")
+    partial_move.record("Pair", (("A", _type("u32")), ("B", _type("u32"))))
+    partial_move.function(
+        "Bad",
+        _type("u32"),
+        (("p", _type("Pair")),),
+        _block_stmts(_return_stmt(_move_arg(_member(_variable("p"), "A")))),
+        block=True,
+    )
+    _refuses(partial_move, "type", "partial-owner-move-unsupported")
+
+    move_through_loan = _Fixture("MoveThroughLoan")
+    move_through_loan.function(
+        "Bad",
+        _type("u32"),
+        (),
+        _block_stmts(
+            _var_stmt("a", _int_lit("5", "u32")),
+            _let_stmt("r", _in_arg(_variable("a"))),
+            _return_stmt(_move_arg(_variable("r"))),
+        ),
+        block=True,
+    )
+    _refuses(move_through_loan, "type", "move-through-loan-unsupported")
+
+    move_in_param = _Fixture("MoveBorrowedInParam")
+    move_in_param.function(
+        "Bad",
+        _type("u32"),
+        (("x", _modified("in", _type("u32"))),),
+        _block_stmts(_return_stmt(_move_arg(_variable("x")))),
+        block=True,
+    )
+    _refuses(move_in_param, "type", "cannot move borrowed 'in' parameter")
+
+    missing_read_effect = _Fixture("EffectsMissingRead")
+    missing_read_effect.function(
+        "Bad",
+        _type("u32"),
+        (("x", _modified("in", _type("u32"))),),
+        _block_stmts(_return_stmt(_variable("x"))),
+        block=True,
+        contracts=(_effects_clause(_variable("none")),),
+    )
+    _refuses(missing_read_effect, "type", "not declared in effects reads(...) or writes(...)")
+
+    missing_write_effect = _Fixture("EffectsMissingWrite")
+    missing_write_effect.function(
+        "Bad",
+        _type("Unit"),
+        (("x", _modified("ref", _type("u32"))),),
+        _block_stmts(_assign_stmt(_variable("x"), "=", _int_lit("1", "u32")), _return_stmt(None)),
+        block=True,
+        contracts=(_effects_clause(_variable("none")),),
+    )
+    _refuses(missing_write_effect, "type", "not declared in effects writes(...)")
+
+    missing_call_effect = _Fixture("EffectsMissingCall")
+    missing_call_effect.function(
+        "Helper",
+        _type("u32"),
+        (("x", _type("u32")),),
+        _block_stmts(_return_stmt(_variable("x"))),
+        block=True,
+    )
+    missing_call_effect.function(
+        "Bad",
+        _type("u32"),
+        (("x", _type("u32")),),
+        _block_stmts(_return_stmt(_call("Helper", _variable("x")))),
+        block=True,
+        contracts=(_effects_clause(_variable("none")),),
+    )
+    _refuses(missing_call_effect, "type", "not declared in effects calls(...)")
+
+
 def cases() -> list[Case]:
     return [Case("fresh-polymorphism-and-higher-order-inference", _polymorphism_and_higher_order),
             Case("familiar-generic-markers-and-mathematical-body-source-binding", _familiar_generic_spellings),
@@ -5787,4 +6051,5 @@ def cases() -> list[Case]:
             Case("out-loan-parameters-and-initialization-tracking", _out_loan_parameters_and_initialization_tracking),
             Case("interfaces-nonoverlapping-impls-and-where-constraints", _interfaces_nonoverlapping_impls_and_where_constraints),
             Case("multi-module-imports-and-visibility", _multi_module_imports_and_visibility),
-            Case("source-bound-borrows-and-constructive-postconditions", _source_bound_borrows_and_constructive_postconditions)]
+            Case("source-bound-borrows-and-constructive-postconditions", _source_bound_borrows_and_constructive_postconditions),
+            Case("consuming-ownership-general-loans-and-closed-effects", _consuming_ownership_general_loans_and_closed_effects)]
