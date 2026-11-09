@@ -430,12 +430,13 @@ statements as named solver-trust axioms recorded in `solver_trust`, so
 `Print Assumptions` and the harness report kernel-proved definitions and
 solver-trusted obligations separately; a non-empty solver-trust ledger leaves
 the slice unaccepted as a closed kernel proof. The current local replay audits
-69 exports and reports three solver-trusted obligations:
+69 exports with `solver_trusted_count == 0`, `accepted: true` and
+`kernel_checked: true`. Inference rollback retains normalization caches only
+when metavariable state is unchanged; this closes
 `PrepareAndValidatePacket_ensures_0`, `PrepareAndValidatePacket_ensures_2` and
-`ValidateEmptyPacketOk`. Their full generated names appear in the receipt's
-`solver_trusted_obligations` ledger. Consequently `solver_trusted_count == 3`,
-`accepted: false` and `kernel_checked: false`; successful command execution and
-recursive checking with these assumptions do not close the source proof.
+`ValidateEmptyPacketOk` within the existing work/reduction budgets. All exported
+definitions report `Closed under the global context`. These source proofs do
+not establish checked source correspondence or machine/artifact acceptance.
 
 - **Concrete `Span<byte>` carrier and contract obligations:** `Span<byte>` lowers
   in the mathematical consumer to `vela_Span` (`vela_ByteStore` paired with
@@ -469,7 +470,7 @@ recursive checking with these assumptions do not close the source proof.
   explicit `effects writes(...), reads(...)` lists, returned subslice views in
   `ValidatedPacket<'dst>`, `foreach` loops with `invariant`/`decreases`, 20
   kernel-proved automatic `ref` descriptor preservation obligations and
-  `ensures` contracts with the two residual obligations named above), and seven symbolic scenario theorems
+  kernel-proved `ensures` contracts), and seven symbolic scenario theorems
   (`ValidateEmptyPacketOk`, `ValidateFullPacketOk`,
   `ValidatePartialPacketScrubsStaleAndTrailingBytes`, `RejectFramingShort`,
   `RejectBadMagic`, `RejectLengthOutOfBounds`,

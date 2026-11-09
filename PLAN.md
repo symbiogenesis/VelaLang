@@ -49,20 +49,22 @@ record. Update this scope description when the priced backlog changes.
 
 ## Current execution
 
-The current parallel work qualifies existing development producers within their
-frozen scope and prepares local receipt integration:
+The current parallel delivery qualifies existing development producers within
+their frozen scope and strengthens local receipt integration:
 
 | Slice | Delivered development behavior | Open acceptance boundary |
 | --- | --- | --- |
 | Mathematical elaboration | Guarded `Option`/`Result` propagation preserves Boolean short-circuiting; unsupported effect sequencing is refused under the [elaboration contract](docs/tooling/elaboration-prototype.md#commands-and-acceptance) | General checked source correspondence and machine-connected composition remain with Q25as/at |
-| Pure editor inspection | Worker responses bind the original source digest before fact publication and caching under the [navigation contract](docs/tooling/lsp-prototype.md#pure-navigation-increment) | Wider semantic services retain Q25ch/ci's producer prerequisites |
+| Pure compiler inspection | `vela inspect` exports versioned source-preserving snapshots and bounded symbol/reference queries under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
 | Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
-| Local first-slice receipts | Schema-2 receipts and `first-slice-bindings` check producer, tool, runtime, parser and retained-output identities under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ar remains open for external checked producer receipts and complete declared coverage |
+| Local first-slice source proofs | All 69 exports kernel-replay with an empty solver-trust ledger within unchanged elaboration budgets under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ba retains source correspondence and exact-artifact producer joins |
+| Local first-slice receipts | Schema-2 binding checks verify retained subjects, proof coverage, assumption ledgers and process transcripts as well as producer/tool/runtime/parser identities | Q25ar remains open for external checked producer receipts and complete declared coverage |
+| Pure compiler traces | Bounded phase/counter recordings bind source, producer and completeness metadata under the [trace increment](docs/tooling/pure-prototype.md#bounded-compiler-traces) | Q25cp retains wider phases/workers, external-viewer qualification, runtime closure and comparative overhead measurement |
 
-The full first-slice replay currently reports three solver-trusted obligations
-and `accepted: false`; its binding check reports only matching identities.
+The full first-slice replay reports zero solver-trusted obligations and source
+`accepted: true`; its binding check verifies retained evidence without proof replay.
 [First-slice qualification](docs/language/first-release.md#first-slice-qualification)
-names the residual source obligations and unavailable local CompCert replay.
+retains unavailable local CompCert replay and the external artifact-acceptance joins.
 
 The [completion log](docs/assurance/completion-log.md) records the scoped landing
 evidence. Q25am–aq and the supported-release cells retain their stated entry and
@@ -306,7 +308,8 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 <a id="q25ba"></a>
 
 - [ ] **Q25ba · Accept the synchronous component at the exact-artifact endpoint** · 96 h, range 48–144 · X
-  - **Owner:** `vela-first-slice`. **Start:** Existing validator-specific source/lowering and independently checked first-client core, machine, compiler, security and admission receipts. **Check:** Close the three currently residual source obligations in [first-slice qualification](docs/language/first-release.md#first-slice-qualification), then bind the authored slice to those exact receipts and bytes; independent output, alias/restoration, wrong-operation, stale-input and corruption controls pass. Broader library/general lowering and the second client's receipts are subsequent work. Existing closed source proofs and Sail/C execution receive no second completion credit.
+  - **Owner:** `vela-first-slice`. **Start:** Existing validator-specific source/lowering and independently checked first-client core, machine, compiler, security and admission receipts. **Check:** Retain the closed source proof in [first-slice qualification](docs/language/first-release.md#first-slice-qualification), then bind the authored slice to those exact receipts and bytes; independent output, alias/restoration, wrong-operation, stale-input and corruption controls pass. Broader library/general lowering and the second client's receipts are subsequent work. Existing closed source proofs and Sail/C execution receive no second completion credit.
+  - All three source residuals now kernel-replay within unchanged budgets; [partial evidence](docs/assurance/completion-log.md#q25ba-accept-the-synchronous-component-at-the-exact-artifact-endpoint) closes no source-correspondence or artifact-admission join.
 
 <a id="q25bb"></a>
 
@@ -476,6 +479,7 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 
 - [ ] **Q25ch · Publish qualified compiler inspection services** · 112 h, range 64–160 · I
   - **Owner:** `vela-compiler-services`. **Start:** Qualified frontend/diagnostic producers; backend for lowering views. **Check:** Meet the [inspection contract](docs/tooling/tooling-protocols.md#compiler-inspection-api) with versioned schemas, bounded snapshots/queries, origins, source reconstruction and stale-handle/input refusal in an independent consumer. Shared identities and producer semantics are charged once here and at their existing producers.
+  - The existing pure producer supplies source snapshots and resolved-identifier queries; [partial evidence](docs/assurance/completion-log.md#q25ch-publish-qualified-compiler-inspection-services) retains the wider views and their producer prerequisites.
 
 <a id="q25ci"></a>
 
@@ -516,6 +520,7 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 
 - [ ] **Q25cp · Expose bounded compiler performance traces** · 28 h, range 16–40 · I
   - **Owner:** `vela-traces`. **Start:** Named compiler phases and an independent trace consumer. **Check:** Meet the trace contract for clocks, nesting/workers, overhead and bounded recording; dropped events, truncation and cancellation remain explicit. Compiler timing supplies no emitted-program WCET proof.
+  - The pure compiler records bounded input-bound phase/counter traces; [partial evidence](docs/assurance/completion-log.md#q25cp-expose-bounded-compiler-performance-traces) retains external-viewer qualification and wider measurement coverage.
 
 <a id="q25cq"></a>
 

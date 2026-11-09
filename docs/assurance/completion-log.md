@@ -412,7 +412,7 @@ once, the ordered-local repair and the intended sequencing refusal.
 
 `python tools/run.py vela-parser elaborate-qualify`
 ([tools/toolchain/elaboration_check.py](../../tools/toolchain/elaboration_check.py))
-replays all `142` native parser and Rocq kernel cases (`Case000`..`Case141`) in
+replays all `172` native parser and Rocq kernel cases (`Case000`..`Case171`) in
 `verifiedos-rocq-9.3.0-ocaml-5.4.1` (`rocq 9.3.0`
 `9a2a4eacf47b44c6ec582bc2b9f9cde9de11af77164e0637103fca9865efd5ac`, `rocqchk`
 `46aae2e2a655bec07928a94df91b028bf1eeb899b2df8d8e277d942e57ff5412`), verifying
@@ -1294,10 +1294,10 @@ to the synchronous design:
   `ComputePacketChecksum` and `PrepareAndValidatePacket` exercise fat-arrow
   `match`, `foreach` loops with `invariant`/`decreases` and automatic `ref`
   descriptor preservation (`restores`). The current local harness audits 69
-  exports with `rocq c`, `Print Assumptions` and `rocqchk`. Three obligations
-  remain solver-trusted: `PrepareAndValidatePacket_ensures_0`,
-  `PrepareAndValidatePacket_ensures_2` and `ValidateEmptyPacketOk`, so the
-  receipt reports `accepted: false` and `kernel_checked: false` under
+  exports with `rocq c`, `Print Assumptions` and `rocqchk`, with zero
+  solver-trusted obligations after the
+  [Q25ba source-proof increment](#q25ba-accept-the-synchronous-component-at-the-exact-artifact-endpoint).
+  The receipt reports source `accepted: true` and `kernel_checked: true` under
   [first-slice qualification](../language/first-release.md#first-slice-qualification).
 - Executable functions forbid `Span.AllocZeroed` capability fabrication,
   `in<'a> Span<byte>` record fields forbid mutation, returning a view derived
@@ -1306,7 +1306,7 @@ to the synchronous design:
 - The capacity-invariance gate (`8usize` vs `1_000_000_000usize`) ranges over a
   capacity-wide symbolic loop (`0usize..dst.Length`) with identical obligation
   count (`11`), reduction steps (`0`), work steps (`1478`) and emitted Gallina
-  bytes (`97754`), all 17 schema-2 negative controls fail with `category == "type"`,
+  bytes (`99934`), all 17 schema-2 negative controls fail with `category == "type"`,
   and the purecap `sail_riscv_sim` controls pass. AST-lowered CompCert Clight/C
   and its four perturbed C controls require the currently unavailable local
   CompCert executable.
@@ -1543,13 +1543,91 @@ Late input changes withdraw publication and preserve a failed attempt journal.
 [receipt controls](../../tools/tests/test_vela_first_slice_receipts.py) cover
 stale/missing/corrupt inputs and outputs, malformed records, refusal and CLI
 dispatch. The binding verdict does not authorize source or machine admission.
-The current main replay's retained receipt matches its bytes while reporting
-three solver-trusted source obligations, `accepted: false` and unavailable
-CompCert execution. Its four Sail capability/fault controls pass. The named
-residuals remain prerequisites for Q25ba; receipt matching closes none of them.
+Binding also checks declared source/Gallina/C subjects, required local law,
+contract and scenario coverage, complete assumption queries, solver-trust status
+and required process subjects/verdicts against retained transcripts. Rehashed
+missing coverage, invented source-proof status and altered process records refuse.
+The current replay reports source `accepted: true` with zero solver-trusted
+obligations and unavailable CompCert execution; four Sail capability/fault
+controls pass. Receipt matching does not replay or authenticate these proofs.
 
 Q25ar remains open for external independently checked producer receipts and its
 complete declared coverage. Canonical-machine interpretation, compiler,
 contextual-security and exact-artifact evidence retain their named owners. No
 whole-cell completion credit or additional hours are recorded for this partial
 development delivery.
+
+<a id="q25ba-accept-the-synchronous-component-at-the-exact-artifact-endpoint"></a>
+
+#### Q25ba · Accept the synchronous component at the exact-artifact endpoint
+
+Partial source-proof delivery on 2026-11-09 under
+[first-slice qualification](../language/first-release.md#first-slice-qualification).
+[Inference rollback](../../tools/toolchain/elaborate.py) retains weak-head
+normalization results when restoring an unchanged metavariable state, while
+changed or abandoned solutions still invalidate that cache. The source and its
+intended contracts are unchanged; work/reduction budgets remain 200,000/20,000.
+The three source obligations `PrepareAndValidatePacket_ensures_0`,
+`PrepareAndValidatePacket_ensures_2` and `ValidateEmptyPacketOk` now synthesize
+constructive proof terms within those limits.
+
+Native `vela-parser first-slice` compiles all 69 exports, audits an empty
+solver-trust ledger and runs recursive `rocqchk`; source `accepted` and
+`kernel_checked` are true. All 17 semantic negatives, proof-corruption refusal,
+capacity-invariance checks and four Sail controls pass. Native
+`vela-parser elaborate-qualify` passes 172 cases: 31 accepted libraries with
+zero solver-trust assumptions and 141 intended refusals.
+[Source-proof regression](../../tools/tests/test_vela_first_slice.py) and the
+existing speculative-inference rollback cases preserve the budget and cache
+boundary. Combined local gate and behavioral validation cover integration.
+
+Q25ba remains open: checked source correspondence, concrete canonical-machine
+laws, retained compiler/contextual-security/admission receipts and exact final
+bytes are still missing. Local CompCert execution remains unavailable. No
+whole-cell completion credit or additional hours are recorded for this increment.
+
+<a id="q25ch-publish-qualified-compiler-inspection-services"></a>
+
+#### Q25ch · Publish qualified compiler inspection services
+
+Partial pure-producer delivery on 2026-11-09 under the
+[pure snapshot contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment).
+`vela inspect` exports immutable source-preserving snapshots with schema-1
+provenance, UTF-8 byte spans and snapshot-scoped resolved symbols/references.
+Its bounded symbol-at, symbol-list and reference queries reuse the existing
+isolated pure compiler producer. Source, URI, compiler/dependency, configuration,
+target and cross-snapshot handle changes refuse; limited results report partial
+status. Unsupported and failed/timed-out analysis cannot report reference absence.
+
+Nine [independent consumer cases](../../tools/tests/test_vela_inspection.py)
+validate the machine-checkable response schema, exact Unicode/CRLF reconstruction,
+types and sibling scopes, query/export bounds, invalidation and read-only CLI
+behavior. Combined local gate and behavioral validation cover integration.
+Q25ch remains open for concrete syntax/typed-tree, imports, generated/proof and
+lowering views and their qualified producers. No whole-cell completion credit
+or additional hours are recorded for this development increment.
+
+<a id="q25cp-expose-bounded-compiler-performance-traces"></a>
+
+#### Q25cp · Expose bounded compiler performance traces
+
+Partial pure-producer delivery on 2026-11-09 under the
+[bounded trace contract](../tooling/pure-prototype.md#bounded-compiler-traces).
+`vela trace` records the existing pure producer's parse and combined
+elaboration/emission phases plus byte counters as Chrome Trace Event JSON.
+The manifest binds source, local producer and events/completeness metadata;
+`vela trace-validate` refuses stale inputs and incomplete or malformed recordings.
+Event/byte/nesting bounds, clock faults, dropped events, open spans and
+refused/cancelled work preserve truthful completeness. Publication rechecks source
+and producer identities and preserves existing output on preparation failure.
+
+Eight [trace consumer cases](../../tools/tests/test_vela_compiler_trace.py)
+independently recover a deterministic timeline and cover quantized zero-duration
+boundaries, changed compiler/parser files, malformed data, truncation/refusal,
+clock regression and late-publication freshness. Independent code review found
+and corrected producer-path, timestamp-boundary and publication-freshness gaps.
+Combined `validate --jobs 4` passes the full local gate and all 497 behavioral
+cases; one slow case and seven unavailable-lane cases are explicitly skipped.
+Q25cp remains open for wider phases/workers, pinned external-viewer qualification,
+exact runtime closure and comparative overhead measurement. No whole-cell
+completion credit, emitted-program timing verdict or additional hours are recorded.
