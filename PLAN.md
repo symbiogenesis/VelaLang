@@ -47,6 +47,22 @@ indicator, not a release-readiness claim or elapsed-time forecast. The
 `python tools/run.py check --fix` refreshes it from the checklist and calibration
 record. Update this scope description when the priced backlog changes.
 
+## Current execution
+
+The current parallel work qualifies existing development producers within their
+frozen scope and prepares local receipt integration:
+
+| Slice | Delivered development behavior | Open acceptance boundary |
+| --- | --- | --- |
+| Mathematical elaboration | Guarded `Option`/`Result` propagation preserves Boolean short-circuiting; unsupported effect sequencing is refused under the [elaboration contract](docs/tooling/elaboration-prototype.md#commands-and-acceptance) | General checked source correspondence and machine-connected composition remain with Q25as/at |
+| Pure editor inspection | Worker responses bind the original source digest before fact publication and caching under the [navigation contract](docs/tooling/lsp-prototype.md#pure-navigation-increment) | Wider semantic services retain Q25ch/ci's producer prerequisites |
+| Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
+| Local first-slice receipts | Schema-2 receipts and `first-slice-bindings` check producer, tool, runtime, parser and retained-output identities under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ar remains open for external checked producer receipts and complete declared coverage |
+
+The [completion log](docs/assurance/completion-log.md) records the scoped landing
+evidence. Q25am–aq and the supported-release cells retain their stated entry and
+acceptance predicates; these development increments close no whole release cell.
+
 ## Planning basis and scope
 
 The open cells price the remaining work for the supported synchronous release
@@ -238,6 +254,7 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 
 - [ ] **Q25ar · Integrate and recheck prerequisite producer receipts** · 40 h, range 24–56 · X
   - **Owner:** `producer-receipts`. **Start:** Named local and externally supplied producer revisions. **Check:** Bind each independently checked subset receipt to source closure, canonical model, assumptions, tool versions and target, including review of user-supplied hosted verdicts. Publish first-client receipts before the second trial and close this cell after complete declared coverage. Missing/skipped receipts remain blockers. This task performs local replay and review; hosted execution remains user-managed.
+  - Local first-slice development identities and retained-output binding checks are implemented; [partial evidence](docs/assurance/completion-log.md#q25ar-integrate-and-recheck-prerequisite-producer-receipts) carries no external-producer or artifact-admission verdict.
 
 ### Supported-release implementation
 

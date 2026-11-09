@@ -400,6 +400,16 @@ irrefutable `let` destructuring, `if (cond) a else b` expressions, `expr is Patt
 flow-refined `if (x is Pattern)` and `let Pattern = expr else { ... }` guards,
 and first-class equality/existential proposition proofs.
 
+Boolean `&&`/`||` keep `Option`/`Result` `?` propagation inside the selected
+branch. Independent truth-table, nested-guard and left-propagation controls cover
+the development interpretation; native source proofs cover skipped and taken
+failure exits. Effectful sibling evaluations that cannot be safely sequenced
+before extraction receive an explicit unsupported diagnostic and can be written
+as ordered local bindings under the [elaboration contract](../tooling/elaboration-prototype.md).
+The current local replay passes 172 fixtures with 31 accepted libraries, zero
+solver-trust axioms and recursive `rocqchk`, including effectful guards evaluated
+once, the ordered-local repair and the intended sequencing refusal.
+
 `python tools/run.py vela-parser elaborate-qualify`
 ([tools/toolchain/elaboration_check.py](../../tools/toolchain/elaboration_check.py))
 replays all `142` native parser and Rocq kernel cases (`Case000`..`Case141`) in
@@ -552,6 +562,12 @@ bounded 5-second worker inspection. Independent fixtures in
 function/branch scopes, separate call/value namespaces, inferred types,
 Unicode/newlines, incremental edits and refusal recovery, worker/response limits
 and real stdio sessions.
+
+The isolated inspection transport carries the exact original-source SHA-256
+before facts reach publication or caching. Independent worker and server controls
+refuse missing, malformed and stale bindings, including equal-coordinate source
+edits, and confirm that a refused response leaves retry and cache recovery usable
+([projection tests](../../tools/tests/test_vela_lsp_projection.py)).
 
 [`vela-lsp --qualify-clients`](../../tools/toolchain/lsp_clients.py) qualifies both
 pinned Neovim `0.11.0` and Vim `9.1.2141` + `yegappan/lsp`
@@ -1429,6 +1445,13 @@ Accepted on 2026-11-09 under the [mathematical elaboration contract](../tooling/
    `solver_trusted == []` (`Closed under the global context` via `Print Assumptions`
    and recursive `rocqchk`) across all `28` accepted elaboration libraries (`156`
    total replay fixtures).
+   The replay input identity includes transitively imported local checker sources,
+   the assumption auditor and Python dependency/version owners. An independent
+   import-graph control catches omitted checker inputs. The assumption auditor
+   refuses empty, malformed and unsupported reports, including unexpected
+   continuations; only recognized closed-context reports establish zero axioms
+   ([audit tests](../../tools/tests/test_vela_solver_ledger.py),
+   [input controls](../../tools/tests/test_vela_elaboration_check.py)).
 2. **Schema-2 AST loan lowering and source-site mapping:**
    [loans.py](../../tools/toolchain/loans.py) extends `_FunctionLowerer` and
    `LoweredFunction` across `vela_parser` schema-2 AST node shapes (`module`,
@@ -1503,3 +1526,27 @@ Accepted on 2026-11-09 under the [mathematical elaboration contract](../tooling/
 The original 12 h estimate, range 8–16, is retained with `n/a` calibration columns.
 
 Landed: Tier A. Full review of consuming `owned`/`move` elaboration, general `in`/`ref` runtime value loans, closed `effects` (`reads`/`writes`/`calls`/`none`) checking, and 166-fixture zero-axiom Rocq kernel replay.
+
+<a id="q25ar-integrate-and-recheck-prerequisite-producer-receipts"></a>
+
+#### Q25ar · Integrate and recheck prerequisite producer receipts
+
+Partial delivery on 2026-11-09 under the
+[first-slice qualification contract](../language/first-release.md#first-slice-qualification):
+[first_slice.py](../../tools/toolchain/first_slice.py) publishes schema-2
+development receipts binding the producer revision, local implementation and
+dependency inputs, parser outputs, locked prover/runtime, interpreter,
+simulator/profile, optional CompCert executable and retained outputs/transcripts.
+Late input changes withdraw publication and preserve a failed attempt journal.
+`vela-parser first-slice-bindings` checks retained identities with
+`proof_replayed: false`, `artifact_accepted: false` and
+`production_admission: false`. Independent
+[receipt controls](../../tools/tests/test_vela_first_slice_receipts.py) cover
+stale/missing/corrupt inputs and outputs, malformed records, refusal and CLI
+dispatch. The binding verdict does not authorize source or machine admission.
+
+Q25ar remains open for external independently checked producer receipts and its
+complete declared coverage. Canonical-machine interpretation, compiler,
+contextual-security and exact-artifact evidence retain their named owners. No
+whole-cell completion credit or additional hours are recorded for this partial
+development delivery.
