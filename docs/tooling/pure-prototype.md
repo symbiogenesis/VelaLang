@@ -356,8 +356,13 @@ as an input to its viewer. No external viewer is qualified by this increment.
 
 The `vela` schema-1 manifest binds events and completeness metadata, exact source
 bytes, local Python/compiler/parser input files and Python/platform versions.
+The producer identity also binds the Python and opam lock owners, the command
+bootstrap, host Python executable bytes and the checked parser executable bytes
+validated against its build receipt. On Windows it observes the selected WSL
+parser and guest Python executable in the same checkout. Identity observation
+lies outside the measured intervals; unavailable or changed executables refuse.
 These hashes detect changed data; they authenticate no producer and carry no
-exact native-runtime, theorem or artifact-admission verdict. The validation
+complete installed-library/operating-system closure, theorem or artifact-admission verdict. The validation
 command refuses changed source or producer identities, malformed events, crossing
 spans, invalid clocks, missing phases or counters, and incomplete recordings.
 A successful complete recording measures a successful pure check only.
@@ -367,7 +372,8 @@ limit. Phase names, counters, nesting and exported/decoded bytes have fixed boun
 Dropped events, open spans, clock faults and refused or cancelled work prevent a
 complete measurement claim. A refused source writes a diagnostic trace and returns
 failure. Publication is atomic, refuses source aliases and rechecks source and
-producer freshness; failed preparation preserves an existing output. The manifest
+producer freshness; failed preparation preserves an existing output. Validation
+also rechecks producer freshness after reading the recording. The manifest
 reports measured recorder bookkeeping in nanoseconds, excluding identity hashing,
 serialization and file publication. No hard elapsed-time overhead bound is claimed.
 

@@ -5,9 +5,12 @@ import hashlib
 import json
 import platform
 import re
+import subprocess
+import sys
 import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from importlib import import_module
 from pathlib import Path
 from typing import cast
 
@@ -30,16 +33,63 @@ def _digest(value: object) -> str:
     return hashlib.sha256(_encoded(value)).hexdigest()
 
 
+def _python_identity() -> Object:
+    return {"executable_sha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),
+            "version": sys.version, "implementation": platform.python_implementation(),
+            "platform": platform.system(), "machine": platform.machine()}
+
+
+def _native_runtime_identity() -> Object:
+    """Observe the checked parser's validated executable outside measured intervals."""
+    checked = import_module("toolchain.parser_checked")
+    compiled = checked.ensure_checked_build()
+    parser_digest = hashlib.sha256(compiled.executable.read_bytes()).hexdigest()
+    outputs = cast("dict[str, str]", compiled.receipt["generated_sha256"])
+    if parser_digest != outputs["vela-parser"]:
+        raise ValueError("checked parser executable changed during runtime observation")
+    return {"python": _python_identity(),
+            "parser_sha256": parser_digest}
+
+
+def _runtime_identity(root: Path) -> Object:
+    if sys.platform == "linux":
+        return _native_runtime_identity()
+    if sys.platform != "win32":
+        raise ValueError("unsupported trace runtime platform")
+    script = ("import json, sys; sys.path.insert(0, 'tools'); "
+              "from toolchain.compiler_trace import _native_runtime_identity; "
+              "print(json.dumps(_native_runtime_identity(), sort_keys=True))")
+    try:
+        result = subprocess.run(
+            ["wsl", "-u", "root", "-e", "/usr/bin/env", "OPAMROOT=/root/.opam",
+             "/root/build/venv-linux/bin/python", "-c", script],
+            cwd=root, stdin=subprocess.DEVNULL, capture_output=True, check=False, timeout=180)
+    except subprocess.SubprocessError as error:
+        raise ValueError("checked parser runtime identity is unavailable") from error
+    if result.returncode or len(result.stdout) > 8192:
+        raise ValueError("checked parser runtime identity is unavailable")
+    descriptor = json.loads(result.stdout, object_pairs_hook=unique_object)
+    if (not isinstance(descriptor, dict) or set(descriptor) != {"python", "parser_sha256"}
+            or not isinstance(descriptor["python"], dict)
+            or set(descriptor["python"]) != {"executable_sha256", "version", "implementation", "platform", "machine"}
+            or any(not isinstance(value, str) or not value for value in descriptor["python"].values())
+            or not _SHA256.fullmatch(descriptor["python"]["executable_sha256"])
+            or not isinstance(descriptor["parser_sha256"], str)
+            or not _SHA256.fullmatch(descriptor["parser_sha256"])):
+        raise ValueError("malformed checked parser runtime identity")
+    return cast("Object", descriptor)
+
+
 def producer_identity() -> str:
-    """Bind local implementation, parser input closure, and Python runtime version."""
+    """Bind local implementation, dependency locks and selected runtime executables."""
     root = Path(__file__).resolve().parents[1]
     paths = sorted((root / "toolchain").rglob("*.py"))
     paths.extend(sorted((root / "toolchain" / "parser").glob("*")))
+    owners = ("run.py", "pyproject.toml", "uv.lock", "opam/rocq.lock", "opam/sail.lock")
     inputs = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in paths if path.is_file()}
-    return _digest({"files": inputs, "python": platform.python_version(),
-                    "implementation": platform.python_implementation(),
-                    "platform": platform.system(), "machine": platform.machine()})
+    inputs.update({name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in owners})
+    return _digest({"files": inputs, "host": _python_identity(), "native": _runtime_identity(root.parent)})
 
 
 class Recorder:

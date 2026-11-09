@@ -113,6 +113,7 @@ def _trace(args: argparse.Namespace) -> int:
                 data = stream.read(compiler_trace.MAX_TRACE_BYTES + 1)
             compiler_trace.validate(compiler_trace.decode(data), source.data, producer)
             _unchanged(source)
+            _producer_unchanged(producer, "during trace validation")
             print("ok vela: complete pure compiler recording; no program timing verdict")
             return 0
         _destination(source_path, args.output)

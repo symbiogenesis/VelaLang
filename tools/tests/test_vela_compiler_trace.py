@@ -4,6 +4,7 @@
 import copy
 import hashlib
 import json
+import subprocess
 import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -14,6 +15,8 @@ from unittest.mock import patch
 import toolchain as vela
 from tests.harness import Case, ensure
 from toolchain import compiler_trace as trace
+from toolchain import parser as vela_parser
+from toolchain import parser_checked
 from toolchain.cli import vela as cli
 
 INDEPENDENT_CASES = True
@@ -175,13 +178,73 @@ def _producer_file_freshness() -> None:
         parser = module.parent / "parser" / "parser.mly"
         parser.parent.mkdir()
         parser.write_text("first grammar", encoding="utf-8")
-        with patch.object(trace, "__file__", str(module)):
+        owners = [module.parents[1] / name for name in (
+            "run.py", "pyproject.toml", "uv.lock", "opam/rocq.lock", "opam/sail.lock")]
+        for path in owners:
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(b"first dependency owner")
+        runtime: trace.Object = {"parser_sha256": "a" * 64}
+        with patch.object(trace, "__file__", str(module)), \
+                patch.object(trace, "_runtime_identity", return_value=runtime):
             first = trace.producer_identity()
             module.write_text("changed implementation", encoding="utf-8")
             second = trace.producer_identity()
             parser.write_text("changed grammar", encoding="utf-8")
             third = trace.producer_identity()
             ensure(len({first, second, third}) == 3, "producer closure ignores Python or parser inputs")
+            previous = third
+            for path in owners:
+                path.write_bytes(b"changed dependency owner")
+                current = trace.producer_identity()
+                ensure(current != previous, f"producer closure ignores {path.name}")
+                previous = current
+            runtime["parser_sha256"] = "b" * 64
+            ensure(trace.producer_identity() != previous, "native runtime change retained producer identity")
+            owners[0].unlink()
+            try:
+                trace.producer_identity()
+            except OSError:
+                pass
+            else:
+                raise AssertionError("missing dependency owner silently omitted from identity")
+
+
+def _runtime_executable_identity() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-trace-runtime-") as directory:
+        executable = Path(directory) / "python"
+        executable.write_bytes(b"first interpreter")
+        with patch.object(trace.sys, "executable", str(executable)):
+            first = trace._python_identity()
+            executable.write_bytes(b"changed interpreter")
+            ensure(trace._python_identity() != first, "same-version interpreter bytes omitted")
+        parser = Path(directory) / "vela-checked-parser"
+        parser.write_bytes(b"native parser")
+        digest = hashlib.sha256(parser.read_bytes()).hexdigest()
+        compiled = vela_parser.Build(Path(directory), parser, {"generated_sha256": {"vela-parser": digest}})
+        with patch.object(parser_checked, "ensure_checked_build", return_value=compiled):
+            native = trace._native_runtime_identity()
+            ensure(native["parser_sha256"] == digest, "native executable bytes omitted")
+            parser.write_bytes(b"changed after build observation")
+            try:
+                trace._native_runtime_identity()
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("late native executable mutation accepted")
+        with patch.object(trace.sys, "platform", "win32"):
+            result = subprocess.CompletedProcess(["wsl"], 0, json.dumps(native).encode(), b"")
+            with patch.object(trace.subprocess, "run", return_value=result) as launch:
+                ensure(trace._runtime_identity(Path(directory)) == native, "guest runtime identity differs")
+                ensure(launch.call_args.kwargs["cwd"] == Path(directory), "guest identity uses another checkout")
+            for raw in (b"{}", b'{"python":{},"parser_sha256":"bad"}',
+                        b'{"python":{},"python":{},"parser_sha256":"bad"}', b"[]", b"x" * 8193):
+                with patch.object(trace.subprocess, "run", return_value=subprocess.CompletedProcess(["wsl"], 0, raw, b"")):
+                    try:
+                        trace._runtime_identity(Path(directory))
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError("malformed guest identity accepted")
 
 
 def _compiler_and_command() -> None:
@@ -200,6 +263,9 @@ def _compiler_and_command() -> None:
             ensure(run("trace-validate", str(output), "--source", str(source)) == 0, "trace validation failed")
             ensure(source.read_bytes() == SOURCE, "tracing edited source")
             previous = output.read_bytes()
+            with patch.object(trace, "producer_identity", side_effect=[PRODUCER, "b" * 64]):
+                ensure(run("trace-validate", str(output), "--source", str(source)) == 1,
+                       "producer changed during validation without refusal")
             ensure(run("trace", str(source), "--output", str(source)) == 1, "source alias permitted")
             ensure(run("trace", str(source), "--output", str(output), "--max-events", "0") == 1, "invalid bound permitted")
             ensure(output.read_bytes() == previous, "failed preparation replaced trace")
@@ -223,4 +289,5 @@ def cases() -> list[Case]:
             Case("quantized-zero-spans-and-inclusive-endpoints", _quantized_boundaries),
             Case("bounded-strict-json", _bounded_decoder),
             Case("producer-python-and-parser-freshness", _producer_file_freshness),
+            Case("host-and-guest-runtime-executable-identities", _runtime_executable_identity),
             Case("same-compiler-output-and-read-only-command", _compiler_and_command)]
