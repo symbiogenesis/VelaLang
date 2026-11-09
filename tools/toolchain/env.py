@@ -170,7 +170,12 @@ class Environment:
     @property
     def profile(self) -> Path:
         """Frozen profile configuration passed to the simulator."""
-        return self.model / PROFILE_CONFIG
+        candidate = self.model / PROFILE_CONFIG
+        if not candidate.is_file():
+            built = self.build_dir / PROFILE_CONFIG
+            if built.is_file():
+                return built
+        return candidate
 
     @property
     def log_dir(self) -> Path:

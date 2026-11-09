@@ -1534,8 +1534,9 @@ def _qualify_attempt(
     c_path = directory / "first_slice.c"
     c_path.write_text(c_source, encoding="utf-8", newline="\n")
 
-    profile = root / "model" / env.PROFILE_CONFIG
-    sim_path = env.load(toolchain=False).simulator
+    loaded_env = env.load(toolchain=False)
+    profile = loaded_env.profile
+    sim_path = loaded_env.simulator
     if not sim_path.is_file():
         raise ValueError(f"Sail emulator not found at {sim_path}; run `python tools/run.py model build`")
     simulator = [str(sim_path)]
