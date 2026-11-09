@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from toolchain import MAX_SOURCE_BYTES, VelaError, compiler_trace, translate
+from toolchain import MAX_SOURCE_BYTES, VelaError, compiler_trace, trace_benchmark, translate
 from toolchain.atomic import atomic_path
 from toolchain.authoring import LINT_CODES, format_source, lint_source
 from toolchain.generated_tests import (
@@ -147,6 +147,46 @@ def _trace(args: argparse.Namespace) -> int:
         return result
 
 
+def _producer_unchanged(producer: str, when: str) -> None:
+    if compiler_trace.producer_identity() != producer:
+        raise OSError(f"compiler inputs changed {when}")
+
+
+def _trace_benchmark(args: argparse.Namespace) -> int:
+    source_path = args.source
+    try:
+        source = _read_source(source_path)
+        producer = compiler_trace.producer_identity()
+        if args.command == "trace-benchmark-validate":
+            with args.report.open("rb") as stream:
+                data = stream.read(trace_benchmark.MAX_REPORT_BYTES + 1)
+            trace_benchmark.validate(trace_benchmark.decode(data), source.data, producer)
+            _unchanged(source)
+            _producer_unchanged(producer, "during benchmark validation")
+            print("ok vela: bound tracing comparison; no overhead bound or program timing verdict")
+            return 0
+        _destination(source_path, args.output)
+        report = trace_benchmark.measure(source.data, producer, samples=args.samples,
+                                         warmups=args.warmups)
+        _unchanged(source)
+        _producer_unchanged(producer, "during benchmark")
+        _destination(source_path, args.output)
+        with atomic_path(args.output) as pending:
+            pending.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
+                               encoding="utf-8", newline="")
+            _unchanged(source)
+            _producer_unchanged(producer, "before benchmark publication")
+    except VelaError as error:
+        print(f"{source_path}:{error.line}:{error.column}: {error.kind}: {error.message}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError) as error:
+        print(f"{source_path}:1:1: trace-benchmark: {error}", file=sys.stderr)
+        return 1
+    else:
+        print(f"vela: {args.output}: {args.samples} tracing comparison pairs")
+        return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(suggest_on_error=True, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -176,6 +216,15 @@ def main(argv: list[str] | None = None) -> int:
     trace_validation = commands.add_parser("trace-validate", help="refuse incomplete or stale compiler traces")
     trace_validation.add_argument("trace", type=Path)
     trace_validation.add_argument("--source", type=Path, required=True)
+    benchmark = commands.add_parser("trace-benchmark", help="compare plain and traced pure compilation")
+    benchmark.add_argument("source", type=Path)
+    benchmark.add_argument("--output", type=Path, required=True)
+    benchmark.add_argument("--samples", type=int, default=trace_benchmark.DEFAULT_SAMPLES)
+    benchmark.add_argument("--warmups", type=int, default=trace_benchmark.DEFAULT_WARMUPS)
+    benchmark_validation = commands.add_parser(
+        "trace-benchmark-validate", help="refuse stale or inconsistent tracing comparisons")
+    benchmark_validation.add_argument("report", type=Path)
+    benchmark_validation.add_argument("--source", type=Path, required=True)
     generated = commands.add_parser(
         "generated-tests",
         help="qualify isolated Hypothesis generated development tests (Q25x)",
@@ -191,6 +240,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command in {"trace", "trace-validate"}:
         return _trace(args)
+    if args.command in {"trace-benchmark", "trace-benchmark-validate"}:
+        return _trace_benchmark(args)
     if args.command == "generated-tests":
         root = Path(__file__).resolve().parents[3]
         try:

@@ -339,6 +339,8 @@ Create the destination directory, then run:
 ```console
 python tools/run.py vela trace examples/pure.vela --output out/pure-trace.json
 python tools/run.py vela trace-validate out/pure-trace.json --source examples/pure.vela
+python tools/run.py vela trace-benchmark examples/pure.vela --output out/pure-trace-comparison.json
+python tools/run.py vela trace-benchmark-validate out/pure-trace-comparison.json --source examples/pure.vela
 ```
 
 The read-only trace command records `compile`, nested `parse` and
@@ -369,9 +371,36 @@ producer freshness; failed preparation preserves an existing output. The manifes
 reports measured recorder bookkeeping in nanoseconds, excluding identity hashing,
 serialization and file publication. No hard elapsed-time overhead bound is claimed.
 
+The comparative benchmark runs both plain and traced translation in alternating
+pairs in the same host process, including checked-parser wait time. It defaults to
+one warmup pair followed by seven measured pairs; `--warmups` accepts 0–5 and
+`--samples` accepts 1–31. Every translation must emit the same module and Gallina,
+and every traced run must pass complete-recording validation. Only translation
+lies inside the measured intervals: recorder construction, trace export and
+validation, identity hashing and report publication are excluded. Warmup intervals
+are discarded, while compiler caches and operating-system scheduling remain part
+of the observed conditions. The command bounds compilation count and report size;
+it establishes no hard elapsed-time bound or stable overhead threshold.
+
+The separate schema-1 comparison report retains each pair's execution order,
+elapsed nanoseconds and traced bookkeeping, output identity, source and producer
+bindings, and exact summaries. Totals, minima, maxima and medians summarize each
+path; an even-sample median rounds down to whole nanoseconds. `elapsed_delta_ns`
+is traced total minus plain total. `overhead_ppm` is that difference divided by
+plain total in parts per million, rounded down; a zero plain total reports `null`.
+Negative observations are retained without claiming that instrumentation improves
+performance. Validation recomputes summaries and refuses stale identities,
+changed samples, invalid durations, incorrect pair order and malformed reports.
+Refused, cancelled or stale measurements preserve an existing report. A hash-bound
+report detects changed data and supplies no authentication of the measurement or
+its environment.
+
 [Independent timeline fixtures](../../tools/tests/test_vela_compiler_trace.py)
 recover expected order, durations, nesting and counters with a separate JSON reader
-and exercise corruption, overflow, clock and refusal controls. Wider phase/worker
-coverage, pinned external-viewer qualification, exact runtime closure and comparative
-overhead measurements remain open under Q25cp. Compiler timings supply no execution
-time, WCET or constant-time evidence for emitted programs.
+and exercise corruption, overflow, clock and refusal controls.
+[Paired-measurement fixtures](../../tools/tests/test_vela_trace_benchmark.py) check
+independently chosen timing totals, warmup exclusion, output equivalence, binding
+and publication refusals. Wider phase/worker coverage, pinned external-viewer
+qualification, exact runtime closure and workload-specific overhead qualification
+remain open under Q25cp. Compiler timings supply no execution time, WCET or
+constant-time evidence for emitted programs.
