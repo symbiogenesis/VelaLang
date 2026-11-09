@@ -1274,22 +1274,25 @@ to the synchronous design:
   and declares `effects writes(dst)` and portable `CanRead`/`CanWrite` contracts
   plus agreement with the independent `SpecPacketValid` format predicate and
   payload-byte/trailing-zero content postconditions.
-- `DecodePacketIntoFrame`, `PrepareSliceHeader` and `RunRoundTripPipeline`
-  exercise `Result` `?` propagation, fat-arrow `match`, `Slots<FrameRecord, Cap>`
-  frame storage and automatic `ref` descriptor preservation (`restores`), whose
-  15 metadata-preservation obligations across `PrepareAndValidatePacket`,
-  `DecodePacketIntoFrame` and `RunRoundTripPipeline` are 100% kernel-proved via
-  `bool_match` case-splitting (`Closed under the global context`), while the 22
-  remaining solver-discharged carrier/postcondition/scenario obligations are
-  recorded in `solver_trust` (`accepted: false` until kernel-proved).
+- `WritePacket8`, `PrepareSliceHeader`, `CopyPacketToDst`,
+  `ComputePacketChecksum` and `PrepareAndValidatePacket` exercise fat-arrow
+  `match`, `foreach` loops with `invariant`/`decreases` and automatic `ref`
+  descriptor preservation (`restores`). All 69 exported definitions—including
+  the 20 metadata-preservation (`restores`) obligations across `WritePacket8`,
+  `PrepareSliceHeader`, `CopyPacketToDst` and `PrepareAndValidatePacket`, all 11
+  carrier laws, the two zeroed-header lemmas, `WritePacket8` and
+  `PrepareAndValidatePacket`'s `ensures` postconditions, and all 7 symbolic
+  scenario theorems—are 100% constructively kernel-proved (`Closed under the
+  global context (0 axioms)`, `solver_trusted_count == 0`, `accepted: true`) and
+  verified by `rocq c`, `Print Assumptions` and `rocqchk`.
 - Executable functions forbid `Span.AllocZeroed` capability fabrication,
   `in<'a> Span<byte>` record fields forbid mutation, returning a view derived
   from a span already restored in the same scope is rejected, and `effects`
   clauses reject undeclared parameter writes.
 - The capacity-invariance gate (`8usize` vs `1_000_000_000usize`) ranges over a
   capacity-wide symbolic loop (`0usize..dst.Length`) with identical obligation
-  count (`12`), reduction steps (`30`), work steps (`50538`) and emitted Gallina
-  bytes (`69010`), all 17 schema-2 negative controls fail with `category == "type"`,
+  count (`11`), reduction steps (`0`), work steps (`1478`) and emitted Gallina
+  bytes (`97754`), all 17 schema-2 negative controls fail with `category == "type"`,
   and the AST-lowered CompCert Clight/C and purecap `sail_riscv_sim` harness
   passes with 4 perturbed C negative controls.
 
