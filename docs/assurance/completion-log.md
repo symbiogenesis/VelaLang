@@ -1359,3 +1359,41 @@ The original 12 h estimate, range 8–16, is retained because authoring interval
 were shared across the Q25af–Q25ai batch; both calibration columns remain `n/a`.
 
 Landed: Tier A. Full review of the compact language reference, extension-dossier separation, and first-release authoring-cost documentation.
+
+<a id="q25aj-unify-vela-playground-assets-single-source-grammar-sync-and-single-pass-worker-execution"></a>
+
+#### Q25aj · Unify Vela playground assets, single-source grammar sync, and single-pass worker execution
+
+Accepted on 2026-11-08 under the [playground architecture contract](../tooling/playground.md#single-source-unification-and-worker-efficiency):
+
+1. **Single canonical asset root (`docs/`):**
+   [PlaygroundServer](../../tools/toolchain/playground.py) serves `docs/index.html`,
+   `docs/app.mjs` and `docs/style.css` directly, retiring the 11,180-line duplicate
+   asset mirror under `tools/toolchain/playground/`. The static check gate
+   ([checks.py](../../tools/toolchain/checks.py)) verifies DOM/example bindings on
+   `docs/` and refuses any reintroduced `tools/toolchain/playground/*` files.
+2. **Single-pass worker evaluation and stat-cached binary identity:**
+   [tools/toolchain/__init__.py](../../tools/toolchain/__init__.py) caches a fresh
+   copy of the elaborated pure module environment from `translate(source)` by
+   `(source, budget_key)` so `evaluate(source, expression, value_type)` in
+   [playground_worker.py](../../tools/toolchain/playground_worker.py) evaluates
+   expressions in one pass without spawning `vela-checked-parser` and re-elaborating
+   `source` a second time. [mathematical.py](../../tools/toolchain/mathematical.py)
+   caches `vela_parser.Build` by `(parser, st_mtime_ns, st_size, st_ino)` across
+   unchanged native parser invocations while preserving fail-closed refusal when the
+   executable changes.
+3. **Exact `Corelib` Gallina, `Q25ah` syntax, Web Crypto, and `lexer.mll` parity:**
+   [docs/app.mjs](../app.mjs) replaces custom bitwise SHA-256 with Web Crypto
+   `crypto.subtle.digest("SHA-256", ...)`, emits canonical `Corelib.Init.Datatypes`
+   and `Corelib.Init.Nat` Gallina (`Module Vela_<name>.`, `Definition c_<name>`,
+   `Definition f_<name>`, `const` parameter specialization) matching
+   [tools/toolchain/__init__.py](../../tools/toolchain/__init__.py), enforces
+   `Q25ah`'s mandatory `let`/`var` local binding rule in `MathParser.parseStatement`,
+   and reuses the elaborated pure evaluator in `browserApi("/api/evaluate", ...)`.
+   [test_vela_playground_math.py](../../tools/tests/test_vela_playground_math.py)
+   verifies differential compilation and evaluation parity between `browserApi` and
+   `playground_worker.compile_request`.
+
+The original 8 h estimate, range 6–12, is retained with `n/a` calibration columns.
+
+Landed: Tier A. Full review of the unified `docs/` asset root, single-pass worker evaluation, and differential `browserApi` / `playground_worker` parity.
