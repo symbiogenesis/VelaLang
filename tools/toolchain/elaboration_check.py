@@ -597,6 +597,39 @@ public lemma StepTwiceCheck()
     ensures StepTwice(5) == 7
     proof { assert StepTwice(5) == 7; }
 """),
+        ("interface-name-and-arity-resolution", """module InterfaceResolutionReplay;
+public interface Unary<T> { T Advance(T x); }
+public interface Binary<T> { T Advance(T x, T y); }
+public impl Unary<Nat> { public definition Nat Advance(Nat x) => x + 1; }
+public impl Binary<Nat> { public definition Nat Advance(Nat x, Nat y) => x + y; }
+public definition Nat UnaryCall() => Advance(5);
+public definition Nat BinaryCall() => Advance(5, 3);
+public definition Nat Receiver(Nat x) => x.Advance();
+public definition Nat ReceiverBinary(Nat x) => x.Advance(3);
+public interface First<T> { T Step(T x); }
+public interface Second<T> { T Step(T x); }
+public impl First<Nat> { public definition Nat Step(Nat x) => x + 1; }
+public impl Second<bool> { public definition bool Step(bool x) => x; }
+public definition Nat Number() => First.Step(5);
+public definition bool Flag() => Second.Step(true);
+public record Callbacks(Fn(Nat value) -> Nat Invoke);
+public definition Nat Apply(Callbacks callbacks) => callbacks.Invoke(5);
+public lemma Values()
+    ensures UnaryCall() == 6
+    ensures BinaryCall() == 8
+    ensures Receiver(5) == 6
+    ensures ReceiverBinary(5) == 8
+    ensures Number() == 6
+    ensures Flag() == true
+    proof {
+        assert UnaryCall() == 6;
+        assert BinaryCall() == 8;
+        assert Receiver(5) == 6;
+        assert ReceiverBinary(5) == 8;
+        assert Number() == 6;
+        assert Flag() == true;
+    }
+"""),
         ("source-bound-borrows-disjoint-fields-and-mutation-invalidation", """module SourceBoundBorrowsReplay;
 public record Window(u32 Low, u32 High)
     invariant Ordered: Low <= High
@@ -880,6 +913,21 @@ public Nat RoundTripOwned()
         ("interface-missing-law",
          "public interface Lawful<T> { T Act(T x); lemma SelfEq(T x) ensures Act(x) == Act(x); } "
          "public impl Lawful<Nat> { public definition Nat Act(Nat x) => x; }", "type"),
+        ("interface-ambiguous-unqualified-method",
+         "public interface First<T> { T Step(T x); } public interface Second<T> { T Step(T x); } "
+         "public impl First<Nat> { public definition Nat Step(Nat x) => x + 1; } "
+         "public impl Second<Nat> { public definition Nat Step(Nat x) => x + 2; } "
+         "public definition Nat Wrong(Nat x) => Step(x);", "type"),
+        ("interface-ambiguous-receiver-method-reordered",
+         "public interface Second<T> { T Step(T x); } public interface First<T> { T Step(T x); } "
+         "public impl Second<Nat> { public definition Nat Step(Nat x) => x + 2; } "
+         "public impl First<Nat> { public definition Nat Step(Nat x) => x + 1; } "
+         "public definition Nat Wrong(Nat x) => x.Step();", "type"),
+        ("interface-disjoint-types-require-qualification",
+         "public interface First<T> { T Step(T x); } public interface Second<T> { T Step(T x); } "
+         "public impl First<Nat> { public definition Nat Step(Nat x) => x + 1; } "
+         "public impl Second<bool> { public definition bool Step(bool x) => x; } "
+         "public definition Nat Wrong(Nat x) => Step(x);", "type"),
         ("interface-unsatisfied-where",
          "public interface Steppable<T> { T Step(T x); } "
          "public definition T UseStep<T>(T x) where Steppable(type T) => Steppable.Step(x); "

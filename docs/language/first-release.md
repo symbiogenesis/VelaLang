@@ -240,6 +240,14 @@ instances or explicit dictionary parameters; adding an unrelated dependency
 cannot change a selected implementation. Required laws are checked fields of
 that dictionary, not facts obtained by finding its name.
 
+An unqualified interface method name or receiver call must identify one visible
+interface by method name and source argument count, counting the receiver as
+the first argument. If several interfaces remain, qualify the call as
+`Interface.Method(...)`, including when their implementations accept disjoint
+argument types. Argument types, result types, contracts and declaration/import
+order do not choose between interface names. After choosing the interface, its
+ordinary type, instance and contract checks still apply.
+
 Public signatures specify generic and required-static parameters, result types,
 effects, call modes, transitive capture constraints, pre/postconditions and
 resource exits. Private representations stay abstract except through explicit

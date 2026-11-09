@@ -38,6 +38,34 @@ if TYPE_CHECKING:
 
 
 class _IntrinsicsMixin:
+    def _select_interface_method_call(
+        self: _Elaborator,
+        node: Node,
+        candidates: list[_InterfaceInfo],
+        method: str,
+        gen_args: list[Node],
+        receiver: _Binding | None,
+        call_args: list[Node],
+        environment: dict[str, _Binding],
+    ) -> _Binding:
+        candidates = list({id(iface): iface for iface in candidates}.values())
+        if len(candidates) > 1:
+            arity = len(call_args) + (receiver is not None)
+            candidates = [
+                iface for iface in candidates
+                if (0 if iface.methods[method].nullary else len(iface.methods[method].param_vars)) == arity
+            ]
+        if not candidates:
+            raise self.fail("type", f"no interface method '{method}' accepts this argument count", node)
+        if len(candidates) > 1:
+            raise self.fail(
+                "type", f"ambiguous interface method '{method}'; qualify the call as Interface.{method}(...)", node
+            )
+        iface = candidates[0]
+        return self._elaborate_interface_method_call(
+            node, iface, iface.methods[method], gen_args, receiver, call_args, environment
+        )
+
     def _root_span(self: _Elaborator, span_term: _Term) -> _Term:
         curr = self.whnf(span_term)
         while curr.kind == "app":
@@ -1976,8 +2004,15 @@ class _IntrinsicsMixin:
                         f"nullary union constructor '{full_callee_path}' must be written bare without '()' (write '{full_callee_path}')",
                         node,
                     )
+                if (
+                    full_callee_path is not None
+                    and full_callee_path.split(".", 1)[0] not in environment
+                    and (full_callee_path in self.globals or full_callee_path in self.inaccessible_private_symbols)
+                ):
+                    return self.apply(self.expression(callee, environment), call_args, environment)
                 receiver = self.node(base_callee["value"])
                 member_name = self.name(base_callee["name"])
+                recv_for_method: _Binding | None = None
                 if (
                     receiver["kind"] == "name"
                     and self.name(receiver["name"]) in self.interfaces
@@ -2128,6 +2163,7 @@ class _IntrinsicsMixin:
                         or member_name in {"LivePrefix", "VacantRange", "VacantSuffix", "PrefixModel", "Read", "Write"}
                     ):
                         recv_b = self.expression(receiver, environment)
+                        recv_for_method = recv_b
                         if self._int_spec(recv_b.type) is not None and member_name in _INT_INTRINSICS:
                             return self._elaborate_int_intrinsic(
                                 member_name, call_args, environment, node, receiver=recv_b
@@ -2145,69 +2181,44 @@ class _IntrinsicsMixin:
                             return self._elaborate_slots_intrinsic(
                                 node, member_name, gen_args, call_args, environment, receiver=recv_b
                             )
-                saved_recv_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                recv_for_method: _Binding | None = None
-                try:
+                if recv_for_method is None:
                     recv_for_method = self.expression(receiver, environment)
-                except Exception:
-                    self.restore_metas(saved_recv_m)
-                if recv_for_method is not None:
-                    rm_head, rm_targs = self.spine(self.whnf(recv_for_method.type))
-                    if (
-                        rm_head.kind == "const"
-                        and isinstance(rm_head.value, str)
-                        and rm_head.value in self.records_by_type
-                        and member_name in self.records_by_type[rm_head.value].methods
-                    ):
-                        rinfo = self.records_by_type[rm_head.value]
-                        rmethod = rinfo.methods[member_name]
-                        return self._elaborate_record_method_call(
-                            node,
-                            rinfo,
-                            rmethod,
-                            rm_targs,
-                            recv_for_method,
-                            gen_args,
-                            call_args,
-                            environment,
-                            recv_node=receiver,
-                        )
-                    candidate_ifaces = [
-                        iface
-                        for iface in self.interfaces.values()
-                        if member_name in iface.methods
-                        and not iface.methods[member_name].nullary
-                        and len(iface.methods[member_name].param_vars) == 1 + len(call_args)
-                    ]
-                    if len(candidate_ifaces) == 1:
-                        iface = candidate_ifaces[0]
-                        return self._elaborate_interface_method_call(
-                            node,
-                            iface,
-                            iface.methods[member_name],
-                            gen_args,
-                            recv_for_method,
-                            call_args,
-                            environment,
-                        )
-                    if len(candidate_ifaces) > 1:
-                        for iface in candidate_ifaces:
-                            saved_try_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                            saved_try_f = list(self.active_facts)
-                            try:
-                                return self._elaborate_interface_method_call(
-                                    node,
-                                    iface,
-                                    iface.methods[member_name],
-                                    gen_args,
-                                    recv_for_method,
-                                    call_args,
-                                    environment,
-                                )
-                            except Exception:
-                                self.restore_metas(saved_try_m)
-                                self.active_facts = saved_try_f
-                    self.restore_metas(saved_recv_m)
+                rm_head, rm_targs = self.spine(self.whnf(recv_for_method.type))
+                if (
+                    rm_head.kind == "const"
+                    and isinstance(rm_head.value, str)
+                    and rm_head.value in self.records_by_type
+                    and member_name in self.records_by_type[rm_head.value].methods
+                ):
+                    rinfo = self.records_by_type[rm_head.value]
+                    rmethod = rinfo.methods[member_name]
+                    return self._elaborate_record_method_call(
+                        node,
+                        rinfo,
+                        rmethod,
+                        rm_targs,
+                        recv_for_method,
+                        gen_args,
+                        call_args,
+                        environment,
+                        recv_node=receiver,
+                    )
+                candidate_ifaces = [
+                    iface
+                    for iface in self.interfaces.values()
+                    if member_name in iface.methods
+                    and not iface.methods[member_name].nullary
+                    and len(iface.methods[member_name].param_vars) == 1 + len(call_args)
+                ]
+                if candidate_ifaces:
+                    return self._select_interface_method_call(
+                        node, candidate_ifaces, member_name, gen_args, recv_for_method, call_args, environment
+                    )
+                if gen_args:
+                    raise self.fail("unsupported", "explicit generics require a declared callable name", callee)
+                return self.apply(
+                    self._project_member(recv_for_method, member_name, base_callee), call_args, environment
+                )
             if base_callee["kind"] == "name":
                 cname = self.name(base_callee["name"])
                 if (
@@ -2276,34 +2287,10 @@ class _IntrinsicsMixin:
                         for iface in self.interfaces.values()
                         if cname in iface.methods
                     ]
-                    if len(candidate_ifaces) == 1:
-                        iface = candidate_ifaces[0]
-                        return self._elaborate_interface_method_call(
-                            node,
-                            iface,
-                            iface.methods[cname],
-                            gen_args,
-                            None,
-                            call_args,
-                            environment,
+                    if candidate_ifaces:
+                        return self._select_interface_method_call(
+                            node, candidate_ifaces, cname, gen_args, None, call_args, environment
                         )
-                    if len(candidate_ifaces) > 1:
-                        for iface in candidate_ifaces:
-                            saved_try_m = [_Meta(m.type, m.scope, m.solution) for m in self.metas]
-                            saved_try_f = list(self.active_facts)
-                            try:
-                                return self._elaborate_interface_method_call(
-                                    node,
-                                    iface,
-                                    iface.methods[cname],
-                                    gen_args,
-                                    None,
-                                    call_args,
-                                    environment,
-                                )
-                            except Exception:
-                                self.restore_metas(saved_try_m)
-                                self.active_facts = saved_try_f
                 if (
                     cname in {"LivePrefix", "VacantRange", "VacantSuffix", "PrefixModel", "CopyRepresentation", "TransferType"}
                     and cname not in environment

@@ -226,7 +226,12 @@ The supported increment includes:
   contract verification, explicit law proof checking, Gallina emission, and
   `where Interface(type T)` generic constraint resolution with dictionary
   witness passing and static (`Interface.Method(...)`) or receiver
-  (`x.Method(...)`) dispatch.
+  (`x.Method(...)`) dispatch. Unqualified and receiver calls follow the
+  [interface name-resolution rule](../language/first-release.md#modules-and-packages):
+  method name and source arity must select one interface. Several matching
+  interface names require explicit qualification,
+  even when their implementations accept disjoint argument types. Calls do not
+  try candidate argument elaborations or use declaration order as priority.
 - Multi-module `import Module.Path;` composition (`elaborate(..., imports=...)`
   and `elaborate_package(modules)`) with topological dependency sorting,
   circular-import refusal, `public` versus `private` visibility enforcement

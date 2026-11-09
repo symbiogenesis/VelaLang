@@ -5431,6 +5431,133 @@ def _interfaces_nonoverlapping_impls_and_where_constraints() -> None:
     _refuses(unsatisfied, "type", "no implementation of interface 'Steppable'")
 
 
+def _dispatch_fixture(order: tuple[str, ...], *, disjoint: bool = False, arities: bool = False) -> _Fixture:
+    fixture = _Fixture("InterfaceDispatch")
+    for name in order:
+        is_bool = disjoint and name == "Second"
+        value_type = _BOOL if is_bool else _NAT
+        parameters = (("x", _type("T")),)
+        impl_parameters = (("x", value_type),)
+        if arities and name == "Second":
+            parameters += (("y", _type("T")),)
+            impl_parameters += (("y", value_type),)
+        _interface_decl(
+            fixture, name, (("type", "T", None),),
+            (_interface_fn_sig("Step", _type("T"), parameters),),
+        )
+        body = _variable("x") if is_bool else _binary("+", _variable("x"), _natural(1 if name == "First" else 2))
+        _impl_decl(
+            fixture, _type(name, value_type),
+            (_record_def_member("Step", value_type, impl_parameters, body),),
+        )
+    return fixture
+
+
+def _interface_dispatch_ambiguity() -> None:
+    for order in (("First", "Second"), ("Second", "First")):
+        for disjoint in (False, True):
+            for receiver in (False, True):
+                fixture = _dispatch_fixture(order, disjoint=disjoint)
+                called = _call(_member(_variable("x"), "Step")) if receiver else _call("Step", _variable("x"))
+                fixture.definition("Wrong", _NAT, (("x", _NAT),), called)
+                with patch.object(language._Elaborator, "_elaborate_interface_method_call",
+                                  side_effect=AssertionError("tried a candidate before resolving its interface name")):
+                    _refuses(fixture, "type", "ambiguous interface method 'Step'; qualify")
+
+
+def _interface_dispatch_qualification_and_arities() -> None:
+    for order in (("First", "Second"), ("Second", "First")):
+        fixture = _dispatch_fixture(order, disjoint=True)
+        fixture.definition("Number", _NAT, (), _call(_member(_variable("First"), "Step"), _natural(5)))
+        fixture.definition("Flag", _BOOL, (), _call(_member(_variable("Second"), "Step"), _boolean(True)))
+        fixture.theorem("NumberValue", (), _binary("==", _call("Number"), _natural(6)),
+                        _assert(_binary("==", _call("Number"), _natural(6))))
+        fixture.theorem("FlagValue", (), _binary("==", _call("Flag"), _boolean(True)),
+                        _assert(_binary("==", _call("Flag"), _boolean(True))))
+        elaborate(*fixture.response())
+
+        fixture = _dispatch_fixture(order, arities=True)
+        fixture.definition("Unary", _NAT, (("x", _NAT),), _call("Step", _variable("x")))
+        fixture.definition("Binary", _NAT, (("x", _NAT),), _call("Step", _variable("x"), _natural(0)))
+        fixture.definition("Receiver", _NAT, (("x", _NAT),), _call(_member(_variable("x"), "Step")))
+        fixture.definition("ReceiverBinary", _NAT, (("x", _NAT),),
+                           _call(_member(_variable("x"), "Step"), _natural(0)))
+        for name, expected in (("Unary", 6), ("Binary", 7), ("Receiver", 6), ("ReceiverBinary", 7)):
+            equality = _binary("==", _call(name, _natural(5)), _natural(expected))
+            fixture.theorem(name + "Value", (), equality, _assert(equality))
+        elaborate(*fixture.response())
+
+        fixture = _Fixture("NullaryInterfaceDispatch")
+        for name in order:
+            parameters = () if name == "First" else (("x", _type("T")),)
+            impl_parameters = () if name == "First" else (("x", _NAT),)
+            _interface_decl(fixture, name, (("type", "T", None),),
+                            (_interface_fn_sig("Step", _type("T"), parameters),))
+            _impl_decl(fixture, _type(name, _NAT),
+                       (_record_def_member("Step", _NAT, impl_parameters, _natural(1 if name == "First" else 2)),))
+        fixture.definition("Nullary", _NAT, (), _call("Step"))
+        fixture.definition("Unary", _NAT, (), _call("Step", _natural(5)))
+        for name, expected in (("Nullary", 1), ("Unary", 2)):
+            equality = _binary("==", _call(name), _natural(expected))
+            fixture.theorem(name + "Value", (), equality, _assert(equality))
+        elaborate(*fixture.response())
+
+
+def _imported_interface_aliases() -> None:
+    producer = _dispatch_fixture(("First",))
+    consumer = _Fixture("InterfaceConsumer")
+    _import_decl(consumer, "InterfaceDispatch")
+    consumer.definition("Bare", _NAT, (("x", _NAT),), _call("Step", _variable("x")))
+    consumer.definition("Receiver", _NAT, (("x", _NAT),), _call(_member(_variable("x"), "Step")))
+    for name in ("Bare", "Receiver"):
+        equality = _binary("==", _call(name, _natural(5)), _natural(6))
+        consumer.theorem(name + "Value", (), equality, _assert(equality))
+    elaborate_package([consumer.response(), producer.response()])
+
+
+def _check_callable_member(member_name: str) -> None:
+    fixture = _Fixture("CallableMember")
+    fixture.record("Callbacks", ((member_name, _function_type((("value", _NAT),), _NAT)),))
+    fixture.definition("Apply", _NAT, (("holder", _type("Callbacks")),),
+                       _call(_member(_variable("holder"), member_name), _natural(5)))
+    original = language._Elaborator.expression
+    visits: list[Node] = []
+
+    def count_receiver(self: language._Elaborator, node: Node,
+                       environment: dict[str, terms._Binding]) -> terms._Binding:
+        if node["kind"] == "name" and cast("Node", node["name"])["text"] == "holder":
+            visits.append(node)
+        return original(self, node, environment)
+
+    with patch.object(language._Elaborator, "expression", count_receiver):
+        elaborate(*fixture.response())
+    ensure(len(visits) == 1, "callable member elaborated its receiver more than once")
+    for failure in (RuntimeError("internal receiver bug"), VelaError("limit", 1, 1, "receiver work exhausted"),
+                    VelaError("protocol", 1, 1, "invalid receiver"),
+                    VelaError("unsupported", 1, 1, "unsupported receiver")):
+        visits.clear()
+
+        def fail_receiver(self: language._Elaborator, node: Node,
+                          environment: dict[str, terms._Binding], failure: Exception = failure) -> terms._Binding:
+            if node["kind"] == "name" and cast("Node", node["name"])["text"] == "holder" and not visits:
+                visits.append(node)
+                raise failure
+            return original(self, node, environment)
+
+        with patch.object(language._Elaborator, "expression", fail_receiver):
+            try:
+                elaborate(*fixture.response())
+            except (RuntimeError, VelaError) as error:
+                ensure(error is failure, "member dispatch replaced the original receiver failure")
+            else:
+                raise AssertionError("member dispatch swallowed a receiver failure")
+
+
+def _callable_member_receiver_and_failures() -> None:
+    _check_callable_member("Invoke")
+    _check_callable_member("Read")
+
+
 def _multi_module_imports_and_visibility() -> None:
     math_mod = _Fixture("MathMod")
     math_mod.definition(
@@ -5489,6 +5616,18 @@ def _multi_module_imports_and_visibility() -> None:
         tuple(pkg_results.keys()) == ("MathMod", "ConsumerMod"),
         "elaborate_package did not topologically order dependencies",
     )
+
+    invalid_generic = _Fixture("InvalidQualifiedGeneric")
+    _import_decl(invalid_generic, "MathMod")
+    invalid_generic.definition("Wrong", _NAT, (),
+                               _call(_member(_variable("MathMod"), "Double"), _natural(1), generics=(_BOOL,)))
+    try:
+        elaborate_package([math_mod.response(), invalid_generic.response()])
+    except VelaError as error:
+        ensure(error.kind == "unsupported" and "explicit generics" in error.message,
+               "qualified member generic arguments lost their existing refusal")
+    else:
+        raise AssertionError("qualified call silently discarded explicit generic arguments")
 
     priv_access = _Fixture("PrivConsumer")
     _import_decl(priv_access, "MathMod")
@@ -6070,6 +6209,10 @@ def cases() -> list[Case]:
             Case("record-member-methods-and-contracts", _record_member_methods_and_contracts),
             Case("out-loan-parameters-and-initialization-tracking", _out_loan_parameters_and_initialization_tracking),
             Case("interfaces-nonoverlapping-impls-and-where-constraints", _interfaces_nonoverlapping_impls_and_where_constraints),
+            Case("interface-dispatch-ambiguity-is-independent-of-order-and-types", _interface_dispatch_ambiguity),
+            Case("interface-dispatch-qualification-and-arity-selection", _interface_dispatch_qualification_and_arities),
+            Case("imported-interface-aliases-share-one-dispatch-identity", _imported_interface_aliases),
+            Case("callable-member-receiver-once-and-fatal-failures", _callable_member_receiver_and_failures),
             Case("multi-module-imports-and-visibility", _multi_module_imports_and_visibility),
             Case("source-bound-borrows-and-constructive-postconditions", _source_bound_borrows_and_constructive_postconditions),
             Case("consuming-ownership-general-loans-and-closed-effects", _consuming_ownership_general_loans_and_closed_effects)]
