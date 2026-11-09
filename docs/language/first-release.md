@@ -517,6 +517,8 @@ not establish checked source correspondence or machine/artifact acceptance.
   these identities against the current checkout and installed inputs, refusing
   changed, missing or malformed data. Its `status: matched` reports byte binding;
   `proof_replayed: false` states that it does not rerun the proof commands.
+  It rechecks source/revision, execution/parser inputs, retained outputs and receipt
+  bytes after the prover/runtime probes, refusing changes during the binding check.
   Before matching, it checks the declared source, Gallina and C subjects against
   their retained hashes, requires the source compilation, complete export
   assumption query, recursive kernel check and proof-corruption transcripts,

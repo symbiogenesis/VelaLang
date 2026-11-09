@@ -325,6 +325,37 @@ def _binding_checks() -> None:
         ensure(result["status"] == "matched" and not result["proof_replayed"]
                and not result["artifact_accepted"] and not result["production_admission"],
                "binding check claimed fresh proof or admission authority")
+        for owner, field, original, changed in (
+                (slice_harness, "_inputs", source_inputs, {"source": "changed during probes"}),
+                (slice_harness, "_revision", "a" * 40, "b" * 40),
+                (slice_harness, "_execution_inputs", execution, {"files": {}, "changed": True}),
+                (slice_harness.vela_parser, "_inputs", {}, {"source": "changed parser"}),
+                (slice_harness.vela_parser, "_toolchain", {}, {"menhir": "changed generator"})):
+            with patch.object(owner, field, side_effect=[original, changed]):
+                try:
+                    slice_harness.verify_bindings(root, receipt)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError(f"{field} changed during binding checks without refusal")
+        for mutation in ("artifact", "parser", "receipt"):
+            target = {"artifact": artifact, "parser": parser / "vela-parser", "receipt": receipt}[mutation]
+            before = target.read_bytes()
+
+            def change_during_probe(_directory: Path, _steps: list[dict[str, object]], *,
+                                    path: Path = target) -> dict[str, object]:
+                path.write_bytes(b"changed during final runtime probe")
+                return {}
+
+            with patch.object(slice_harness.replay, "_runtime", side_effect=change_during_probe):
+                try:
+                    slice_harness.verify_bindings(root, receipt)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError(f"{mutation} changed during final probes without refusal")
+                finally:
+                    target.write_bytes(before)
         for field, changed in (("schema", True), ("status", "skipped"), ("status", "failed"),
                                ("producer_revision", "b" * 40), ("inputs", {}),
                                ("artifact_accepted", True), ("source_correspondence", True),
