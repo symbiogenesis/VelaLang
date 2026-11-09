@@ -26,20 +26,21 @@ evaluation to the development prototypes.
 
 The [tooling qualification](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/assurance/proof-tooling-qualification.md) retained the locked batch workflow: cached presentation missed an imported-lemma change; Selective Stdlib, Equations and standalone `sauto` replayed without new assumptions but showed no client maintenance benefit. None was adopted.
 
-**Deliver the bounded synchronous release first.** The [release contract](../language/first-release.md#release-boundary) selects explicit representations, fixed ownership/use modes, stable dependent indices, ordinary errors and checked contracts over one retained compiler route. General grade algebras, multi-shot/shallow handlers, broad reflection and concurrent mutation need separate justification. Async requires a concrete service consumer and complete resource contract. The [delivery plan](../../PLAN.md#vela-first-release-delivery) starts with a bounded concrete-buffer foundation investigation, whose results determine pricing for an executable slice and independent package trial. Syntax, mathematics and editor prototypes remain development tools; they supply no machine laws.
+**Deliver the bounded synchronous release first.** The [release contract](../language/first-release.md#release-boundary) selects explicit representations, fixed ownership/use modes, stable dependent indices, ordinary errors and checked contracts over one retained compiler route. General grade algebras, multi-shot/shallow handlers, broad reflection and concurrent mutation need separate justification. Async requires a concrete service consumer and complete resource contract. The [delivery plan](../../PLAN.md#vela-first-release-delivery) retains Q25w's blocked foundation investigation and the later kernel-closed synchronous source validator, ownership and effect increments. It prices the residual concrete foundation, checked source correspondence, runtime libraries, retained-backend connection and independent package trial. The development implementations supply reusable source evidence; their machine-refinement, security and admission joins remain open.
 
 **Interpret source in existing anchors.** Under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-020a), untrusted elaboration is kernel-rechecked under R-05-009. The rule dossiers state laws about that checked interpretation, without introducing independent source semantics. Concrete resource laws, checked source correspondence, lowering and final-byte acceptance remain prerequisites. Before implementing later runtime-varying storage, amend the R-08-046 inventory and lifecycle classification.
 
 **Use Menhir for development parsing.** The [parser goal](#development-parser-and-grammar)
-connects the proposed grammar to located syntax trees, separate elaboration and
-eventual checked parsing. The [pure prototype](../tooling/pure-prototype.md) remains the
-executable baseline until qualification; implementation and migration retain
-their entry gates.
+connects the grammar to located syntax trees and separate elaboration. Q25h's
+Rocq-extracted checked parser is the qualified pure runtime baseline; Q25i's
+wider Menhir surface and the mathematical consumer retain their documented
+qualification scope. Broader checked parsing and source correspondence keep
+their own entry gates.
 
 The opt-in [mathematical elaborator](../tooling/elaboration-prototype.md) exercises generic
 and dependent functions, higher-order inference, indexed collections and explicit
 proof terms over the native surface tree. Kernel replay checks its generated CIC
-interpretation; checked parsing, source correspondence and full-calculus implementation
+interpretation; broader checked parsing, source correspondence and full-calculus implementation
 retain their separate owners and gates.
 
 ## Constraints and Desired Product
@@ -1715,9 +1716,9 @@ Changing the required Iris-over-Sail validation path also needs review of R-05-0
 
 #### Bounded Emission Versus General Logic
 
-Q21b's retained contract includes a **bounded emission-lemma alternative** alongside Q2c's operation-law foundation. Its full establishment cost remains unpriced, which prevents commissioning the experiment. The hypothesis is that a restricted generated family needs simulation lemmas for a closed set of emitted constructs rather than a complete user-facing imperative proof system before its first compilation theorem. The proposed ledger names each construct, its emitted term, entry/exit representations, frame, arithmetic and effect premises, termination argument and pinned-Sail simulation, plus their composition theorem. Loops, calls and external interference still need invariants and explicit premises; finite syntax is not a finite proof of all programs.
+Q21b's retained contract includes a **bounded emission-lemma alternative** alongside Q2c's operation-law foundation. Its commissioning rejection remains the recorded outcome. The [current planning portfolio](../../PLAN.md#planning-basis-and-scope) separately prices the retained route's missing selected-target connections and conditional compiler alternatives; a planning allowance neither selects an alternative nor supplies its entry evidence. The hypothesis is that a restricted generated family needs simulation lemmas for a closed set of emitted constructs rather than a complete user-facing imperative proof system before its first compilation theorem. The proposed ledger names each construct, its emitted term, entry/exit representations, frame, arithmetic and effect premises, termination argument and pinned-Sail simulation, plus their composition theorem. Loops, calls and external interference still need invariants and explicit premises; finite syntax is not a finite proof of all programs.
 
-Test closure on the parser destination and reserved staging client without adapting the rules to fit the latter. Q2c retains the existing foundation's implementation breakdown; the comparison reports reusable, replaced and still-required work in the same attended-session units. Price source correspondence, representation, emission and composition, optimization, TAL, linkage, leakage and robust preservation separately, charging shared work once. The comparison budget buys scoping, not a backend theorem, and no projected saving reduces plan estimates.
+Test closure on the parser destination and reserved staging client without adapting the rules to fit the latter. Q2c retains the existing foundation's implementation breakdown; the comparison reports reusable, replaced and still-required work in the plan's prospective attended engineering-hour units, keeping measured execution clocks separate. Price source correspondence, representation, emission and composition, optimization, TAL, linkage, leakage and robust preservation separately, charging shared work once. The comparison budget buys scoping, not a backend theorem, and no projected saving reduces plan estimates.
 
 The reduction fails if each client needs fresh constructs or semantic exceptions, the family cannot express its failure/resource behavior, or encapsulation and robust preservation need a logical relation over arbitrary contexts anyway. Morello-Cerise is the relevant warning: simulation over known generated code does not provide its adversarial-code theorem. Even a successful bounded simulation removes neither the existing Iris-over-Sail anchor nor the library proposal's actual-law prerequisite. A reduced entry condition needs checked substitute artifacts and explicit approval at the owning requirements and plan items.
 
@@ -1754,7 +1755,7 @@ SourcePackage(sourceClosure) = {
 
 The reviewed elaboration relation covers checked parsing or parse validation, binding and resolution, implicit insertion, overload/instance selection and desugaring. Source maps aid navigation; they are not correspondence proofs. Bind exact source, generated inputs and dependency/configuration identities to the derivations. MetaRocq can help construct and check terms but does not prove an external frontend merely by receiving its output. Typed holes remain outside accepted packages. Source, resolution and desugaring mutations must invalidate or refute correspondence even where a stale core theorem still checks.
 
-Linking is a typed proof boundary. Generated required/provided contracts state calling convention, preserved registers, stack shape, memory/capability authority, relocations, callbacks and reentrancy, effects and observations. Discharge them through existing TAL judgments where applicable and CIC proofs for deeper composition, not new TAL grade axes or an on-device solver. Independently compiled verified-C, Rust and generated components must agree, and their composition must retain required robust properties. An unchecked linker assumption cannot replace that evidence. The compiler-side precedent for composing separately compiled modules is CompCertO's open-module refinement: [CompCertOC](https://pldi25.sigplan.org/details/pldi-2025-papers/27), PLDI 2025, carries threaded Kripke memory relations through 18 CompCert passes, horizontally and vertically composable, for cooperative threads sharing stacks. Adopting that composition for the CHERI port is unpriced work, not an inherited theorem.
+Linking is a typed proof boundary. Generated required/provided contracts state calling convention, preserved registers, stack shape, memory/capability authority, relocations, callbacks and reentrancy, effects and observations. Discharge them through existing TAL judgments where applicable and CIC proofs for deeper composition, not new TAL grade axes or an on-device solver. Independently compiled verified-C, Rust and generated components must agree, and their composition must retain required robust properties. An unchecked linker assumption cannot replace that evidence. The compiler-side precedent for composing separately compiled modules is CompCertO's open-module refinement: [CompCertOC](https://pldi25.sigplan.org/details/pldi-2025-papers/27), PLDI 2025, carries threaded Kripke memory relations through 18 CompCert passes, horizontally and vertically composable, for cooperative threads sharing stacks. The selected Vela target's linkage and preservation work is priced in the [shared retained-route allowances](../../PLAN.md#shared-foundation-and-retained-route); this precedent supplies no inherited CHERI theorem or implied adoption of CompCertOC.
 
 The [proposed pipeline](#proposed-architecture) binds these packages through optimization, typed linkage and final image validation. The decoder's required route goes through Clight; a direct explicit-memory capability-IR branch is conditional. Both must terminate at the same pinned Sail term, never a machine semantics generated by the compiler.
 
@@ -1983,7 +1984,7 @@ Q21's retained contracts cover the bounded core and compiler comparison; Q25's d
 | Source-to-binary leakage | Public-equivalent source runs and compositional observation proofs connected to the optimized image, with a secret-dependent variant | A source flag stands for the binary obligation, or ordinary functional preservation hides a new observation |
 | IR and capability-cost comparison | Equivalent endpoint and target, attributed capability operations/traffic, full port and maintenance cost, independent reviewer assessment | A route cannot reach its endpoint or budget; unavailable target data is presented as a performance result |
 | Emission-rule closure and route agreement | Frozen emission rules applied to the independent client, residual general-logic costs, and disagreements adjudicated against the same Sail meaning | Every client expands the rules, arbitrary-context duties are dropped, or shared dependencies masquerade as route independence |
-| Waypoint necessity | A duty-by-duty substitute-evidence dossier for every proposed amendment | Deleting Clight, a named compiler or the program logic deletes a guarantee or merely moves its unpriced work |
+| Waypoint necessity | A duty-by-duty substitute-evidence dossier for every proposed amendment | Deleting Clight, a named compiler or the program logic drops a required guarantee or leaves displaced work without an owner and budget |
 
 For executable contract checks, use the repository's [oracle, mutation, and QuickChick instruments](../../tools/README.md) where applicable; keep negative proof tests alongside positive replay.
 A release-quality component also needs a transitive assumption audit: no unresolved holes, no `Admitted`, no new unchecked axioms, and no unsafe proof-evaluation shortcut outside the accepted base.
@@ -2003,10 +2004,17 @@ A general quantitative dependent typechecker, a Rust-equivalent ecosystem, and a
 These are engineering judgments for deciding which experiment to fund, not measured productivity results, upstream delivery promises, or estimates copied into the implementation checklist.
 A person-week or person-month means focused engineering effort, including local proof work, tests, documentation, and review preparation; it is not elapsed time for an intermittently staffed project.
 
-**They are also in a different unit from the plan's, and the two are not convertible.**
-[The implementation checklist](../../PLAN.md) prices every item in attended agent-session hours, keeps a separate clock for items that ran under fan-out, fits a calibration over each clock separately on the ground that no item has been measured on both, and derives every total, range and progress figure from those cells arithmetically.
-A person-month here is neither of those clocks.
-Read the ranges below as relative costs *among the experiments in this document*, and read the plan's own cells for what any of this would cost this project.
+The [implementation plan's basis](../../PLAN.md#planning-basis-and-scope) owns
+prospective attended engineering-hour estimates, uncertainty ranges and the
+finite target/client scope. Its [current summary](../../PLAN.md#current-summary)
+uses recorded completed actuals or retained estimates plus open planning cells;
+it does not fit a productivity rate from the small completed prototype sample.
+Human attended work, agent-session wall time and machine runtime remain separate
+measurements. The comparative person-month bands below are independently scoped
+judgments, with overlapping rows and assumptions; they are not converted into
+plan hours or added to the plan's totals.
+Read these ranges as relative costs *among the experiments in this document*,
+and use the plan's priced leaves for the current project portfolio.
 The estimates assume engineers already productive in Rocq and the selected program logic, stable primitive specifications, and reuse of existing libraries.
 A small team needs both proof-engineering and systems/compiler expertise; dividing person-months by headcount is not a reliable calendar forecast because semantic design and review are serial dependencies.
 An unfamiliar team, missing transport theorem, changing ISA/ABI, or unexpectedly weak upstream library can exceed these bands substantially.
@@ -2044,7 +2052,7 @@ There is no responsible architecture-independent estimate for a complete new tar
 The optional probe budget assumes those source-level foundations already exist; it is not a budget for adding an arbitrary processor.
 An existing target-parametric verified compiler can offer reusable passes and simulation structure, but target lowering, calling convention, linking, and security preservation still need separate evidence.
 The framework does not reduce the repository's unfinished CHERI compiler obligations by relabeling them as an instance.
-The existing [project plan](../../PLAN.md) remains the owner of scheduled work and its measured/calibrated estimates; these ranges neither replace it nor subtract claimed savings from it.
+The existing [project plan](../../PLAN.md) remains the owner of priced work, its prospective engineering-hour estimates and recorded actuals; these comparison bands neither replace those cells nor subtract claimed savings from them.
 The graded dependent foundation is selected for expressiveness and resource reasoning. Gerty's substitution-skipping optimization remains a separate performance question: its toy-program result supplies neither a measured bottleneck here nor a justification for new speed-only verified machinery.
 
 #### Where Time Might Be Saved

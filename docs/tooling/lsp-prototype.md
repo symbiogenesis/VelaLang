@@ -332,4 +332,6 @@ wire transcripts and client observations against independent expected oracles in
 User-managed Host CI and Guest CI verdicts remain separate from local client
 qualification for Q25n, Q25o, and Q25u. Broader asynchronous services require
 explicit cancellation and deliberately late-result controls before advertising
-them. DAP and DWARF implementation remain separately unpriced.
+them. DAP, DWARF and their simulator execution producer have separate
+[conditional tooling budgets](../../PLAN.md#tooling-and-metaprogramming);
+this pure LSP qualification supplies none of their implementation.

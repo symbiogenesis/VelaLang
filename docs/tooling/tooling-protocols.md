@@ -110,7 +110,9 @@ descriptor identities in the
 [R-05-043](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-043) retains their required lowering and
 [R-05-046](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/spec.md#r-05-046) independent descriptor review. A bounded JSON
 library or successful protocol transcript discharges none of these duties.
-The unpriced protocol stages select no resident profile or parser implementation.
+The [priced conditional host slices](../../PLAN.md#tooling-and-metaprogramming)
+follow the [plan's scope boundary](../../PLAN.md#planning-basis-and-scope);
+they select no resident profile or parser implementation.
 
 Freeze bounds on header/body bytes, JSON nesting, document/workspace size,
 outstanding requests, result size and worker time before implementation

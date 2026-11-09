@@ -1,6 +1,6 @@
 # Bounded language core and qualification contract
 
-> Non-normative synchronous-core design. Start with the [primary Vela design and examples](../assurance/verification-strategy.md) and the [first-release contract](first-release.md). The Q21a fixture retains its [missing prerequisites](#decision-and-reopening-evidence); the [first-release delivery plan](../../PLAN.md#vela-first-release-delivery) selects bounded work separately. No frontend, metatheory or production qualification is supplied. The [workflow disposition](../assurance/workflow-contract.md#commissioning-disposition) governs canceled trials; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations.
+> Non-normative synchronous-core design. Start with the [primary Vela design and examples](../assurance/verification-strategy.md) and the [first-release contract](first-release.md). The Q21a fixture retains its [missing prerequisites](#decision-and-reopening-evidence); the [first-release delivery plan](../../PLAN.md#vela-first-release-delivery) prices bounded residual work separately. Development frontend and source-proof increments exist; complete core metatheory, checked source correspondence and production qualification remain open. The [workflow disposition](../assurance/workflow-contract.md#commissioning-disposition) governs canceled trials; the [requirements register](https://github.com/symbiogenesis/VerifiedOS/blob/main/docs/requirements-register.md) governs obligations.
 
 ## Decision and boundary
 
@@ -25,10 +25,12 @@ an existing anchor under [R-05-020a](https://github.com/symbiogenesis/VerifiedOS
 a theorem to be checked about that image and its resource interpretation, with
 source correspondence binding the exact authored computation. This interpretation
 commitment supplies no proof of those laws and admits no independent source reduction.
-The [delivery plan](../../PLAN.md#vela-first-release-delivery) scopes an actual
-first consumer, a finite foundation investigation and conditional construction;
-it does not reopen the canceled generic pilot or assert that its foundations
-are now established.
+The [delivery plan](../../PLAN.md#vela-first-release-delivery) retains the
+completed foundation investigation and source-level synchronous validator, then
+prices conditional construction and full-chain qualification. Its
+[shared foundation allocations](../../PLAN.md#shared-foundation-and-retained-route)
+cover the remaining selected-target connections once; a price supplies no law
+and does not reopen the canceled generic pilot.
 
 Runtime types are machine integers, bytes, fixed records, finite sums and statically sized buffers. Parameters are explicit and calls resolve statically. Capacities and layouts specialize before emission; runtime lengths and discriminants remain represented. A known total shared-call callback may specialize with its immutable environment and proved representation. General runtime higher-order functions, recursive heap data and dynamic dispatch are excluded.
 
@@ -326,31 +328,34 @@ records the technical prerequisites and ownership boundaries for that work.
 
 | Obligation | Existing evidence or missing prerequisite | Owner |
 | --- | --- | --- |
-| Stable dependent values, universes and resource interpretation | Rocq checks its own terms; the source-bound elaboration-image and resource laws still need construction and checking | `core-soundness` |
-| Byte representations, read/write/frame, initialization and concrete loan laws | `DescriptorCheck` uses another memory model; `CopyRingService` is a statement artifact. No concrete CHERI instance exists in this record. | Q2c's `byte-instance` and `scoped-resources` review obligations remain unpriced after its rejection. Q2b/M7.1 implement consumers; no new core package discovers these foundations within its estimate. |
+| Stable dependent values, universes and resource interpretation | Rocq checks generated terms; Q25af/Q25ag/Q25ak/Q25al qualify bounded source images. General composition, source correspondence and resource interpretation still need checked laws. | `core-soundness` |
+| Byte representations, read/write/frame, initialization and concrete loan laws | The mathematical `Span<byte>` carrier and synchronous source laws are kernel-closed. Their connection to canonical Sail machine memory and its concrete loan interpretation remains open; `DescriptorCheck` uses another memory model. | Q2c's `byte-instance` and `scoped-resources` retain semantic ownership. The [shared foundation allocation](../../PLAN.md#shared-foundation-and-retained-route) prices the Vela-required residual; Q2b/M7.1 remain consumers. The core envelopes exclude this construction. |
 | Fixture cleanup token | No checked `PreparationOpen`/`finish` interpretation is supplied; its state is not the ring lifecycle | `core-repair-trial` constructs the token and total transition from supplied laws; `core-soundness` proves its usage rules. Failure to construct an inhabited instance blocks the fixture. |
-| Loop/return/reborrow/capture analysis | Callback combinators do not supply the selected flow-sensitive rules | `core-soundness` proves rules; `core-frontend` emits checked derivations |
+| Loop/return/reborrow/capture analysis | Q25ak/Q25al implement source-bound borrow, mutation-invalidation, ownership and closed-effect checks for the documented mathematical subset. General checked derivations over the concrete resource interpretation remain open. | `core-soundness` proves rules; `core-frontend` emits checked derivations |
 | Parsing, coherent resolution, dependent insertion and source identity | SourcePackage remains a design interface | `core-frontend` |
-| Refinement reconstruction and erasure | Existing arithmetic/equality mechanisms need client qualification; combined translation is unauthored | Q19b qualifies reuse; `core-frontend` handles this translation |
-| Observation, cost and robust guarantees | An annotation or closed effect set supplies no theorem | `core-soundness` composes supplied laws; Q2c's `machine-logic` and `context-preservation` obligations and Q21b retain concrete connections. These are unpriced obligations, not funded packages; a missing law blocks its requested case. |
+| Refinement reconstruction and erasure | Mathematical arithmetic/equality reconstruction exists; its complete source-correspondence and runtime-erasure theorem remains open. | `core-frontend`, reusing the qualified mathematical consumer |
+| Observation, cost and robust guarantees | An annotation or closed effect set supplies no theorem. | `core-soundness` composes supplied laws; Q2c's `machine-logic` and `context-preservation` obligations and Q21b retain concrete connections. The [shared allocations](../../PLAN.md#shared-foundation-and-retained-route) price the selected Vela endpoint; a missing law still blocks its requested case. |
 | Contextual diagnostics | Q19a concerns existing Rocq clients only | `core-diagnostics` |
-| Composed fixture and repair | All cases above are unexecuted | `core-repair-trial`, with independent intended-behavior review |
-| Device lowering, optimization, linkage and bytes | Actual producer state and missing connections are Q21b's inventory | Q2b and existing M1/TAL owners retain their booked work. Q2c's `source-transport` and `artifact-admission` review obligations and any route extension need separately reviewed cells for additional work. |
+| Composed fixture and repair | The full Q21a fixture and its repair comparison remain unexecuted; Q25ag supplies a narrower synchronous source client. | `core-repair-trial`, with independent intended-behavior review |
+| Device lowering, optimization, linkage and bytes | Q25ag supplies AST-lowered CompCert/Clight and Sail execution controls. Mechanized source-to-machine refinement, robust linkage and final-byte admission remain open. | Q2b and existing M1/TAL owners retain their booked work. The [shared residual allocations](../../PLAN.md#shared-foundation-and-retained-route) and [Vela delivery leaves](../../PLAN.md#vela-first-release-delivery) separately price the required transport, admission and client joins. |
 
-`core-soundness` owns checked interpretation of syntax composition; Q2c's `scoped-resources` owns concrete permissions, split/join and restoration. `core-frontend` owns SourcePackage checking and frontend erasure; Q2b/Q21b retain source-to-IR bridges and machine simulation. Charge shared work once. Keys do not price missing laws. Source-only qualification requires its actual concrete laws/guarantees, while stronger endpoints additionally retain contextual preservation and final admission.
+`core-soundness` owns checked interpretation of syntax composition; Q2c's `scoped-resources` owns concrete permissions, split/join and restoration. `core-frontend` owns SourcePackage checking and frontend erasure; Q2b/Q21b retain source-to-IR bridges and machine simulation. The [planning basis](../../PLAN.md#planning-basis-and-scope) transfers the four core envelopes once and prices shared residual work separately, reusing completed mathematical, parser and source-proof increments. These conditional planning cells authorize no dependent implementation before its entry predicate. Source-only qualification requires its actual concrete laws/guarantees, while stronger endpoints additionally retain contextual preservation and final admission.
 
 ## Decision and reopening evidence
 
-The blocking `Ready` entailment must close nested readers, preserve copied bytes/frame, consume the preparation token once, return a shared prefix and restoration duty, and restore disjoint audit/tail access while overlapping parent access stays suspended. Rejected exits restore full ownership. The selected byte/loan representation must prove these over the admitted CHERI interpretation; descriptor/ring theorems address different subjects. No checked constant or separately priced cell supplies them. This is an unavailable premise, not an executed counterexample.
+The blocking `Ready` entailment must close nested readers, preserve copied bytes/frame, consume the preparation token once, return a shared prefix and restoration duty, and restore disjoint audit/tail access while overlapping parent access stays suspended. Rejected exits restore full ownership. The selected byte/loan representation must prove these over the admitted CHERI interpretation; descriptor/ring theorems address different subjects. No checked machine-connected constant supplies that complete entailment. The plan now prices its required foundation and fixture work; those allocations do not discharge this unavailable premise.
 
 Q21a's broad trial remains uncommissioned. Its conditional
-syntax/frontend/diagnostic/fixture estimates exclude this unpriced foundation.
+syntax/frontend/diagnostic/fixture envelopes exclude the foundation construction,
+which the [shared plan](../../PLAN.md#shared-foundation-and-retained-route)
+prices separately for the selected target and release subset.
 The interpretation commitment now selects checked elaboration into the existing
 anchor; the [composition review](../extensions/full-language-review.md#r-05-009-r-05-020-and-what-holds-the-frontend-rows)
-records its acceptance boundary. Rocq output or a SourcePackage sketch supplies
+records its acceptance boundary. Rocq output alone or a SourcePackage sketch supplies
 no concrete law or source correspondence. The
 [first-release delivery plan](../../PLAN.md#vela-first-release-delivery) owns
-the finite investigation and any separately accepted narrower component. It
+the completed investigation and narrower source-proof increments, plus the open
+machine-connected component and independent package-trial allocations. It
 claims no productivity result or new compiler-route choice.
 
 Qualifying this fixture needs a reviewed foundation package selecting the
