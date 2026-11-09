@@ -2,12 +2,15 @@
 """Independent coordinate, overlay, and formatter oracle and seeded-fault controls."""
 
 import json
+import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 from typing import cast
 from unittest.mock import patch
 
 from tests.harness import Case, ensure
+from toolchain import generated_tests
 from toolchain.cli import vela as vela_cli
 from toolchain.generated_tests import (
     CANDIDATE_VERSIONS,
@@ -315,6 +318,46 @@ def _isolated_hypothesis_cli_qualification() -> None:
     )
 
 
+def _isolated_compiler_runtime_closure() -> None:
+    root = Path(__file__).resolve().parents[2]
+    done = subprocess.CompletedProcess([], 0, stdout='{"status":"fixture"}', stderr="")
+    with patch.object(generated_tests.shutil, "which", return_value="uv-fixture"), \
+            patch.object(generated_tests.subprocess, "run", return_value=done) as run, \
+            patch.dict(generated_tests.os.environ, {"VIRTUAL_ENV": "ambient-venv"}):
+        ensure(generated_tests.qualify_isolated_campaign(root) == {"status": "fixture"},
+               "isolated campaign lost its result")
+    create, synchronize, install, campaign = run.call_args_list
+    target = Path(create.args[0][-1])
+    ensure(create.args[0][1] == "venv" and "--system-site-packages" not in create.args[0],
+           "generator environment inherited ambient site packages")
+    ensure(synchronize.args[0][1] == "sync" and "--locked" in synchronize.args[0]
+           and "--no-default-groups" in synchronize.args[0]
+           and "--no-python-downloads" in synchronize.args[0]
+           and synchronize.args[0][synchronize.args[0].index("--project") + 1] == str(root / "tools"),
+           "disposable compiler dependencies were not synchronized from the existing project lock")
+    isolated_env = synchronize.kwargs["env"]
+    ensure(isolated_env["UV_PROJECT_ENVIRONMENT"] == str(target) and "VIRTUAL_ENV" not in isolated_env,
+           "compiler dependency synchronization escaped the disposable environment")
+    command = install.args[0]
+    ensure(command[1:3] == ["pip", "install"] and "--no-deps" in command and "--no-build" in command
+           and all(package in command for package in generated_tests.CANDIDATE_PACKAGES),
+           "candidate install expanded its separately qualified package closure")
+    worker = Path(campaign.args[0][0])
+    ensure(worker.is_relative_to(target) and command[command.index("--python") + 1] == str(worker)
+           and campaign.args[0][1:3] == ["-I", "-c"],
+           "candidate installation and isolated execution used different interpreters")
+    failure = subprocess.CalledProcessError(1, ["uv-fixture", "sync"])
+    with patch.object(generated_tests.shutil, "which", return_value="uv-fixture"), \
+            patch.object(generated_tests.subprocess, "run", side_effect=[done, failure]) as run:
+        try:
+            generated_tests.qualify_isolated_campaign(root)
+        except subprocess.CalledProcessError:
+            pass
+        else:
+            raise AssertionError("failed runtime synchronization produced a campaign verdict")
+        ensure(run.call_count == 2, "failed runtime synchronization still installed or ran the generator")
+
+
 def cases() -> list[Case]:
     return [
         Case("independent-coordinate-oracle-and-utf16-controls", _coordinate_oracle_and_utf16_controls),
@@ -322,4 +365,5 @@ def cases() -> list[Case]:
         Case("independent-pure-formatting-template-oracle", _pure_formatting_template_oracle),
         Case("seeded-fault-controls-shrinking-and-mutation-vocabulary", _seeded_faults_shrinking_and_mutation_vocabulary),
         Case("isolated-hypothesis-cli-qualification", _isolated_hypothesis_cli_qualification),
+        Case("isolated-compiler-runtime-uses-locked-disposable-closure", _isolated_compiler_runtime_closure),
     ]

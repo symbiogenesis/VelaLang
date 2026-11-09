@@ -13,6 +13,7 @@ import importlib
 import importlib.metadata as importlib_metadata
 import io
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -2123,6 +2124,18 @@ def qualify_isolated_campaign(
             if sys.platform == "win32"
             else venv_dir / "bin" / "python"
         )
+        isolated_env = os.environ.copy()
+        isolated_env.pop("VIRTUAL_ENV", None)
+        isolated_env["UV_PROJECT_ENVIRONMENT"] = str(venv_dir)
+        subprocess.run(
+            [uv_bin, "sync", "--project", str((root / "tools").resolve()), "--locked",
+             "--no-default-groups", "--no-python-downloads",
+             "--python", sys.executable],
+            env=isolated_env,
+            check=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+        )
         subprocess.run(
             [
                 uv_bin,
@@ -2130,6 +2143,8 @@ def qualify_isolated_campaign(
                 "install",
                 "--python",
                 str(venv_python),
+                "--no-deps",
+                "--no-build",
                 "--exclude-newer",
                 COOLDOWN_CUTOFF,
                 *CANDIDATE_PACKAGES,

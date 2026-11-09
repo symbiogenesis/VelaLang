@@ -509,7 +509,16 @@ prerequisites without promoting the candidate into the ordinary tool closure.
 qualifies `hypothesis==6.170.14` and `sortedcontainers==2.4.0` under the
 `2026-10-31T07:17:33Z` dependency cooldown recorded in
 [THIRD-PARTY.md](../../THIRD-PARTY.md) inside a disposable Python 3.14 virtual
-environment on both Windows ARM64 (Python `3.14.10`, `_native` SHA-256
+environment. Before installing those separate generator candidates, the command
+synchronizes the compiler's ordinary runtime dependency closure from
+[`tools/uv.lock`](../../tools/uv.lock) with `--locked --no-default-groups` into
+that same disposable environment. This supplies dependencies such as `filelock`
+to the Linux checked-parser build without exposing global or system site
+packages. Candidate installation allows only the two exact pins, disables
+dependency expansion and source builds, and retains the recorded cooldown;
+the campaign runs with Python's `-I` isolation.
+
+Qualification evidence covers Windows ARM64 (Python `3.14.10`, `_native` SHA-256
 `b7722a385d97a5ce0e0a5800770516ce5557f4abed4503b12b7f8e6c6a202c3b`, 4.7 s wall
 time) and Ubuntu ARM64 (Python `3.14.7`, `_native` SHA-256
 `1a25e29e9b879fb3de4bdd805e11d416dc8a4fc62d2f81472095fbfa8630ea61`, 3.0 s wall
