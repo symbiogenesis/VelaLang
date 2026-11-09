@@ -55,11 +55,12 @@ their frozen scope and strengthens local receipt integration:
 | Slice | Delivered development behavior | Open acceptance boundary |
 | --- | --- | --- |
 | Mathematical elaboration | Guarded `Option`/`Result` propagation preserves Boolean short-circuiting; unsupported effect sequencing is refused under the [elaboration contract](docs/tooling/elaboration-prototype.md#commands-and-acceptance) | General checked source correspondence and machine-connected composition remain with Q25as/at |
-| Pure compiler inspection | `vela inspect` exports versioned source-preserving snapshots and bounded symbol/reference queries under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
+| Pure compiler inspection | `vela inspect` exports versioned source-preserving snapshots, structured pure identifier types and bounded symbol/type/reference queries under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, typed trees, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
+| Pure semantic editor | Negotiated semantic token deltas reconstruct current pure compiler tokens across unsaved edits under the [LSP contract](docs/tooling/lsp-prototype.md) | Q25ci retains wider producers, editor operations and two-client delta qualification |
 | Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
 | Local first-slice source proofs | All 69 exports kernel-replay with an empty solver-trust ledger within unchanged elaboration budgets under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ba retains source correspondence and exact-artifact producer joins |
-| Local first-slice receipts | Schema-2 binding checks verify retained subjects, proof coverage, assumption ledgers and process transcripts as well as producer/tool/runtime/parser identities | Q25ar remains open for external checked producer receipts and complete declared coverage |
-| Pure compiler traces | Bounded phase/counter recordings bind source, producer and completeness metadata under the [trace increment](docs/tooling/pure-prototype.md#bounded-compiler-traces) | Q25cp retains wider phases/workers, external-viewer qualification, runtime closure and comparative overhead measurement |
+| Local first-slice receipts | Schema-2 binding checks verify retained subjects, capacity and semantic-negative coverage, assumption ledgers and process transcripts as well as producer/tool/runtime/parser identities | Q25ar remains open for external checked producer receipts and complete declared coverage |
+| Pure compiler traces | Bounded phase/counter recordings and paired tracing comparisons bind source, producer and measurement metadata under the [trace increment](docs/tooling/pure-prototype.md#bounded-compiler-traces) | Q25cp retains wider phases/workers, external-viewer qualification and runtime closure |
 
 The full first-slice replay reports zero solver-trusted obligations and source
 `accepted: true`; its binding check verifies retained evidence without proof replay.
@@ -479,12 +480,13 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 
 - [ ] **Q25ch · Publish qualified compiler inspection services** · 112 h, range 64–160 · I
   - **Owner:** `vela-compiler-services`. **Start:** Qualified frontend/diagnostic producers; backend for lowering views. **Check:** Meet the [inspection contract](docs/tooling/tooling-protocols.md#compiler-inspection-api) with versioned schemas, bounded snapshots/queries, origins, source reconstruction and stale-handle/input refusal in an independent consumer. Shared identities and producer semantics are charged once here and at their existing producers.
-  - The existing pure producer supplies source snapshots and resolved-identifier queries; [partial evidence](docs/assurance/completion-log.md#q25ch-publish-qualified-compiler-inspection-services) retains the wider views and their producer prerequisites.
+  - The existing pure producer supplies source snapshots, structured identifier types and resolved queries; [partial evidence](docs/assurance/completion-log.md#q25ch-publish-qualified-compiler-inspection-services) retains the wider views and their producer prerequisites.
 
 <a id="q25ci"></a>
 
 - [ ] **Q25ci · Extend semantic editor services beyond the pure prototype** · 112 h, range 64–160 · I
   - **Owner:** `vela-lsp`. **Start:** Compiler services and qualified wider-language facts. **Check:** Meet the [LSP contract](docs/tooling/tooling-protocols.md#language-server-protocol) for selected workspace navigation, completion/signatures, rename, checked actions, token deltas and read-only proof inspection in two clients. Reuse Q25n/o/u and refuse stale or capturing edits.
+  - Pure semantic token deltas use bounded document history and invalidate changed producer generations; [partial evidence](docs/assurance/completion-log.md#q25ci-extend-semantic-editor-services-beyond-the-pure-prototype) retains wider editor scope and two-client qualification.
 
 <a id="q25cj"></a>
 

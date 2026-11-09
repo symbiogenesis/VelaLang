@@ -1547,6 +1547,13 @@ Binding also checks declared source/Gallina/C subjects, required local law,
 contract and scenario coverage, complete assumption queries, solver-trust status
 and required process subjects/verdicts against retained transcripts. Rehashed
 missing coverage, invented source-proof status and altered process records refuse.
+Capacity coverage requires both compilation subjects, their joint kernel-check
+transcript and retained source/library outputs; declared capacities and byte
+lengths agree with those outputs. All 17 semantic negatives must occur exactly
+once with successful parsing, the intended semantic refusal and positive integer locations.
+The eight receipt cases include omitted capacity processes/artifacts, altered
+metrics, duplicate or missing controls and syntax-only refusals. These checks
+preserve coverage reporting without rerunning controls or remeasuring work.
 Native proof observations bind stdout/stderr byte lengths and hashes separately;
 the strict assumption audit reads the bound stdout while retaining all stderr.
 The current replay reports source `accepted: true` with zero solver-trusted
@@ -1594,20 +1601,47 @@ whole-cell completion credit or additional hours are recorded for this increment
 
 Partial pure-producer delivery on 2026-11-09 under the
 [pure snapshot contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment).
-`vela inspect` exports immutable source-preserving snapshots with schema-1
-provenance, UTF-8 byte spans and snapshot-scoped resolved symbols/references.
-Its bounded symbol-at, symbol-list and reference queries reuse the existing
+`vela inspect` exports immutable source-preserving snapshots with schema-2
+provenance, UTF-8 byte spans, structured scalar/callable identifier types and
+snapshot-scoped resolved symbols/references. Function types include parameter
+types, required-static flags, result types and constant-callable status.
+Its bounded symbol-at, type-at, symbol-list and reference queries reuse the existing
 isolated pure compiler producer. Source, URI, compiler/dependency, configuration,
 target and cross-snapshot handle changes refuse; limited results report partial
 status. Unsupported and failed/timed-out analysis cannot report reference absence.
 
-Nine [independent consumer cases](../../tools/tests/test_vela_inspection.py)
+Eleven [independent consumer cases](../../tools/tests/test_vela_inspection.py)
 validate the machine-checkable response schema, exact Unicode/CRLF reconstruction,
-types and sibling scopes, query/export bounds, invalidation and read-only CLI
-behavior. Combined local gate and behavioral validation cover integration.
+structured types and sibling scopes, query/export bounds, invalidation and read-only
+CLI behavior. Worker checks refuse malformed types, inconsistent declaration
+labels and missing type records; version-1 queries are explicitly refused.
+Combined local gate and behavioral validation cover integration.
 Q25ch remains open for concrete syntax/typed-tree, imports, generated/proof and
 lowering views and their qualified producers. No whole-cell completion credit
 or additional hours are recorded for this development increment.
+
+<a id="q25ci-extend-semantic-editor-services-beyond-the-pure-prototype"></a>
+
+#### Q25ci · Extend semantic editor services beyond the pure prototype
+
+Partial pure-editor delivery on 2026-11-09 under the
+[LSP prototype contract](../tooling/lsp-prototype.md).
+Negotiated `textDocument/semanticTokens/full/delta` returns opaque result IDs and
+bounded integer edits over the existing pure compiler token stream. Each open
+document retains only its latest published stream. Unknown, evicted or foreign
+IDs return current full tokens; configuration/producer changes, save, close,
+desynchronization and shutdown invalidate history. Oversized or failed responses
+cannot advance the retained base. Full-only clients keep their data-only responses.
+
+Five [independent delta cases](../../tools/tests/test_vela_lsp_delta.py) reconstruct
+exact integer streams, cover lifecycle/refusal and Unicode/CRLF edits, and exercise
+the real stdio process with unsaved source. Existing client observations accept
+the negotiated IDs without changing compiler token expectations. Combined local
+gate and behavioral validation cover integration.
+
+Q25ci remains open for wider qualified producers, the remaining selected editor
+operations and two-client delta qualification. This increment supplies no wider
+language or proof admission and records no whole-cell completion credit or hours.
 
 <a id="q25cp-expose-bounded-compiler-performance-traces"></a>
 
@@ -1628,8 +1662,15 @@ independently recover a deterministic timeline and cover quantized zero-duration
 boundaries, changed compiler/parser files, malformed data, truncation/refusal,
 clock regression and late-publication freshness. Independent code review found
 and corrected producer-path, timestamp-boundary and publication-freshness gaps.
-Combined `validate --jobs 4` passes the full local gate and all 498 behavioral
-cases; one slow case and seven unavailable-lane cases are explicitly skipped.
+`vela trace-benchmark` measures bounded alternating plain/traced compilation pairs,
+excludes declared warmups and checks identical outputs and complete recordings.
+The source/producer-bound report retains raw timings and independently recomputed
+summaries; `vela trace-benchmark-validate` rejects stale or malformed reports.
+Five [benchmark cases](../../tools/tests/test_vela_trace_benchmark.py) cover
+independent timing arithmetic, bounds, clock faults, changed outputs, cancellation
+and atomic publication. A local seven-pair benchmark and its validator pass.
+Combined local gate and behavioral validation cover integration.
 Q25cp remains open for wider phases/workers, pinned external-viewer qualification,
-exact runtime closure and comparative overhead measurement. No whole-cell
+and exact runtime closure. The comparison measures warm-process wall time,
+including parser waits, and supplies no hard overhead limit. No whole-cell
 completion credit, emitted-program timing verdict or additional hours are recorded.
