@@ -152,6 +152,15 @@ class _Elaborator:
         self.fresh_argument = 0
         self.facts = facts
 
+    def copy(self) -> _Elaborator:
+        cloned = _Elaborator()
+        cloned.functions = dict(self.functions)
+        cloned.constants = dict(self.constants)
+        cloned.static_work = self.static_work
+        cloned.specialization_depth = self.specialization_depth
+        cloned.fresh_argument = self.fresh_argument
+        return cloned
+
     def _declare(self, name: syntax.Name, kind: SymbolKind, detail: str, *,
                  inferred: bool | None = None) -> int | None:
         return None if self.facts is None else self.facts.declare(name, kind, detail, inferred=inferred)
@@ -555,6 +564,13 @@ def _translate(source: bytes, module: syntax.Module, facts: Facts | None = None,
     return Translation(name, gallina)
 
 
+_LAST_ELABORATED: tuple[tuple[bytes, int, int, int, int], _Elaborator] | None = None
+
+
+def _budget_key(source: bytes) -> tuple[bytes, int, int, int, int]:
+    return (source, MAX_OUTPUT_BYTES, MAX_STATIC_WORK, MAX_STATIC_DEPTH, MAX_EXPRESSION_DEPTH)
+
+
 def parse_module(source: bytes) -> syntax.Module:
     """Parse and decode pure Vela source through the Rocq-extracted checked parser."""
     checked = import_module("toolchain.parser_checked")
@@ -563,7 +579,11 @@ def parse_module(source: bytes) -> syntax.Module:
 
 def translate(source: bytes) -> Translation:
     """Validate the complete bounded source through the Rocq-extracted checked parser."""
-    return _translate(source, parse_module(source))
+    global _LAST_ELABORATED  # noqa: PLW0603
+    elaborator = _Elaborator()
+    translated = _translate(source, parse_module(source), elaborator=elaborator)
+    _LAST_ELABORATED = (_budget_key(source), elaborator.copy())
+    return translated
 
 
 def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEvaluation:
@@ -572,8 +592,14 @@ def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEva
     The [playground contract](../../docs/tooling/playground.md#browser-behavior)
     restricts this development service to the existing bounded static evaluator.
     """
-    elaborator = _Elaborator()
-    _translate(source, parse_module(source), elaborator=elaborator)
+    global _LAST_ELABORATED  # noqa: PLW0603
+    key = _budget_key(source)
+    if _LAST_ELABORATED is not None and _LAST_ELABORATED[0] == key:
+        elaborator = _LAST_ELABORATED[1].copy()
+    else:
+        elaborator = _Elaborator()
+        _translate(source, parse_module(source), elaborator=elaborator)
+        _LAST_ELABORATED = (key, elaborator.copy())
     if value_type not in {"Nat", "bool"}:
         raise VelaError("type", 1, 1, "expression: expected Nat or bool result type")
     if len(expression.encode("utf-8")) > 4096:

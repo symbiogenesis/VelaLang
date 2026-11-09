@@ -20,10 +20,19 @@ from toolchain.ast import Name, position
 from toolchain.authoring import Finding, generic_type_findings
 from toolchain.elaborate import Elaboration
 
+_BUILD_CACHE: tuple[tuple[Path, int, int, int], vela_parser.Build] | None = None
+
 
 def _build(parser: Path) -> vela_parser.Build:
+    global _BUILD_CACHE  # noqa: PLW0603
+    stat = parser.stat()
+    key = (parser, stat.st_mtime_ns, stat.st_size, stat.st_ino)
+    if _BUILD_CACHE is not None and _BUILD_CACHE[0] == key:
+        return _BUILD_CACHE[1]
     digest = hashlib.sha256(parser.read_bytes()).hexdigest()
-    return vela_parser.Build(parser.parent, parser, {"generated_sha256": {"vela-parser": digest}})
+    built = vela_parser.Build(parser.parent, parser, {"generated_sha256": {"vela-parser": digest}})
+    _BUILD_CACHE = (key, built)
+    return built
 
 
 @dataclass(frozen=True)
