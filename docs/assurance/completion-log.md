@@ -1457,3 +1457,49 @@ Accepted on 2026-11-09 under the [mathematical elaboration contract](../tooling/
 The original 16 h estimate, range 12–20, is retained with `n/a` calibration columns.
 
 Landed: Tier A. Full review of constructive Rocq postcondition synthesis, schema-2 loan lowering, source-bound borrow/mutation-invalidation checking, and 156-fixture zero-axiom Rocq kernel replay.
+
+<a id="q25al-elaborate-consuming-ownership-owned-parameters-and-move-transfers-general-in-ref-runtime-value-loans-and-closed-effects-footprints-reads-writes-calls"></a>
+
+#### Q25al · Elaborate consuming ownership (`owned` parameters and `move` transfers), general `in`/`ref` runtime value loans, and closed `effects` footprints (`reads`/`writes`/`calls`)
+
+Accepted on 2026-11-09 under the [mathematical elaboration contract](../tooling/elaboration-prototype.md) and [language reference](../language/reference.md#loans-and-parameter-modes):
+
+1. **Consuming `owned` parameters, data fields, and `move` transfers:**
+   [elaborate.py](../../tools/toolchain/elaborate.py),
+   [elaborate_declarations.py](../../tools/toolchain/elaborate_declarations.py),
+   [elaborate_intrinsics.py](../../tools/toolchain/elaborate_intrinsics.py),
+   [elaborate_statements.py](../../tools/toolchain/elaborate_statements.py), and
+   [loans.py](../../tools/toolchain/loans.py) elaborate `owned T` on callable
+   parameters and record/union constructor fields, enforce `move` at call sites
+   targeting `owned` parameters while rejecting `move` arguments to borrowed `in`,
+   `ref`, or `out` parameters, support consuming record updates
+   `move base with { Field = value }` (evaluating update expressions before
+   consuming `base`), and reject `use-after-owner-move`, moves while a shared or
+   exclusive loan is live (`suspended-parent`), partial moves out of fields or
+   indexed elements (`partial-owner-move-unsupported`), moves through loans
+   (`move-through-loan-unsupported`), and moves of borrowed parameters, constants,
+   collections traversed by `foreach`, or records with lifted invariants.
+2. **General `in T` and `ref T` runtime value loans:**
+   [elaborate.py](../../tools/toolchain/elaborate.py) generalizes
+   `_is_supported_loan_type` to accept `in T` and `ref T` over any runtime value
+   type (`Nat`, `bool`, `char`, fixed-width integers, records, unions, tuples,
+   `Vec<T, n>`, `Fin<n>`, `TextBuilder<N>`, `Seq<T>`, `Span<T>`, and `Slots<T, n>`)
+   while rejecting `Prop`, `Unit`, function types, and universes.
+3. **Closed `effects` footprint verification (`reads`, `writes`, `calls`, `none`):**
+   [elaborate.py](../../tools/toolchain/elaborate.py) and
+   [elaborate_declarations.py](../../tools/toolchain/elaborate_declarations.py)
+   verify closed `effects` clauses on top-level callables and record methods:
+   every mutated `ref`/`out` parameter must be declared in `writes(...)`, every
+   borrowed parameter (`in`, `ref`, non-`owned` `Span`/`Slots`, or `this`) read in
+   the callable body must be declared in `reads(...)` or `writes(...)`, and every
+   invocation of a function-typed parameter, an untracked `function` without its
+   own `effects` clause, or a callee with non-empty `calls(...)` effects must be
+   covered by the caller's `calls(...)` clause.
+   [elaboration_check.py](../../tools/toolchain/elaboration_check.py) and
+   [test_vela_elaborate.py](../../tools/tests/test_vela_elaborate.py) verify
+   constructive zero-axiom Rocq 9.3.0 replay across all `29` accepted elaboration
+   libraries (`166` total replay fixtures).
+
+The original 12 h estimate, range 8–16, is retained with `n/a` calibration columns.
+
+Landed: Tier A. Full review of consuming `owned`/`move` elaboration, general `in`/`ref` runtime value loans, closed `effects` (`reads`/`writes`/`calls`/`none`) checking, and 166-fixture zero-axiom Rocq kernel replay.
