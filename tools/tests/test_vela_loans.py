@@ -156,6 +156,9 @@ def _shared_and_exclusive_grants() -> None:
     shared = _path(Borrow(Loan("first", "workspace", _BYTES)),
                    Borrow(Loan("second", "workspace", _BYTES)), Use("first"), Use("second"))
     ensure(not shared.issues, "compatible shared sibling handles conflict")
+    shared_owner_read = _path(Borrow(Loan("first", "workspace", _BYTES)),
+                              Access(_BYTES, "read"), Use("first"))
+    ensure(not shared_owner_read.issues, "shared borrow conflicted with concurrent owner read")
     for mode in ("shared", "exclusive"):
         loan = Loan("second", "workspace", _BYTES, "shared" if mode == "shared" else "exclusive")
         neighbor = _path(Borrow(Loan("first", "workspace", _BYTES, "exclusive")),

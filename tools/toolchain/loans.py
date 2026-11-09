@@ -862,8 +862,14 @@ class _State:
                 continue
             # An owner/ancestor route cannot bypass a live descendant permission.
             descendant = route is None or route in self.ancestors({other})
-            if overlap == "yes" and (descendant or event.kind != "read"
-                                     or self.loans[other].mode == "exclusive"):
+            exclusive_ancestor = (
+                descendant and route is not None and self.loans[route].mode == "exclusive"
+            )
+            if overlap == "yes" and (
+                exclusive_ancestor
+                or event.kind != "read"
+                or self.loans[other].mode == "exclusive"
+            ):
                 self.issue(node, "suspended-parent" if descendant else "conflicting-access", other)
         if event.kind == "move" and event.via is None:
             if event.place.fields:
