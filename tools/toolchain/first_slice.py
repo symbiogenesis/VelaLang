@@ -2114,6 +2114,16 @@ def verify_bindings(root: Path, receipt_path: Path) -> dict[str, object]:
         if (replay._toolchain(root, Path(temporary), steps) != receipt.get("toolchain")
                 or replay._runtime(Path(temporary), steps) != receipt.get("runtime")):
             raise ValueError("first-slice receipt prover or runtime changed")
+    if (receipt.get("inputs") != _inputs(root) or receipt.get("producer_revision") != _revision(root)
+            or _execution_inputs(compiler) != execution
+            or parser_receipt.get("inputs") != vela_parser._inputs(root)
+            or parser_receipt.get("toolchain") != vela_parser._toolchain(root)
+            or replay._parser_outputs(compiled) != receipt.get("parser_outputs")
+            or _artifacts(_receipt_directory(directory_name, _work_root(root), "slice-")) != artifacts):
+        raise ValueError("first-slice receipt inputs or outputs changed during binding check")
+    with receipt_path.open("rb") as stream:
+        if stream.read(RECEIPT_BYTES + 1) != raw:
+            raise ValueError("first-slice receipt changed during binding check")
     return {"schema": 1, "scope": "vela-first-slice-binding-check", "status": "matched",
             "receipt": str(receipt_path), "receipt_sha256": _sha256(raw),
             "proof_replayed": False, "artifact_accepted": False, "production_admission": False}
