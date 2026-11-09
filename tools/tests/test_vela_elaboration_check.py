@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Failure retention and exact-subject controls for native Vela term replay."""
 
+import ast
 import json
 import subprocess
 import tempfile
@@ -15,6 +16,41 @@ from toolchain import (
 from toolchain import (
     elaboration_check as replay,
 )
+
+
+def _qualification_input_closure() -> None:
+    root = Path(__file__).resolve().parents[2]
+    bound = replay._inputs(root)
+    pending = ["elaboration_check"]
+    visited: set[str] = set()
+    while pending:
+        module = pending.pop()
+        if module in visited:
+            continue
+        visited.add(module)
+        relative = f"tools/toolchain/{'__init__' if module == 'toolchain' else module}.py"
+        path = root / relative
+        ensure(relative in bound, f"replay does not bind its imported checker input {relative}")
+        ensure(bound[relative] == replay._sha256(path.read_bytes()),
+               f"replay checker hash does not describe {relative}")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            imports: list[str] = []
+            if isinstance(node, ast.Import):
+                imports = [name.name for name in node.names if name.name == "toolchain"
+                           or name.name.startswith("toolchain.")]
+            elif isinstance(node, ast.ImportFrom) and node.module is not None:
+                if node.module == "toolchain":
+                    imports = [f"toolchain.{name.name}" for name in node.names]
+                elif node.module.startswith("toolchain."):
+                    imports = [node.module]
+            for name in imports:
+                local = name.removeprefix("toolchain.")
+                if local == "toolchain" or (root / f"tools/toolchain/{local}.py").is_file():
+                    pending.append(local)
+    ensure({"tools/pyproject.toml", "tools/uv.lock"} <= bound.keys(),
+           "replay omitted its Python dependency/version owners")
+    ensure("solver_ledger" in visited and "jsonutil" in visited,
+           "input audit failed to reach the assumption and syntax-protocol checkers")
 
 
 def _process_controls() -> None:
@@ -279,7 +315,8 @@ def _pure_semantic_negatives_and_inventory() -> None:
 
 
 def cases() -> list[Case]:
-    return [Case("vela-replay-process-controls", _process_controls),
+    return [Case("vela-replay-qualification-input-closure", _qualification_input_closure),
+            Case("vela-replay-process-controls", _process_controls),
             Case("vela-replay-semantic-negative-controls", _semantic_controls),
             Case("vela-replay-failed-attempt-retention", _refused_attempts),
             Case("vela-replay-artifact-freshness", _freshness_controls),
