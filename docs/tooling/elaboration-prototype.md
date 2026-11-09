@@ -197,6 +197,18 @@ The supported increment includes:
   (`?`) before every `out` parameter is initialized on all normal return paths,
   and postcondition (`ensures` / `restores`) binding to the final initialized
   value.
+- Source-bound local borrow bindings (`let r = in target;` and `let r = ref target;`
+  over local variables and disjoint record fields `target.Field`), connected to
+  path-sensitive loan-end inference ([`loans.py`](../../tools/toolchain/loans.py))
+  and dependent mutation-invalidation rules under the
+  [borrow-analysis promotion contract](../language/core-design.md#borrow-analysis-promotion):
+  local `in` and `ref` borrows suspend conflicting parent/field reads, writes and
+  moves until the borrow's path-sensitive last use while permitting simultaneous
+  borrows and mutations of disjoint sibling record fields (`r.Low` versus `r.High`),
+  refuse loop-carried local borrows and local-reference return escape, and
+  invalidate stale current-value facts across writes to a mutable variable, field
+  or indexed collection while preserving immutable snapshots (`let snap = ...`),
+  `old(...)` pre-state references and proved-disjoint field facts.
 - Explicit nonoverlapping `interface Name<T, ...> { ... }` and
   `impl<...> Interface<...> { ... }` declarations, supporting abstract callable
   signatures with `requires`/`where`/`ensures` contracts and abstract

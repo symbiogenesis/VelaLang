@@ -162,10 +162,11 @@ also remains distinct from the production algorithm choice.
 | Mutation and dependent facts | Writes and transitive call effects transform the current resource predicate. Reusing a current-content fact requires a checked preservation or re-establishment step; immutable historical snapshots stay stable without granting current access. Fresh authorized reads after a value-changing overwrite succeed, a stale equality fails, and a proved-disjoint field fact survives. For a selected library operation that changes represented length at fixed capacity, an old length-three bound used at index two after shortening to one fails; an unsupported operation supplies no semantic negative. This row states the release rule; the extension's [snapshot and invalidation design](../extensions/interior-mutability.md#snapshots-and-dependent-indices) develops it for cells, and selecting Ante-style local aliases still requires that separately gated extension. |
 | Control and demand | Bounded loops establish their invariant at entry and every back edge, closing local descendants as specified above; acyclic unrolling supplies no loop evidence. Transitive capture checking respects the selected fixed usage modes. General grade checking, suspension, cyclic captures and broader loan escape retain their extension boundaries and require their own checked rules before support is claimed. |
 
-The [first-release qualification](first-release.md#qualification) consumes these
-joins on its actual clients. Record unsupported source patterns, unresolved
-proofs and exhausted analysis budgets separately from semantic rejection and
-checked acceptance. The [independent package trial](../../PLAN.md#vela-first-release-delivery)
+The [first-release qualification](first-release.md#qualification) and
+[mathematical elaboration qualification](../tooling/elaboration-prototype.md#commands-and-acceptance)
+consume these joins on their checked source fragments (`Q25ak`). Record unsupported
+source patterns, unresolved proofs and exhausted analysis budgets separately from
+semantic rejection and checked acceptance. The [independent package trial](../../PLAN.md#vela-first-release-delivery)
 owns any commissioned ergonomic or cost comparison; neither feature coverage
 nor a diagnostic's path precision establishes superiority to another checker.
 
