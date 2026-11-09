@@ -191,6 +191,29 @@ def _malformed_type_refusal() -> None:
             raise AssertionError("public schema accepted a callable/scalar kind mismatch")
 
 
+def _parameter_inventory_refusal() -> None:
+    source = (b"module Types; public Nat F(Nat first, bool second) { "
+              b"let local = first; let tail = second; return local; }")
+    raw = inspect_source(source)
+    for retained in (0, 1):
+        changed = copy.deepcopy(raw)
+        function = cast("list[dict[str, object]]", changed["symbols"])[0]
+        value_type = cast("dict[str, object]", function["type"])
+        value_type["parameters"] = cast("list[object]", value_type["parameters"])[:retained]
+        function["detail"] = "public Nat F()" if retained == 0 else "public Nat F(Nat first)"
+        with patch.object(inspection, "inspect_document", return_value=changed):
+            result = inspection.inspect(source).export()
+        ensure(result["status"] == "unavailable" and result["symbols"] == [],
+               "coordinated callable type and label edits hid trailing parameter declarations")
+    changed = copy.deepcopy(raw)
+    symbols = cast("list[dict[str, object]]", changed["symbols"])
+    symbols[-1]["kind"] = "parameter"
+    with patch.object(inspection, "inspect_document", return_value=changed):
+        result = inspection.inspect(source).export()
+    ensure(result["status"] == "unavailable" and result["symbols"] == [],
+           "unowned parameter after local declarations escaped inventory validation")
+
+
 def _binding_invalidation() -> None:
     snapshot = inspection.inspect(SOURCE)
     request = _request(snapshot, "symbols")
@@ -302,6 +325,7 @@ def cases() -> list[Case]:
             Case("nested-sibling-scope-consumer", _nested_scope_consumer),
             Case("structured-scalar-callable-and-type-at-consumer", _structured_types_consumer),
             Case("malformed-structured-types-and-version-refusal", _malformed_type_refusal),
+            Case("complete-callable-parameter-inventory-refusal", _parameter_inventory_refusal),
             Case("source-config-target-and-producer-invalidation", _binding_invalidation),
             Case("query-bounds-and-malformed-input-refusal", _bounded_and_malformed_queries),
             Case("unavailable-timeout-and-schema-refusal", _unavailable_status_and_schema),

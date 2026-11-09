@@ -204,13 +204,18 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
             site = Site(_integer(symbol["line"]), _integer(symbol["column"]))
             doc = documentation.validate(symbol["documentation"], Name(name, site), cast("str", kind))
         symbols.append(_Symbol(name, cast("str", kind), detail, value_type, first, last, type_hint, doc))
+    owned_parameters: set[int] = set()
     for index, symbol in enumerate(symbols):
         parameters = symbol.value_type.parameters
         if parameters is None:
             continue
-        declared = symbols[index + 1:index + 1 + len(parameters)]
+        end = index + 1
+        while end < len(symbols) and symbols[end].kind == "parameter":
+            end += 1
+        declared = symbols[index + 1:end]
         if len(declared) != len(parameters):
-            raise InspectionError("Pure prototype callable omits parameter declarations")
+            raise InspectionError("Pure prototype callable parameter inventory differs from its type")
+        owned_parameters.update(range(index + 1, end))
         labels: list[str] = []
         for parameter, (value_type, required_static) in zip(declared, parameters, strict=True):
             prefix = "const " if required_static else ""
@@ -222,6 +227,9 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
         expected = f"public {prefix}{symbol.value_type.result} {symbol.name}({', '.join(labels)})"
         if symbol.detail != expected:
             raise InspectionError("Pure prototype callable type differs from its label")
+    if any(symbol.kind == "parameter" and index not in owned_parameters
+           for index, symbol in enumerate(symbols)):
+        raise InspectionError("Pure prototype parameter has no callable owner")
     occurrences: list[_Occurrence] = []
     declarations: set[int] = set()
     for value in occurrences_raw:
