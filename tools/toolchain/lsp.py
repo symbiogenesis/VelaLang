@@ -21,6 +21,7 @@ from toolchain.lsp_services import (
     project_inspection,
     validate_inspection,
 )
+from toolchain.lsp_tokens import token_edits
 from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import (
     MAX_BODY_BYTES,
@@ -36,6 +37,8 @@ MAX_DOCUMENTS = 16
 MAX_CHANGES = 64
 WORKER_SECONDS = 5
 type Checker = Callable[[bytes], dict[str, object] | None]
+_SEMANTIC_DELTA = "textDocument/semanticTokens/full/delta"
+_SEMANTIC_FULL = "textDocument/semanticTokens/full"
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,14 @@ class _CachedInspection:
     generation: int
     producer: Inspector
     facts: Inspection
+
+
+@dataclass(frozen=True)
+class _TokenHistory:
+    result_id: str
+    generation: int
+    producer: Inspector
+    data: tuple[int, ...]
 
 
 def _invalid(message: str) -> Never:
@@ -128,6 +139,9 @@ class Server:
         self.received_versions: dict[str, int] = {}
         self._inspections: dict[str, _CachedInspection] = {}
         self._inspection_generation = 0
+        self._token_history: dict[str, _TokenHistory] = {}
+        self._token_serial = 0
+        self._token_deltas = False
         self.generation = 0
         self.initialized = False
         self.ready = False
@@ -137,7 +151,24 @@ class Server:
     def invalidate_inspections(self) -> None:
         """Advance the producer generation after a toolchain or configuration change."""
         self._inspections.clear()
+        self._token_history.clear()
         self._inspection_generation += 1
+
+    def _tokens(self, snapshot: SourceSnapshot, previous: str | None,
+                delta: bool) -> tuple[dict[str, object], _TokenHistory | None]:
+        projected = cast("dict[str, object]", project_inspection(
+            snapshot, self._inspection(snapshot), _SEMANTIC_FULL, None))
+        if not delta and not self._token_deltas:
+            return projected, None
+        data = tuple(cast("list[int]", projected["data"]))
+        identity = hashlib.sha256(
+            f"{snapshot.identity}:{self._inspection_generation}:{self._token_serial + 1}".encode()).hexdigest()
+        candidate = _TokenHistory(identity, self._inspection_generation, self.inspector, data)
+        old = self._token_history.get(snapshot.uri)
+        if (delta and old is not None and old.result_id == previous
+                and old.generation == self._inspection_generation and old.producer is self.inspector):
+            return {"resultId": identity, "edits": token_edits(old.data, data)}, candidate
+        return {"resultId": identity, "data": list(data)}, candidate
 
     def _inspection(self, snapshot: SourceSnapshot) -> Inspection | None:
         inspector, generation = self.inspector, self._inspection_generation
@@ -229,6 +260,9 @@ class Server:
         position: tuple[int, int] | None = None
         requested_range: QueryRange | None = None
         include_declaration = False
+        previous_result: str | None = None
+        if method == _SEMANTIC_DELTA:
+            previous_result = _string(params.get("previousResultId"))
         if method == "textDocument/inlayHint":
             span = _object(params.get("range"))
             start, end = _object(span.get("start")), _object(span.get("end"))
@@ -241,7 +275,7 @@ class Server:
             requested_range = ((first_position["line"], first_position["character"]),
                                (last_position["line"], last_position["character"]))
         elif method not in {"textDocument/documentSymbol", "textDocument/semanticTokens/full",
-                            "textDocument/formatting"}:
+                            "textDocument/formatting", _SEMANTIC_DELTA}:
             point = _object(params.get("position"))
             offset = snapshot.position_byte_offset(_integer(point.get("line")),
                                                     _integer(point.get("character")))
@@ -258,8 +292,11 @@ class Server:
             if _integer(options.get("tabSize")) <= 0 or type(options.get("insertSpaces")) is not bool:
                 _invalid("formatting requires positive tabSize and Boolean insertSpaces")
         try:
+            token_history = None
             if method == "textDocument/formatting":
                 result = formatting_edits(snapshot, self.formatter(snapshot.source))
+            elif method in {_SEMANTIC_FULL, _SEMANTIC_DELTA}:
+                result, token_history = self._tokens(snapshot, previous_result, method == _SEMANTIC_DELTA)
             else:
                 result = project_inspection(snapshot, self._inspection(snapshot), method,
                                             position, include_declaration, requested_range)
@@ -270,6 +307,9 @@ class Server:
             # request, including when a string ID nearly fills the frame budget.
             return _error(request_id, -32803, "Inspection failed or exceeded bounds")
         else:
+            if token_history is not None:
+                self._token_history[uri] = token_history
+                self._token_serial += 1
             return reply
 
     def handle(self, message: dict[str, object]) -> list[dict[str, object]]:
@@ -300,6 +340,17 @@ class Server:
                 encodings = general.get("positionEncodings", ["utf-16"])
                 if not isinstance(encodings, list) or not all(isinstance(e, str) for e in encodings):
                     _invalid("invalid positionEncodings")
+                text_capabilities = _object(capabilities.get("textDocument", {}))
+                semantic = _object(text_capabilities.get("semanticTokens", {}))
+                token_requests = _object(semantic.get("requests", {}))
+                full_tokens = token_requests.get("full", False)
+                token_deltas = False
+                if isinstance(full_tokens, dict):
+                    token_deltas = full_tokens.get("delta", False)
+                    if type(token_deltas) is not bool:
+                        _invalid("semantic token delta capability must be a boolean")
+                elif type(full_tokens) is not bool:
+                    _invalid("semantic token full capability must be a boolean or object")
                 # UTF-16 is mandatory in LSP even when omitted from the offer.
                 reply: dict[str, object] = {"jsonrpc": "2.0", "id": request_id, "result": {
                     "capabilities": {"positionEncoding": "utf-16", "hoverProvider": True,
@@ -309,7 +360,7 @@ class Server:
                         "semanticTokensProvider": {
                             "legend": {"tokenTypes": list(SEMANTIC_TOKEN_TYPES),
                                        "tokenModifiers": list(SEMANTIC_TOKEN_MODIFIERS)},
-                            "full": True, "range": False},
+                            "full": {"delta": True}, "range": False},
                         "textDocumentSync": {
                         "openClose": True, "change": 2, "save": {"includeText": False}}},
                     "serverInfo": {"name": "Vela pure prototype (unqualified)", "version": "0"}}}
@@ -318,6 +369,7 @@ class Server:
                 except (FrameError, UnicodeError):
                     return [_error(request_id, -32803, "Initialization reply exceeds bounds")]
                 self.initialized = True
+                self._token_deltas = token_deltas
                 return [reply]
             if method == "shutdown" and request:
                 self.invalidate_inspections()
@@ -327,7 +379,7 @@ class Server:
                 self.received_versions.clear()
                 return [{"jsonrpc": "2.0", "id": request_id, "result": None}]
             if request:
-                if method in METHODS or method == "textDocument/formatting":
+                if method in METHODS or method in {"textDocument/formatting", _SEMANTIC_DELTA}:
                     return [self._navigation(request_id, method, params)]
                 return [_error(request_id, -32601, "Method not found")]
             if method == "initialized":
@@ -366,6 +418,7 @@ class Server:
                 old = self.documents[uri]
                 if method == "textDocument/didClose":
                     self._inspections.pop(uri, None)
+                    self._token_history.pop(uri, None)
                     del self.documents[uri]
                     self.desynchronized.discard(uri)
                     del self.received_versions[uri]
@@ -373,6 +426,7 @@ class Server:
                     return [self._clear(uri)]
                 if method == "textDocument/didSave":
                     self._inspections.pop(uri, None)
+                    self._token_history.pop(uri, None)
                     if uri in self.desynchronized:
                         return [self._clear(uri)]
                     return [self._diagnostics(old)]
@@ -398,6 +452,7 @@ class Server:
                     uri_value = document_value.get("uri")
                     if isinstance(uri_value, str) and uri_value in self.documents:
                         self._inspections.pop(uri_value, None)
+                        self._token_history.pop(uri_value, None)
                         self.desynchronized.add(uri_value)
                         return [self._clear(uri_value)]
             return []

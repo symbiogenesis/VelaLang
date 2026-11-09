@@ -72,7 +72,7 @@ def _server(text: str = _TEXT) -> Server:
            "document formatting capability is missing")
     ensure(capabilities.get("semanticTokensProvider") == {
         "legend": {"tokenTypes": ["function", "parameter", "variable"],
-                   "tokenModifiers": ["declaration", "readonly"]}, "full": True, "range": False},
+                   "tokenModifiers": ["declaration", "readonly"]}, "full": {"delta": True}, "range": False},
         "semantic token legend or supported operations differ from the contract")
     server.handle(_notice("initialized"))
     server.handle(_notice("textDocument/didOpen", {"textDocument": {
@@ -151,9 +151,9 @@ def _parameters_lifecycle_and_recovery() -> None:
         params = _params()
         params["options"] = options
         _error(server, "textDocument/formatting", params, -32602)
-    for method in ("textDocument/semanticTokens/range", "textDocument/semanticTokens/full/delta",
-                   "textDocument/rangeFormatting"):
+    for method in ("textDocument/semanticTokens/range", "textDocument/rangeFormatting"):
         _error(server, method, _params(), -32601)
+    _error(server, "textDocument/semanticTokens/full/delta", _params(), -32602)
     for text in ("module M; public Nat F()=>true;", "module M; public Nat F()=>;",
                  "module M; public Nat F(ref Nat x)=>x;"):
         server = _server(text)

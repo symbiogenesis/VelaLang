@@ -1129,7 +1129,7 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
                     "tokenTypes": list(SEMANTIC_TOKEN_TYPES),
                     "tokenModifiers": list(SEMANTIC_TOKEN_MODIFIERS),
                 },
-                "full": True,
+                "full": {"delta": True},
                 "range": False,
             },
             "textDocumentSync": {
@@ -1218,6 +1218,16 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
     }
 
 
+def _token_observation(key: str, value: object) -> object:
+    if "semantic_tokens" not in key or not isinstance(value, dict) or "resultId" not in value:
+        return value
+    identity = value["resultId"]
+    _require(isinstance(identity, str) and len(identity) == 64
+             and all(character in "0123456789abcdef" for character in identity),
+             "semantic token resultId is malformed")
+    return {field: item for field, item in value.items() if field != "resultId"}
+
+
 def verify_client_observation(observation: dict[str, object], oracle: dict[str, object]) -> None:
     """Verify a client's recorded scenario observations against the independent oracle."""
     label = str(observation.get("client", "unknown"))
@@ -1236,7 +1246,7 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     oracle1 = _object(oracle["stage1"])
     _require(stage1.get("diagnostics") == [], f"{label}: stage1 initial diagnostics not empty")
     for key, expected in oracle1.items():
-        _require(stage1.get(key) == expected, f"{label}: stage1.{key} mismatch")
+        _require(_token_observation(key, stage1.get(key)) == expected, f"{label}: stage1.{key} mismatch")
     if "goto_definition_cursor_1based" in stage1:
         _require(
             stage1["goto_definition_cursor_1based"] == [5, 18],
@@ -1247,7 +1257,7 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     oracle2 = _object(oracle["stage2"])
     _require(stage2.get("diagnostics") == [], f"{label}: stage2 formatted diagnostics not empty")
     for key, expected in oracle2.items():
-        _require(stage2.get(key) == expected, f"{label}: stage2.{key} mismatch")
+        _require(_token_observation(key, stage2.get(key)) == expected, f"{label}: stage2.{key} mismatch")
 
     stage3 = _object(observation.get("stage3"), f"{label}.stage3")
     oracle3 = _object(oracle["stage3"])
@@ -1272,7 +1282,8 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
         "broken_formatting",
         "broken_semantic_tokens",
     ):
-        _require(stage4.get(key) == oracle4[key], f"{label}: stage4.{key} exposed stale facts")
+        _require(_token_observation(key, stage4.get(key)) == oracle4[key],
+                 f"{label}: stage4.{key} exposed stale facts")
 
     stage5 = _object(observation.get("stage5"), f"{label}.stage5")
     oracle5 = _object(oracle["stage5"])
@@ -1285,7 +1296,7 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     oracle6 = _object(oracle["stage6"])
     _require(stage6.get("diagnostics") == [], f"{label}: stage6 recovery diagnostics not empty")
     for key, expected in oracle6.items():
-        _require(stage6.get(key) == expected, f"{label}: stage6.{key} mismatch")
+        _require(_token_observation(key, stage6.get(key)) == expected, f"{label}: stage6.{key} mismatch")
 
 
 def verify_wire_transcript(
