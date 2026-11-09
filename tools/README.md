@@ -7,7 +7,8 @@
 | Command | Lane | Purpose |
 | --- | --- | --- |
 | `python tools/run.py gate` | host / guest | Run `check`, `markdown`, and `typecheck` in one verdict |
-| `python tools/run.py check` | host / guest | Enforce REUSE v3.3, SPDX headers, EditorConfig, glyph hygiene, source-comment links, and JavaScript/playground asset bindings |
+| `python tools/run.py check` | host / guest | Enforce REUSE v3.3, SPDX headers, EditorConfig, glyph hygiene, source-comment links, JavaScript/playground asset bindings, and plan-summary arithmetic |
+| `python tools/run.py check --fix` | host / guest | Refresh only the generated estimate table in [PLAN.md](../PLAN.md#current-summary), then run all `check` rules |
 | `python tools/run.py markdown` | host / guest | Validate `tools/rumdl.toml` and run closed-world `rumdl` Markdown linting across the corpus |
 | `python tools/run.py typecheck` | host / guest | Typecheck and lint `tools/` under pinned `ty` (`linux` + `win32`) and `ruff` |
 | `python tools/run.py prepare python` | host / guest | Order imports in explicitly selected `tools/*.py` files with locked `ruff` |

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Repository-wide REUSE, SPDX header, EditorConfig, glyph, and source-reference checks."""
+"""Repository hygiene, licensing, source-reference, and plan-summary checks."""
 
 import ast
 import configparser
@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
 import toolchain as vela
-from toolchain import authoring, corpus, markdown, toolenv
+from toolchain import authoring, corpus, estimates, markdown, toolenv
 from toolchain.cli import typecheck
 from toolchain.report import Reporter
 
@@ -974,7 +974,7 @@ def javascript_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
 
 
 def run(root: Path) -> Reporter:
-    """Run all repository hygiene, licensing, EditorConfig, and source-reference checks."""
+    """Run all repository hygiene, licensing, source-reference, and plan-summary checks."""
     rep = Reporter()
     rep.line("=== check ===")
     try:
@@ -982,6 +982,13 @@ def run(root: Path) -> Reporter:
     except (OSError, ValueError, RuntimeError) as err:
         rep.report("corpus", "load error(s):", [f"cannot load repository corpus: {err}"])
         return rep
+    plan = loaded.get("PLAN.md")
+    rep.report(
+        "estimates",
+        "plan-summary finding(s):",
+        estimates.findings(plan.raw) if plan is not None else ["PLAN.md is missing"],
+        "the plan summary matches its priced checklist leaves and calibration record",
+    )
     rep.report(
         "reuse",
         "REUSE v3.3 compliance finding(s):",

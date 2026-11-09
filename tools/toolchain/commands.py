@@ -25,7 +25,7 @@ COMMANDS: tuple[Command, ...] = (
     Command("gate", "toolchain.cli.gate",
             "run check, markdown, and typecheck in one static verdict"),
     Command("check", "toolchain.cli.check",
-            "REUSE v3.3, SPDX headers, EditorConfig, glyph hygiene, and source-comment links"),
+            "repository hygiene, licensing, source-comment links, and plan-summary arithmetic"),
     Command("markdown", "toolchain.cli.markdown",
             "closed-world Markdown linting and link validation under pinned rumdl"),
     Command("typecheck", "toolchain.cli.typecheck",

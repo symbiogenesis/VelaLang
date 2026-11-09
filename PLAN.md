@@ -2,6 +2,52 @@
 
 This document is the source of truth for Vela language design, parser and elaborator qualification, authoring tooling, first-release delivery, and whole-system authoring proposals, extracted from [VerifiedOS](https://github.com/symbiogenesis/VerifiedOS).
 
+## Current Summary
+
+The table estimates completion of the priced Q25 checklist. This scope covers
+completed design decisions, bounded investigations and development prototypes.
+Q25w closed its investigation with a blocked outcome;
+the [first-release delivery](#vela-first-release-delivery) prerequisites remain
+open. **First-release completion is n/a:** its remaining foundation, source
+correspondence, backend and admission work is not fully priced.
+
+<!-- estimate-summary:start -->
+| Measure | Value |
+| --- | --- |
+| Total estimate midpoint h | 411.9 |
+| Total estimate range h | 411.9–411.9 |
+| Completed scope h | 411.9 |
+| Complete by estimate % | 100.0 |
+| Remaining h | 0 |
+| Open class I h | 0 |
+| Open class X h | 0 |
+| Retained completion estimate h | 408.5 |
+| Unmeasured completed items | 29 |
+<!-- estimate-summary:end -->
+
+The [checklist](#checklist-items-q25-series) owns completion status and the
+[calibration record](#calibration-record-q25-series) owns hours. Following
+[VerifiedOS's approach](https://github.com/symbiogenesis/VerifiedOS/blob/main/PLAN.md#current-summary),
+completed scope sums recorded actual hours, retaining each completed leaf's
+estimate when its actual is unavailable. Total midpoint is completed scope plus
+open leaf estimates; the range adds open lower and upper bounds to completed
+scope. Completion is `100 × completed scope / total midpoint`, rounded to one
+decimal (`n/a` when the total is zero). Parents contribute no duplicate hours.
+An open leaf needs a priced estimate and range before entering this accounting.
+
+These totals cover priced Q25 scope only. The four
+[language core proposals](#language-core-proposals) retain their separate,
+uncommissioned 412 h estimate (range 232–592 h); the
+[whole-system proposal](#vela-whole-system-authoring-proposal) and unpriced release stages add
+no hours here. Missing prices never imply zero remaining work. Actuals and
+retained estimates measure different things; this percentage is neither a
+release-readiness claim nor an elapsed-time forecast. The
+[completion log](docs/assurance/completion-log.md) owns landing evidence.
+
+`python tools/run.py check` checks the generated table for drift;
+`python tools/run.py check --fix` refreshes it from the checklist and calibration
+record. Update this scope description when the priced backlog changes.
+
 <a id="q-assessment-actions"></a>
 <a id="checklist-conventions"></a>
 
