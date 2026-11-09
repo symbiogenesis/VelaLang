@@ -204,18 +204,18 @@ Operators from weakest to strongest binding, as fixed by the
 | Level | Operators and forms | Associativity | Status |
 | --- | --- | --- | --- |
 | 1 | Lambdas `x => e`, quantifiers `forall (T x) => P`, `let ... in`, `if (c) a else b` | Extend right | M |
-| 2 | Implication `==>`, equivalence `<==>` | Right | S |
+| 2 | Implication `==>`, equivalence `<==>` | Right | M |
 | 3 | `\|\|` | Left | P |
 | 4 | `&&` | Left | P |
 | 5 | `==`, `!=`, `<`, `<=`, `>`, `>=`, `e is Pattern` | None | P (`is`: M) |
 | 6 | Range `a..b` | None | M |
-| 7 | Bitwise `\|` | Left | S |
-| 8 | Bitwise `^` | Left | S |
+| 7 | Bitwise `\|` | Left | M |
+| 8 | Bitwise `^` | Left | M |
 | 9 | Bitwise `&` | Left | M |
 | 10 | `+`, `-` | Left | P |
 | 11 | `*`, `/`, `%` | Left | P |
 | 12 | Record update `e with { Field = v, ... }` | Left | M |
-| 13 | Prefix `!`, `-`, `~`, `*p`, `&place`, `move`, `in`, `ref`, `out` | Right | P (`!`), M (`-`, `in`, `ref`, `out`), S (rest) |
+| 13 | Prefix `!`, `-`, `~`, `*p`, `&place`, `move`, `in`, `ref`, `out` | Right | P (`!`), M (`-`, `~`, `move`, `in`, `ref`, `out`), S (rest) |
 | 14 | Postfix call `f(...)`, member `.Name`, index `e[i]`, generic `F<T>(...)`, `F::<T>`, propagation `e?` | Left | P (calls), M |
 | 15 | Literals, names, `(e)`, tuples, `match`, holes `?name`, operator values `(+)` | n/a | P (literals, names, grouping), M |
 
@@ -314,9 +314,9 @@ public Nat CountTo(Nat limit)
 | Construct | Meaning | Status |
 | --- | --- | --- |
 | Value parameter `T x` | Passes a value; copying only where the value's resource rules permit | P |
-| `owned T x` / `move x` | Consuming transfer; the moved-from binding is unusable | S |
-| `in T x` / `in place` | Shared-read loan | M (`Span<byte>`), D (general) |
-| `ref T x` / `ref place` | Initialized exclusive loan | M (`Span<byte>`), D (general) |
+| `owned T x` / `move x` | Consuming transfer; the moved-from binding is unusable | M |
+| `in T x` / `in place` | Shared-read loan | M |
+| `ref T x` / `ref place` | Initialized exclusive loan | M |
 | `out T x` / `out place` | Initialization loan: no read before initialization, initialized on every normal return | M |
 | Receiver `this`, `ref this.Tail` | The receiver and a receiver loan limited to a named view | M (`this`), S (views) |
 | Named view `view Tail = slots[length], length grows;` | A part of a struct a signature can lend separately | S |
@@ -361,7 +361,7 @@ public Result<PacketView<'input>, ParseError> ParsePrefix(in Span<byte> input)
 | `restores P` | Predicate over the lender that holds when a returned loan ends; `final(x)` is the value the loan leaves behind | D ([restoration contracts](../assurance/verification-strategy.md#flow-sensitive-loans-and-restoration-contracts)) |
 | `invariant Name: P` | Named record or struct invariant conjunct, or a loop invariant | M |
 | `decreases m` | Termination measure of a recursive definition or loop | M |
-| `effects reads(a), writes(b), calls(f)` | Closed upper bound on reads, writes and calls, including transitive callees and captures; no allocation | S |
+| `effects reads(a), writes(b), calls(f)` | Closed upper bound on reads, writes and calls, including transitive callees and captures; no allocation | M |
 | `open (ref this, ref d) lifts A, B { ... }` | Opens only the listed invariant conjuncts; unlifted conjuncts stay in force, and the block must re-establish the lifted ones before any exit | M |
 
 A `ref` view parameter's descriptor metadata (base, length and permissions) is

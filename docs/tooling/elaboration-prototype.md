@@ -198,17 +198,26 @@ The supported increment includes:
   and postcondition (`ensures` / `restores`) binding to the final initialized
   value.
 - Source-bound local borrow bindings (`let r = in target;` and `let r = ref target;`
-  over local variables and disjoint record fields `target.Field`), connected to
+  over local variables and disjoint record fields `target.Field`), general
+  `in T` and `ref T` runtime value loans, consuming ownership (`owned T`
+  parameters and data fields with explicit `move expr` transfers and consuming
+  record updates `move base with { ... }`), and closed `effects` footprints
+  (`reads(...)`, `writes(...)`, `calls(...)`, and `effects none`), connected to
   path-sensitive loan-end inference ([`loans.py`](../../tools/toolchain/loans.py))
   and dependent mutation-invalidation rules under the
   [borrow-analysis promotion contract](../language/core-design.md#borrow-analysis-promotion):
   local `in` and `ref` borrows suspend conflicting parent/field reads, writes and
   moves until the borrow's path-sensitive last use while permitting simultaneous
   borrows and mutations of disjoint sibling record fields (`r.Low` versus `r.High`),
-  refuse loop-carried local borrows and local-reference return escape, and
-  invalidate stale current-value facts across writes to a mutable variable, field
-  or indexed collection while preserving immutable snapshots (`let snap = ...`),
-  `old(...)` pre-state references and proved-disjoint field facts.
+  `owned` parameters require explicit `move` arguments at call sites and refuse
+  use-after-move (`use-after-owner-move`), partial field/element moves
+  (`partial-owner-move-unsupported`), and moves through loans
+  (`move-through-loan-unsupported`), closed `effects` clauses verify borrowed
+  parameter reads, mutable parameter writes, and direct or transitive callable
+  invocations, and writes to a mutable variable, field or indexed collection
+  invalidate stale current-value facts while preserving immutable snapshots
+  (`let snap = ...`), `old(...)` pre-state references and proved-disjoint field
+  facts.
 - Explicit nonoverlapping `interface Name<T, ...> { ... }` and
   `impl<...> Interface<...> { ... }` declarations, supporting abstract callable
   signatures with `requires`/`where`/`ensures` contracts and abstract
