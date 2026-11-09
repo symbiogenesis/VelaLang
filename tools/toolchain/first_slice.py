@@ -419,7 +419,26 @@ def _reported_outputs(report: dict[str, object]) -> dict[str, str]:
     return outputs
 
 
-def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[str, object]) -> None:
+def _stream_identity(stdout: str, stderr: str) -> dict[str, object]:
+    streams = {"stdout": stdout.encode("utf-8"), "stderr": stderr.encode("utf-8")}
+    return {key: value for name, raw in streams.items()
+            for key, value in ((f"{name}_bytes", len(raw)), (f"{name}_sha256", _sha256(raw)))}
+
+
+def _retained_stdout(step: dict[str, object]) -> bytes:
+    """Recover the explicitly bound stdout prefix without filtering process diagnostics."""
+    raw = Path(str(step["log"])).read_bytes()
+    stdout_bytes, stderr_bytes = step.get("stdout_bytes"), step.get("stderr_bytes")
+    if (type(stdout_bytes) is not int or type(stderr_bytes) is not int
+            or stdout_bytes < 0 or stderr_bytes < 0 or stdout_bytes + stderr_bytes != len(raw)):
+        raise ValueError("first-slice receipt process stream lengths are malformed")
+    stdout, stderr = raw[:stdout_bytes], raw[stdout_bytes:]
+    if step.get("stdout_sha256") != _sha256(stdout) or step.get("stderr_sha256") != _sha256(stderr):
+        raise ValueError("first-slice receipt process stream hashes changed")
+    return stdout
+
+
+def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[str, object]) -> str:
     """Bind every declared process observation and the required local proof steps."""
     steps = report.get("steps")
     if not isinstance(steps, list) or not steps or len(steps) > ARTIFACT_ENTRIES:
@@ -434,7 +453,7 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
         "FirstSliceCorrupted.compile.log": _opam(["rocq", "c", "-q", "-R", str(directory),
                                                    "VelaFirstSlice", "FirstSliceCorrupted.v"]),
     }
-    covered: set[str] = set()
+    covered: dict[str, bytes] = {}
     for step in steps:
         if not isinstance(step, dict):
             raise TypeError("first-slice receipt process observation is malformed")
@@ -453,9 +472,12 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
         if name in required:
             if command != required[name]:
                 raise ValueError("first-slice receipt proof command differs from its declared subject")
-            covered.add(name)
-    if covered != required.keys() or report.get("proof_corruption_refused") is not True:
+            if name in covered:
+                raise ValueError("first-slice receipt repeats a required proof observation")
+            covered[name] = _retained_stdout(step)
+    if covered.keys() != required.keys() or report.get("proof_corruption_refused") is not True:
         raise ValueError("first-slice receipt omits required local proof or corruption coverage")
+    return covered["FirstSlice.assumptions.log"].decode("utf-8")
 
 
 def _retained_proof(root: Path, report: dict[str, object], directory: Path,
@@ -486,9 +508,9 @@ def _retained_proof(root: Path, report: dict[str, object], directory: Path,
         f"Print Assumptions FirstSlice.{modules[0]}.{name}.\n" for name in exports)
     if (directory / "FirstSliceAssumptions.v").read_text(encoding="utf-8") != expected_query:
         raise ValueError("first-slice receipt assumption query omits or changes an audited export")
+    assumption_output = _retained_steps(report, directory, artifacts)
     trusted = solver_ledger.ledger(gallina)
-    reported = solver_ledger.audit((directory / "FirstSlice.assumptions.log").read_text(encoding="utf-8"),
-                                    len(exports), modules[0], trusted)
+    reported = solver_ledger.audit(assumption_output, len(exports), modules[0], trusted)
     inventory = report.get("inventory")
     assumptions = ("Closed under the global context (0 axioms)" if not trusted
                    else f"{len(trusted)} solver-trusted axioms; no other assumptions")
@@ -503,7 +525,6 @@ def _retained_proof(root: Path, report: dict[str, object], directory: Path,
             or inventory.get("solver_trusted_obligations") != [entry.as_json() for entry in trusted]
             or inventory.get("global_assumptions") != assumptions):
         raise ValueError("first-slice receipt source-proof status contradicts its retained assumption ledger")
-    _retained_steps(report, directory, artifacts)
 
 
 def _write(path: Path, payload: object) -> None:
@@ -535,6 +556,7 @@ def _run(command: list[str], cwd: Path, log_path: Path,
         "returncode": completed.returncode,
         "log": str(log_path),
         "log_sha256": _sha256(log_path.read_bytes()),
+        **_stream_identity(completed.stdout, completed.stderr),
     })
     if completed.returncode != 0:
         raise ValueError(f"command failed ({completed.returncode}): {' '.join(command)}\n{combined[-600:]}")
@@ -1699,7 +1721,8 @@ def _qualify_attempt(
     corruption_log.write_text(corrupt_proc.stdout + corrupt_proc.stderr, encoding="utf-8", newline="")
     steps.append({"command": corrupt_proc.args, "cwd": str(directory),
                   "returncode": corrupt_proc.returncode, "expected_refusal": True,
-                  "log": str(corruption_log), "log_sha256": _sha256(corruption_log.read_bytes())})
+                  "log": str(corruption_log), "log_sha256": _sha256(corruption_log.read_bytes()),
+                  **_stream_identity(corrupt_proc.stdout, corrupt_proc.stderr)})
 
     # 3. Capacity-invariance gate (8usize vs 1_000_000_000usize)
     cap_gate = _run_capacity_invariance_gate(compiled, directory, steps)

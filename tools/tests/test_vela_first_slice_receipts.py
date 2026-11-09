@@ -3,6 +3,7 @@
 
 import copy
 import json
+import subprocess
 import tempfile
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
@@ -17,7 +18,8 @@ from toolchain.cli import vela_parser as cli
 INDEPENDENT_CASES = True
 
 
-def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False) -> dict[str, object]:
+def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
+                   assumption_stderr: bytes = b"") -> dict[str, object]:
     """Retain an independently assembled local proof report for binding-only checks."""
     labels = (
         "LawInhabitedByteCase", "LawAllocZeroedRead", "LawReadOverWriteSame", "LawReadOverWriteOther",
@@ -43,9 +45,10 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False) -> dict[
     (outputs / "FirstSliceAssumptions.v").write_text(
         "From VelaFirstSlice Require Import FirstSlice.\n" + "".join(
             f"Print Assumptions FirstSlice.{module}.{name}.\n" for name in names), encoding="utf-8")
-    (outputs / "FirstSlice.assumptions.log").write_text("".join(
+    assumption_stdout = "".join(
         f"Axioms:\n{module}.{axiom} : True\n" if trusted and index == 16
-        else "Closed under the global context\n" for index in range(len(names))), encoding="utf-8")
+        else "Closed under the global context\n" for index in range(len(names))).encode("utf-8")
+    (outputs / "FirstSlice.assumptions.log").write_bytes(assumption_stdout + assumption_stderr)
     for name in ("FirstSlice.vo", "FirstSliceAssumptions.vo", "first_slice.c"):
         (outputs / name).write_bytes(f"retained {name}".encode())
     source = root / slice_harness.EXAMPLE
@@ -63,10 +66,14 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False) -> dict[
         if not log.is_file():
             log.write_bytes(b"independent retained transcript")
         refused = name == "FirstSliceCorrupted.compile.log"
+        stdout = assumption_stdout if name == "FirstSlice.assumptions.log" else log.read_bytes()
+        stderr = assumption_stderr if name == "FirstSlice.assumptions.log" else b""
         row: dict[str, object] = {
             "command": ["opam", "exec", "--switch", slice_harness.proofenv.ROCQ_SWITCH, "--", *command],
             "cwd": str(outputs), "returncode": 1 if refused else 0,
             "log": str(log), "log_sha256": slice_harness._sha256(log.read_bytes()),
+            "stdout_bytes": len(stdout), "stdout_sha256": slice_harness._sha256(stdout),
+            "stderr_bytes": len(stderr), "stderr_sha256": slice_harness._sha256(stderr),
         }
         if refused:
             row["expected_refusal"] = True
@@ -362,6 +369,66 @@ def _retained_coverage() -> None:
                 raise AssertionError(f"rehashed {mutation} concealed incomplete local proof coverage")
 
 
+def _process_streams() -> None:
+    warning = b"[WARNING] Running as root is not recommended\n"
+    with tempfile.TemporaryDirectory(prefix="vela-slice-streams-") as temporary:
+        root = Path(temporary)
+        outputs = root / "slice-fixture"
+        outputs.mkdir()
+        for trusted in (False, True):
+            report = _proof_fixture(root, outputs, trusted=trusted, assumption_stderr=warning)
+            artifacts: dict[str, object] = dict(slice_harness._artifacts(outputs))
+            slice_harness._retained_proof(root, report, outputs, artifacts)
+            ensure((outputs / "FirstSlice.assumptions.log").read_bytes().endswith(warning),
+                   "stderr warning was discarded from the retained transcript")
+        report = _proof_fixture(root, outputs, assumption_stderr=warning)
+        artifacts = dict(slice_harness._artifacts(outputs))
+        for field, changed in (("stdout_bytes", True), ("stdout_bytes", -1), ("stdout_bytes", 0),
+                               ("stdout_bytes", 100_000), ("stdout_sha256", "0" * 64),
+                               ("stderr_bytes", True), ("stderr_bytes", -1), ("stderr_bytes", 0),
+                               ("stderr_sha256", "0" * 64)):
+            damaged = copy.deepcopy(report)
+            rows = cast("list[dict[str, object]]", damaged["steps"])
+            rows[1][field] = changed
+            try:
+                slice_harness._retained_proof(root, damaged, outputs, artifacts)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"tampered assumption stream {field} was accepted")
+        for mutation in ("missing-stream-identity", "duplicate-observation", "warning-on-stdout"):
+            damaged = copy.deepcopy(report)
+            rows = cast("list[dict[str, object]]", damaged["steps"])
+            if mutation == "missing-stream-identity":
+                del rows[1]["stdout_sha256"]
+            elif mutation == "duplicate-observation":
+                rows.append(copy.deepcopy(rows[1]))
+            else:
+                raw = (outputs / "FirstSlice.assumptions.log").read_bytes()
+                rows[1].update(stdout_bytes=len(raw), stdout_sha256=slice_harness._sha256(raw),
+                               stderr_bytes=0, stderr_sha256=slice_harness._sha256(b""))
+            try:
+                slice_harness._retained_proof(root, damaged, outputs, artifacts)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"{mutation} concealed malformed stdout or provenance")
+        stdout, stderr = "Closed under the global context\n", "diagnostic λ\n"
+        command = ["independent-command"]
+        completed = subprocess.CompletedProcess(command, 0, stdout, stderr)
+        steps: list[dict[str, object]] = []
+        log = outputs / "run.log"
+        with patch.object(slice_harness.subprocess, "run", return_value=completed):
+            result = slice_harness._run(command, outputs, log, steps)
+        ensure(result == stdout and log.read_bytes() == (stdout + stderr).encode("utf-8"),
+               "producer merged diagnostics into stdout or discarded retained bytes")
+        ensure(steps[0]["stdout_bytes"] == len(stdout.encode("utf-8"))
+               and steps[0]["stderr_bytes"] == len(stderr.encode("utf-8"))
+               and steps[0]["stdout_sha256"] == slice_harness._sha256(stdout.encode("utf-8"))
+               and steps[0]["stderr_sha256"] == slice_harness._sha256(stderr.encode("utf-8")),
+               "producer stream identity uses character positions or another byte subject")
+
+
 def _output_bounds() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-output-bounds-") as temporary:
         root = Path(temporary)
@@ -409,5 +476,6 @@ def cases() -> list[Case]:
             Case("changed inputs withdraw first-slice publication", _publication_freshness),
             Case("retained first-slice identities and malformed refusals", _binding_checks),
             Case("retained proof coverage and assumption consistency", _retained_coverage),
+            Case("stdout audit provenance preserves stderr diagnostics", _process_streams),
             Case("first-slice output directory and inventory bounds", _output_bounds),
             Case("first-slice binding CLI and refusal", _cli_dispatch)]

@@ -524,6 +524,10 @@ not establish checked source correspondence or machine/artifact acceptance.
   omitted libraries, changed process subjects or verdicts and source-proof
   status inconsistent with the actual solver-trust ledger refuse, including
   attempts to promote a nonempty ledger by changing `accepted` or `kernel_checked`.
+  Native proof observations bind separate UTF-8 stdout/stderr byte lengths and
+  hashes within each combined retained transcript. The assumption audit consumes
+  that checked stdout segment; tool diagnostics on stderr remain retained without
+  becoming assumption reports or weakening malformed-stdout refusals.
   Output directories must belong to the current checkout's local lane; inventories
   reject aliases and exceedance of 4,096 entries or 256 MiB. Runtime identity
   normalizes only the qualification working-directory load-path entry, retaining
