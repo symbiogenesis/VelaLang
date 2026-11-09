@@ -79,6 +79,34 @@ class _StatementsMixin:
             [*items[:idx], cls._with_node_field(item_node, child_key, inner_rebuild(repl)), *items[idx + 1:]],
         )
 
+    def _has_order_sensitive_evaluation(self: _Elaborator, node: Node) -> bool:
+        self.tick()
+        if node.get("kind") in {"call", "block"}:
+            return True
+        if node.get("kind") == "unary" and self.operator(node["operator"]) in {"in", "ref", "out", "move"}:
+            return True
+        for value in node.values():
+            if isinstance(value, dict) and self._has_order_sensitive_evaluation(value):
+                return True
+            if isinstance(value, list) and any(
+                self._has_order_sensitive_evaluation(item) for item in value if isinstance(item, dict)
+            ):
+                return True
+        return False
+
+    def _require_propagation_order(
+        self: _Elaborator, earlier: list[Node], propagated: Node, site: Node
+    ) -> None:
+        if earlier and (
+            any(self._has_order_sensitive_evaluation(value) for value in earlier)
+            or self._has_order_sensitive_evaluation(propagated)
+        ):
+            raise self.fail(
+                "unsupported",
+                "propagation across callable or ownership evaluation requires an explicit earlier local",
+                site,
+            )
+
     def _split_first_propagate(self: _Elaborator, node: Node) -> tuple[Node, Callable[[Node], Node]] | None:
         kind = node["kind"]
         if kind == "propagate":
@@ -103,6 +131,7 @@ class _StatementsMixin:
                 if self.operator(node["operator"]) in {"&&", "||"}:
                     # The RHS early exit belongs inside the Boolean guard.
                     return node, lambda repl: repl
+                self._require_propagation_order([self.node(node["left"])], self.node(node["right"]), node)
                 prop, inner_rebuild = res_r
                 return prop, lambda repl: self._with_node_field(node, "right", inner_rebuild(repl))
             return None
@@ -111,6 +140,7 @@ class _StatementsMixin:
             for i, v in enumerate(vals):
                 res = self._split_first_propagate(v)
                 if res is not None:
+                    self._require_propagation_order(vals[:i], v, node)
                     prop, inner_rebuild = res
                     return prop, self._make_list_rebuilder(node, "values", vals, i, inner_rebuild)
             return None
@@ -123,6 +153,15 @@ class _StatementsMixin:
             for i, a in enumerate(args):
                 res_a = self._split_first_propagate(self.node(a["value"]))
                 if res_a is not None:
+                    callee = self.node(node["callee"])
+                    plain_callee = callee
+                    while plain_callee["kind"] in {"group", "generic_application"}:
+                        plain_callee = self.node(plain_callee["value"])
+                    stable_callee = (plain_callee["kind"] == "name"
+                                     and self.name(plain_callee["name"]) not in self.mutable_locals)
+                    earlier = [] if stable_callee else [callee]
+                    earlier.extend(self.node(arg["value"]) for arg in args[:i])
+                    self._require_propagation_order(earlier, self.node(a["value"]), node)
                     prop, inner_rebuild = res_a
                     return prop, self._make_nested_list_rebuilder(node, "arguments", args, i, a, "value", inner_rebuild)
             return None
@@ -135,6 +174,10 @@ class _StatementsMixin:
             for i, u in enumerate(upds):
                 res_u = self._split_first_propagate(self.node(u["value"]))
                 if res_u is not None:
+                    self._require_propagation_order(
+                        [self.node(node["value"]), *(self.node(upd["value"]) for upd in upds[:i])],
+                        self.node(u["value"]), node,
+                    )
                     prop, inner_rebuild = res_u
                     return prop, self._make_nested_list_rebuilder(node, "updates", upds, i, u, "value", inner_rebuild)
             return None
@@ -167,6 +210,7 @@ class _StatementsMixin:
                 return prop, lambda repl: self._with_node_field(node, "value", inner_rebuild(repl))
             res_i = self._split_first_propagate(self.node(node["index"]))
             if res_i is not None:
+                self._require_propagation_order([self.node(node["value"])], self.node(node["index"]), node)
                 prop, inner_rebuild = res_i
                 return prop, lambda repl: self._with_node_field(node, "index", inner_rebuild(repl))
             return None

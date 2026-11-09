@@ -3012,6 +3012,110 @@ def _short_circuit_propagation() -> None:
     elaborate(source, response)
 
 
+def _propagation_evaluation_order() -> None:
+    def base(module: str) -> _Fixture:
+        fixture = _Fixture(module)
+        fixture.union("Option", (("None", ()), ("Some", (("Value", _T),))), generics=_POLY)
+        fixture.record("Pair", (("First", _BOOL), ("Second", _BOOL)))
+        fixture.function(
+            "Tick", _BOOL, (("x", _modified("ref", _NAT)), ("flag", _BOOL)),
+            _block_stmts(
+                _assign_stmt(_variable("x"), "=", _binary("+", _variable("x"), _natural(1))),
+                _return_stmt(_variable("flag")),
+            ), block=True,
+        )
+        fixture.definition("Combine", _type("Option", _BOOL),
+                           (("first", _BOOL), ("second", _BOOL)), _call("Some", _variable("second")))
+        fixture.function(
+            "Bump", _type("Option", _BOOL), (("x", _modified("ref", _NAT)),),
+            _block_stmts(_expr_stmt(_call("Tick", _ref_arg(_variable("x")), _boolean(True))),
+                         _return_stmt(_call("Some", _boolean(True)))), block=True,
+        )
+        return fixture
+
+    tick = _call("Tick", _ref_arg(_variable("x")), _boolean(True))
+    absent = _propagate(_variable("None", _BOOL))
+    vec = _call("VCons", _boolean(True), _call("VNil", generics=(_BOOL,)))
+    for name, expression in (
+        ("EarlierArgument", _call("Combine", tick,
+                                  _binary("&&", _binary("==", _variable("x"), _natural(1)), absent))),
+        ("EarlierBinaryOperand", _call("Some", _binary("==", tick, absent))),
+        ("EarlierTupleElement", _call("Some", _call("Fst", _tuple(tick, absent)))),
+        ("EarlierRecordBase", _call("Some", _member(
+            _with_expr(_call("Pair", tick, _boolean(False)), (("Second", absent),)), "Second"))),
+        ("EarlierIndexBase", _call("Some", _index_expr(vec, _propagate(_call("Some", _natural(0)))))),
+        ("LaterMutation", _call("Combine", _binary("==", _variable("x"), _natural(0)),
+                                _propagate(_call("Bump", _ref_arg(_variable("x")))))),
+    ):
+        fixture = base(name)
+        fixture.function(
+            "Probe", _type("Option", _BOOL), (),
+            _block_stmts(_var_stmt("x", _natural(0)), _return_stmt(expression)), block=True,
+        )
+        _refuses(fixture, "unsupported", "explicit earlier local")
+
+    fixture = base("ExplicitPropagationOrder")
+    fixture.function(
+        "Sequenced", _type("Option", _BOOL), (),
+        _block_stmts(
+            _var_stmt("x", _natural(0)),
+            _let_stmt("first", tick),
+            _return_stmt(_call("Combine", _variable("first"),
+                               _binary("&&", _binary("==", _variable("x"), _natural(1)), absent))),
+        ), block=True,
+    )
+    fixture.function(
+        "GuardOnce", _type("Option", _BOOL), (),
+        _block_stmts(
+            _var_stmt("x", _natural(0)),
+            _let_stmt("value", _binary("&&", _call("Tick", _ref_arg(_variable("x")), _boolean(False)), absent)),
+            _return_stmt(_call("Some", _binary("&&", _binary("==", _variable("x"), _natural(1)),
+                                               _unary_op("!", _variable("value"))))),
+        ), block=True,
+    )
+    fixture.definition("PureOperands", _type("Option", _NAT), (("value", _type("Option", _NAT)),),
+                       _call("Some", _binary("+", _natural(3), _propagate(_variable("value")))))
+    for name, expected in (("Sequenced", _variable("None", _BOOL)),
+                           ("GuardOnce", _call("Some", _boolean(True)))):
+        claim = _binary("==", _call(name), expected)
+        fixture.theorem(name + "Correct", (), claim, _assert(claim))
+    claim = _binary("==", _call("PureOperands", _call("Some", _natural(4))), _call("Some", _natural(7)))
+    fixture.theorem("PureOperandsCorrect", (), claim, _assert(claim))
+    source, response = fixture.response()
+    elaborate(source, response)
+
+    out = base("GuardedPropagationBeforeOutInitialization")
+    out.function(
+        "Bad", _type("Option", _BOOL),
+        (("flag", _BOOL), ("right", _type("Option", _BOOL)), ("dst", _modified("out", _NAT))),
+        _block_stmts(
+            _let_stmt("value", _binary("&&", _variable("flag"), _propagate(_variable("right")))),
+            _assign_stmt(_variable("dst"), "=", _natural(1)),
+            _return_stmt(_call("Some", _variable("value"))),
+        ), block=True,
+    )
+    _refuses(out, "type", "before 'out' parameter 'dst' is initialized")
+
+    lifted = _Fixture("GuardedPropagationWhileInvariantLifted")
+    lifted.union("Option", (("None", ()), ("Some", (("Value", _T),))), generics=_POLY)
+    lifted.record("Bounds", (("Low", _NAT), ("High", _NAT)), contracts=(
+        _invariant_contract(_binary("<=", _variable("Low"), _variable("High")), "Ordered"),
+    ))
+    lifted.function(
+        "Bad", _type("Option", _BOOL), (("flag", _BOOL), ("right", _type("Option", _BOOL))),
+        _block_stmts(
+            _var_stmt("bounds", _call("Bounds", _natural(0), _natural(1))),
+            _open_lifts((_ref_arg(_variable("bounds")),), ("Ordered",), (
+                _let_stmt("value", _call("Some", _binary("&&", _variable("flag"),
+                                                         _propagate(_variable("right")))),
+                          _type("Option", _BOOL)),
+            )),
+            _return_stmt(_call("Some", _boolean(True))),
+        ), block=True,
+    )
+    _refuses(lifted, "type", "while a record invariant is lifted")
+
+
 def _int_lit(value: str, suffix: str = "") -> Form:
     def form(fixture: _Fixture) -> Node:
         start = fixture.offset
@@ -6251,6 +6355,7 @@ def cases() -> list[Case]:
             Case("dependent-records-and-existential-propositions", _dependent_records_and_existential_propositions),
             Case("early-return-propagation-for-option-and-result", _early_return_propagation),
             Case("short-circuit-option-and-result-propagation", _short_circuit_propagation),
+            Case("propagation-preserves-explicit-evaluation-order", _propagation_evaluation_order),
             Case("represented-integers-preconditions-and-conversions", _represented_integers_and_conversions),
             Case("pure-sequences-and-model-reasoning", _pure_sequences_and_model_reasoning),
             Case("mutable-locals-assignments-and-bounded-loops", _mutable_locals_assignments_and_bounded_loops),
