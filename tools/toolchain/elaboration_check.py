@@ -50,6 +50,38 @@ class Fixture:
 def fixtures(example: bytes) -> tuple[Fixture, ...]:
     """Independent source examples and well-formed semantic negative neighbors."""
     positives = (
+        ("short-circuit-propagation", """module ShortCircuitReplay;
+public union Option<T> { None(); Some(T Value); }
+public union Result<T,E> { Ok(T Value); Err(E Error); }
+public definition Option<bool> AndOption(bool left, Option<bool> right) => Some(left && right?);
+public definition Option<bool> OrOption(bool left, Option<bool> right) => Some(left || right?);
+public definition Result<bool,Nat> AndResult(bool left, Result<bool,Nat> right) => Ok(left && right?);
+public definition Result<bool,Nat> OrResult(bool left, Result<bool,Nat> right) => Ok(left || right?);
+public definition Option<bool> Nested(bool left, Option<bool> right) => Some(left && (false || right?));
+public lemma TruthTable()
+    ensures AndOption(false, None::<bool>) == Some(false)
+    ensures OrOption(true, None::<bool>) == Some(true)
+    ensures AndOption(true, None::<bool>) == None::<bool>
+    ensures OrOption(false, None::<bool>) == None::<bool>
+    ensures AndResult(false, Err<bool,Nat>(7)) == Ok(false)
+    ensures OrResult(true, Err<bool,Nat>(7)) == Ok(true)
+    ensures AndResult(true, Err<bool,Nat>(7)) == Err<bool,Nat>(7)
+    ensures OrResult(false, Err<bool,Nat>(7)) == Err<bool,Nat>(7)
+    ensures Nested(false, None::<bool>) == Some(false)
+    ensures Nested(true, None::<bool>) == None::<bool>
+    proof {
+        assert AndOption(false, None::<bool>) == Some(false);
+        assert OrOption(true, None::<bool>) == Some(true);
+        assert AndOption(true, None::<bool>) == None::<bool>;
+        assert OrOption(false, None::<bool>) == None::<bool>;
+        assert AndResult(false, Err<bool,Nat>(7)) == Ok(false);
+        assert OrResult(true, Err<bool,Nat>(7)) == Ok(true);
+        assert AndResult(true, Err<bool,Nat>(7)) == Err<bool,Nat>(7);
+        assert OrResult(false, Err<bool,Nat>(7)) == Err<bool,Nat>(7);
+        assert Nested(false, None::<bool>) == Some(false);
+        assert Nested(true, None::<bool>) == None::<bool>;
+    }
+"""),
         ("fresh-polymorphic-calls", """module GenericReplay;
 definition T Identity<T>(T value) => value;
 definition Nat Number() => Identity(3);
