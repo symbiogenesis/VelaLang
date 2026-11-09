@@ -304,7 +304,9 @@ The command runs through the existing guest dispatch because Menhir is native.
 elaborates the authored example and independent positive/negative sources, then
 kernel-checks emitted terms with the locked proof switch and recursively checks
 the resulting library. Its receipt binds source, elaborator, parser and tool
-identities. A rejected neighbor must reach its intended semantic diagnostic;
+identities. The assumption audit refuses empty, malformed or unsupported
+reports; only the recognized closed-context response establishes zero assumptions.
+A rejected neighbor must reach its intended semantic diagnostic;
 parse failure and unavailable tooling supply no semantic rejection evidence.
 The model Guest CI lane runs this command. A kernel verdict covers generated
 terms only, not checked parsing or source correspondence.

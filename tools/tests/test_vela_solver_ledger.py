@@ -63,9 +63,40 @@ def _audit_matches_kernel_report() -> None:
         raise AssertionError(f"audit accepted a report with an {label}")
 
 
+def _audit_refuses_malformed_reports() -> None:
+    for report in (
+        "Axioms:\n",
+        "Axioms:\n  hidden : False\n",
+        "Axioms:\nhidden\n  : False\n",
+        "Axioms:\n\u00c9vidence : False\n",
+        "Axioms:\nClosed under the global context\n",
+        "Closed under the global context\ntrailing output\n",
+        "Closed under the global context\n  hidden : False\n",
+        "hidden : False\nClosed under the global context\n",
+    ):
+        audited = report.count("Closed under the global context") + report.count("Axioms:")
+        try:
+            solver_ledger.audit(report, audited, _MODULE, ())
+        except ValueError:
+            continue
+        raise AssertionError(f"malformed output supplied an empty assumption verdict: {report!r}")
+    entries = solver_ledger.ledger(_GALLINA)
+    wrapped = "Axioms:\nVela_M.vela_solver_vela_d3_Law :\n  forall x : nat,\n  x = x\n"
+    ensure(solver_ledger.audit(wrapped, 1, _MODULE, entries)
+           == ["Vela_M.vela_solver_vela_d3_Law"],
+           "a supported wrapped proposition lost its assumption identity")
+    try:
+        solver_ledger.audit(wrapped + "Axioms:\n", 2, _MODULE, entries)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a valid report hid an empty later report")
+
+
 def cases() -> list[Case]:
     return [
         Case("ledger-reads-markers", _ledger_reads_markers),
         Case("ledger-refuses-unmarked-axioms", _ledger_refuses_unmarked_axioms),
         Case("audit-matches-kernel-report", _audit_matches_kernel_report),
+        Case("audit-refuses-malformed-reports", _audit_refuses_malformed_reports),
     ]

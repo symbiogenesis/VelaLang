@@ -70,16 +70,29 @@ def audit(output: str, audited: int, module: str,
         raise ValueError(f"expected {audited} assumption reports, found {reports}")
     allowed = {f"{module}.{entry.axiom}" for entry in entries}
     reported: set[str] = set()
+    in_axioms = False
+    has_axiom = False
     for line in lines:
-        if line in {"Closed under the global context", "Axioms:"} or line[0].isspace():
+        if line in {"Closed under the global context", "Axioms:"}:
+            if in_axioms and not has_axiom:
+                raise ValueError("empty or malformed kernel assumption report")
+            in_axioms = line == "Axioms:"
+            has_axiom = False
+            continue
+        if line[0].isspace():
+            if not in_axioms or not has_axiom:
+                raise ValueError("unexpected kernel assumption continuation")
             continue
         match = _ASSUMPTION_NAME.match(line)
-        if match is None:
-            continue
+        if match is None or not in_axioms:
+            raise ValueError("unsupported kernel assumption report")
         name = match["name"]
         if name not in allowed:
             raise ValueError(f"exports depend on an unledgered assumption: {name}")
         reported.add(name)
+        has_axiom = True
+    if in_axioms and not has_axiom:
+        raise ValueError("empty or malformed kernel assumption report")
     if reported != allowed:
         raise ValueError(f"ledger axioms not reported by any export: {sorted(allowed - reported)}")
     return sorted(reported)
