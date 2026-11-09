@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Independent declaration/type/identity oracles for the pure compiler inspector."""
 
+import hashlib
 import json
 import sys
 from contextlib import redirect_stdout
@@ -152,18 +153,24 @@ def _worker(source: bytes, inspect: bool) -> tuple[int, object]:
 
 
 def _worker_modes_and_output_bound() -> None:
-    ensure(_worker(_SOURCE.encode(), True) == (0, _expected()), "worker lost inspection facts")
+    digest = hashlib.sha256(_SOURCE.encode()).hexdigest()
+    ensure(_worker(_SOURCE.encode(), True) == (0, {**_expected(), "source_sha256": digest}),
+           "worker lost inspection facts or their original-byte source binding")
     ensure(_worker(_SOURCE.encode(), False) == (0, None), "existing diagnostic mode changed")
     source = b"module Bad; public Nat Bad() { return true; }"
-    ensure(_worker(source, True) == (0, {"status": "unavailable", "reason": "type"}),
+    ensure(_worker(source, True) == (0, {"status": "unavailable", "reason": "type",
+                                        "source_sha256": hashlib.sha256(source).hexdigest()}),
            "failed worker inspection published partial facts")
     code, diagnostic = _worker(source, False)
     ensure(code == 0 and isinstance(diagnostic, dict) and diagnostic.get("kind") == "type",
            "existing worker diagnostics changed")
-    with patch.object(vela_lsp_worker, "MAX_BODY_BYTES", 64):
-        ensure(_worker(_SOURCE.encode(), True) ==
-               (0, {"status": "unavailable", "reason": "inspection-limit"}),
+    with patch.object(vela_lsp_worker, "MAX_BODY_BYTES", 256):
+        code, result = _worker(_SOURCE.encode(), True)
+        ensure((code, result) ==
+               (0, {"status": "unavailable", "reason": "inspection-limit", "source_sha256": digest}),
                "oversized worker response was partially published")
+        ensure(len(json.dumps(result, ensure_ascii=True).encode()) <= 256,
+               "source-bound overflow refusal exceeded its transport budget")
 
 
 def cases() -> list[Case]:
