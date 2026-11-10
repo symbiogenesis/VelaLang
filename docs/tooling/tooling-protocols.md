@@ -375,6 +375,10 @@ only for `checked` and preserves the source file.
 
 ## Syntax grammars and highlighting
 
+The distributed [editor syntax assets](highlighting.md) implement this boundary
+with generated Tree-sitter/TextMate assets, pinned independent consumers, the
+shared canonical corpus and explicit recovery dispositions.
+
 Distribute [Tree-sitter grammars and queries](https://tree-sitter.github.io/tree-sitter/3-syntax-highlighting.html)
 for syntax-aware consumers and a
 [TextMate grammar](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide)

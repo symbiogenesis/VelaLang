@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
 import toolchain as vela
-from toolchain import authoring, corpus, estimates, markdown, toolenv
+from toolchain import authoring, corpus, estimates, highlight_qualification, markdown, toolenv
 from toolchain.cli import typecheck
 from toolchain.report import Reporter
 
@@ -31,6 +31,8 @@ _SOURCE_REF_SUFFIXES = (
     ".mli",
     ".mll",
     ".mly",
+    ".c",
+    ".scm",
     ".v",
     ".mjs",
     ".js",
@@ -216,6 +218,8 @@ def marks_findings(root: Path, loaded: corpus.Corpus) -> list[str]:
         ".mll": (f"(* {tag} *)",),
         ".v": (f"(* {tag} *)",),
         ".mly": (f"/* {tag} */",),
+        ".c": (f"/* {tag} */",),
+        ".scm": (f"; {tag}",),
         ".css": (f"/* {tag} */",),
         ".mjs": (f"// {tag}",),
         ".js": (f"// {tag}",),
@@ -776,6 +780,8 @@ def _js_module_findings(rel: str, text: str) -> list[str]:
         return findings
     declared = _collect_js_declarations(tokens)
     known = declared | _JS_GLOBALS | _JS_KEYWORDS
+    if rel == "tools/editor/tree-sitter/grammar.js":
+        known |= {"module", "grammar", "seq", "choice", "optional", "repeat", "repeat1", "token"}
     paren_stops = frozenset({")"})
     m = len(tokens)
     for idx, (kind, val, ln, cl) in enumerate(tokens):
@@ -1034,6 +1040,10 @@ def run(root: Path, *, loaded: corpus.Corpus | RuntimeError | None = None) -> Re
         javascript_findings(root, loaded),
         "all tracked JavaScript modules and playground DOM/asset bindings resolve cleanly",
     )
+    if "tools/editor/tree-sitter/grammar.js" in loaded.tracked:
+        rep.report("editor-syntax", "generated editor-asset finding(s):",
+                   highlight_qualification.check_generated(root),
+                   "secondary syntax grammars and queries match the canonical Menhir owner")
     return rep
 
 

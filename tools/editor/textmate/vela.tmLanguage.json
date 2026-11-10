@@ -1,0 +1,143 @@
+{
+  "name": "Vela",
+  "scopeName": "source.vela",
+  "fileTypes": [
+    "vela"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#raw-string"
+    },
+    {
+      "include": "#interpolated"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#character"
+    },
+    {
+      "include": "#tokens"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.vela",
+          "match": "//.*$"
+        },
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.vela",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "raw-string": {
+      "name": "string.quoted.other.raw.vela",
+      "begin": "(\"{3,})",
+      "end": "\\1(?!\")"
+    },
+    "interpolated": {
+      "name": "string.quoted.double.interpolated.vela",
+      "begin": "\\$\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.vela",
+          "match": "\\\\.|\\{\\{|\\}\\}"
+        },
+        {
+          "name": "meta.interpolation.vela",
+          "begin": "\\{(?!\\{)",
+          "end": "\\}",
+          "patterns": [
+            {
+              "include": "#interpolation-brace"
+            },
+            {
+              "include": "$self"
+            }
+          ]
+        }
+      ]
+    },
+    "interpolation-brace": {
+      "name": "meta.interpolation.block.vela",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#interpolation-brace"
+        },
+        {
+          "include": "$self"
+        }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.vela",
+      "begin": "\"",
+      "end": "\"|(?=$)",
+      "patterns": [
+        {
+          "name": "constant.character.escape.vela",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "character": {
+      "name": "string.quoted.single.vela",
+      "match": "'(?:[^'\\\\\\r\\n]|\\\\.)'"
+    },
+    "tokens": {
+      "patterns": [
+        {
+          "name": "keyword.control.vela",
+          "match": "\\b(?:Fn|FnMut|FnOnce|add|admits|alias|as|assert|async|await|break|by|calc|cancel|captures|carrier|coinductive|commit|const|continue|cycle|decreases|definition|dispose|domain|effect|effects|else|ensures|exists|forall|foreach|ghost|grade|grows|handle|hardware|if|impl|import|in|inductive|interface|internal|interpret|invariant|is|laws|lemma|let|lifts|machine|match|module|move|mul|namespace|next|on|one|open|out|owned|predicate|private|progress|proof|public|record|ref|region|register|rehandle|requires|restores|resume|resumes|return|rule|schedule|scope|scoped|shallow|spawn|state|struct|theorem|tracked|transition|type|union|universe|var|view|when|where|while|with|zero)\\b"
+        },
+        {
+          "name": "storage.type.vela",
+          "match": "\\b(?:Nat|bool)\\b"
+        },
+        {
+          "name": "constant.language.vela",
+          "match": "\\b(?:true|false)\\b"
+        },
+        {
+          "name": "constant.numeric.vela",
+          "match": "\\b[0-9][A-Za-z_0-9]*\\b"
+        },
+        {
+          "name": "entity.name.type.lifetime.vela",
+          "match": "'[A-Za-z_][A-Za-z_0-9]*(?:\\.[A-Za-z_][A-Za-z_0-9]*)*"
+        },
+        {
+          "name": "invalid.deprecated.hole.vela",
+          "match": "\\?[A-Za-z_][A-Za-z_0-9]*"
+        },
+        {
+          "name": "keyword.operator.vela",
+          "match": "[+*/%=!<>&|^~?:@-]+"
+        },
+        {
+          "name": "punctuation.separator.vela",
+          "match": "[(){}\\[\\],;.]"
+        }
+      ]
+    }
+  }
+}

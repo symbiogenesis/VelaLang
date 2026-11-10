@@ -106,6 +106,50 @@ directory alongside the upstream license; retained reports contain Vela-authored
 fixture data, SQL observations and tool identities. Qualification of one target
 does not claim execution on every target in the pin table or browser UI coverage.
 
+<a id="independent-syntax-consumers"></a>
+
+## Independent syntax consumers
+
+The optional [editor-asset qualification](docs/tooling/highlighting.md) runs
+Tree-sitter CLI `0.25.10`, revision
+`da6fe9beb4f7f67beb75914ca8e0d48ae48d6406`, as an independent parser/query
+consumer and generator. Its revision's
+[LICENSE](https://github.com/tree-sitter/tree-sitter/blob/v0.25.10/LICENSE)
+was read on 2026-11-09: MIT, copyright 2018-2024 Max Brunsfeld; SHA-256
+`5f9cf9fb6acb1972b35ae29119ce563bb60ec097656bc4b69b9bac2d04c7a147`.
+The official
+[Linux ARM64 release archive](https://github.com/tree-sitter/tree-sitter/releases/download/v0.25.10/tree-sitter-linux-arm64.gz)
+has SHA-256 `07fbff8ae0eeb0d3e496e14fc1a30dcc730cc2c97d70e601e5357f2e51958af5`;
+its executable has SHA-256
+`6329ea4be486c26ef87fdc45ead60c1b1fb9ffab62fe9bd295932ec8e0645751`.
+Generated parser C, Tree-sitter runtime headers, compiled language libraries and
+the CLI remain in isolated/ignored development directories with upstream
+notices; none is copied into tracked source or a Vela/VerifiedOS image. The
+tracked grammar, queries and external scanner are original Apache-2.0 work.
+
+The lexical consumer is Microsoft's VS Code tokenization engine
+[`vscode-textmate` `9.2.0`](https://registry.npmjs.org/vscode-textmate/-/vscode-textmate-9.2.0.tgz)
+(archive SHA-256 `1f4aed19818315f5b2822bf485eb1a9efc02b0a8b88f5d4e9409d6d289ff61cf`)
+with [`vscode-oniguruma` `2.0.1`](https://registry.npmjs.org/vscode-oniguruma/-/vscode-oniguruma-2.0.1.tgz)
+(archive SHA-256 `3b42911fd9609f2cc3b9c6dd52236b3da73780e633aa7dc381267006b7e7da21`),
+running on the existing Node.js `22.22.1` host runtime. Both published packages'
+own licenses were read on 2026-11-09: MIT, copyright Microsoft Corporation;
+`vscode-textmate/LICENSE.md` SHA-256
+`b5cb7ff7859e7d282d98fc43ab081b0dda5dc659dc3385cf65740c759a7e6a6c`
+and `vscode-oniguruma/LICENSE.txt` SHA-256
+`ddde8aba8fe72b4830e27901fc78733eb6db7b6c653161075de213a6adeda3fd`.
+The latter's complete `NOTICES.txt` was also read (SHA-256
+`615d94d89eacc046241518c247f6650a5df80d1adf4b284a756f500867620b35`):
+its bundled Oniguruma `6.9.5_rev1` is BSD-2-Clause, copyright 2002-2020 K. Kosako.
+Their pinned JavaScript/Wasm implementation bytes and release metadata are
+checked by the [qualifier](tools/toolchain/highlight_qualification.py).
+Packages and notices remain externally provisioned local development tools;
+no upstream JavaScript, Wasm, package or Node runtime is vendored, added to the
+Python environment or distributed in the syntax extension or a Vela/VerifiedOS
+image. The harness records the exact selected Node executable and refuses
+changed runtime bytes before report publication. This use grants no additional
+runtime or generated-parser distribution closure.
+
 <a id="development-tools-contained-by-use"></a>
 
 ## Development parser generator

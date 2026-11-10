@@ -1,0 +1,14 @@
+{
+  "name": "vela-syntax",
+  "displayName": "Vela Syntax",
+  "description": "Syntax highlighting for Vela; compiler acceptance is supplied separately.",
+  "version": "0.1.0",
+  "publisher": "velalang",
+  "license": "Apache-2.0",
+  "engines": {"vscode": "^1.90.0"},
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [{"id": "vela", "aliases": ["Vela"], "extensions": [".vela"]}],
+    "grammars": [{"language": "vela", "scopeName": "source.vela", "path": "./vela.tmLanguage.json"}]
+  }
+}
