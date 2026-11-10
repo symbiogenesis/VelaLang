@@ -57,11 +57,11 @@ def _execution_fixture(outputs: Path, *, available: bool = False) -> dict[str, o
         clight, assembly = outputs / "first_slice/first_slice.light.c", outputs / "first_slice/first_slice.s"
         clight.parent.mkdir(exist_ok=True)
         clight.write_bytes(b"retained Clight\n")
-        assembly.write_bytes(b"retained assembly\n")
+        assembly.write_bytes(b".text\n.globl main\nmain:\nli a0, 0\nret\n")
         compiler.update({
             "ccomp_path": ccomp["path"], "ccomp_sha256": ccomp["sha256"],
             "clight_path": str(clight), "clight_sha256": hashlib.sha256(clight.read_bytes()).hexdigest(),
-            "asm_sha256": hashlib.sha256(assembly.read_bytes()).hexdigest(), "asm_lines": 1,
+            "asm_sha256": hashlib.sha256(assembly.read_bytes()).hexdigest(), "asm_lines": 5,
             "interp_exit_code": 0, "sail_verdict": "pass", "sail_records": 3,
             "sail_trace_digest": digest, "sail_cap_roundtrip": True,
             "perturbed_controls": [
@@ -69,8 +69,58 @@ def _execution_fixture(outputs: Path, *, available: bool = False) -> dict[str, o
                 for check, label in ((7, "perturbed-wrong-payload-byte"), (12, "perturbed-stale-trailing-byte"),
                                      (16, "perturbed-checksum-error-code"), (17, "perturbed-unscrubbed-checksum-dst"))],
         })
+        compiler["programs"] = _compiler_fixture(outputs, files, trace_lines)
     return {"execution_inputs": {"files": files, "compcert_available": available},
             "purecap_cheri_runs": runs, "compcert_sail": compiler}
+
+
+def _compiler_fixture(directory: Path, files: dict[str, object], trace_lines: list[str]) -> list[dict[str, object]]:
+    programs: list[dict[str, object]] = []
+    compiler, simulator, profile = (cast("dict[str, str]", files[key])["path"]
+                                   for key in ("ccomp", "simulator", "profile"))
+    command = [compiler, "-fverifiedos-typed", "-dclight"]
+    for name, code in (("first_slice", 0), ("perturbed-wrong-payload-byte", 7),
+                       ("perturbed-stale-trailing-byte", 12), ("perturbed-checksum-error-code", 16),
+                       ("perturbed-unscrubbed-checksum-dst", 17)):
+        fresh, interpreted = directory / name, directory / f"{name}.interp"
+        fresh.mkdir(exist_ok=True)
+        interpreted.mkdir(exist_ok=True)
+        source, unit, interp_unit = directory / f"{name}.c", fresh / f"{name}.i", interpreted / f"{name}.i"
+        for path in (source, unit, interp_unit):
+            path.write_bytes(f"int main(void) {{ return {code}; }}\n".encode())
+        assembly, elf = fresh / f"{name}.s", directory / f"{name}.elf"
+        assembly.write_bytes(f".text\n.globl main\nmain:\nli a0, {code}\nret\n".encode())
+        refused, image_bytes = slice_harness.cd.assemble(assembly.read_text(encoding="utf-8"), name, elf)
+        ensure(not refused, "independent compiler receipt image did not assemble")
+        stages = (
+            (fresh / f"{name}.preprocess.log", [*command, "-E", source.name, "-o", str(unit)], directory, ""),
+            (fresh / f"{name}.compile.log", [*command, "-S", unit.name, "-o", assembly.name], fresh, ""),
+            (interpreted / f"{name}.preprocess.log", [*command, "-E", unit.name, "-o", str(interp_unit)], fresh, ""),
+            (interpreted / f"{name}.interpret.log", [*command, "-interp", interp_unit.name], interpreted,
+             f"Time 42: program terminated (exit code = {code})\n"),
+            (directory / f"{name}.sail.log",
+             [simulator, "--config", profile, "--trace-commit", "--inst-limit", "1000000",
+              "--terminal-log", str(directory / f"{name}.term"), str(elf)], None,
+             "\n".join(trace_lines) + ("\nSUCCESS\n" if code == 0 else f"\nFAILURE: {code}\n")),
+        )
+        processes: list[dict[str, object]] = []
+        for log, argv, working, stdout in stages:
+            stderr = "diagnostic \u03bb\n"
+            raw = (stdout + stderr).encode()
+            log.write_bytes(raw)
+            process: dict[str, object] = {
+                "command": argv, "returncode": 1 if code != 0 and working is None else 0,
+                "log": str(log), "log_sha256": hashlib.sha256(raw).hexdigest(),
+                "stdout_bytes": len(stdout.encode()), "stdout_sha256": hashlib.sha256(stdout.encode()).hexdigest(),
+                "stderr_bytes": len(stderr.encode()), "stderr_sha256": hashlib.sha256(stderr.encode()).hexdigest(),
+            }
+            if working is not None:
+                process["cwd"] = str(working)
+            processes.append(process)
+        programs.append({"name": name, "expect": code, "image_bytes": image_bytes, "processes": processes,
+                         "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                         "preprocessed_sha256": hashlib.sha256(unit.read_bytes()).hexdigest()})
+    return programs
 
 
 def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
@@ -739,6 +789,121 @@ def _compiler_coverage() -> None:
                 ensure(mutation == "none", f"{mutation} concealed missing optional compiler coverage")
 
 
+def _compiler_process_coverage() -> None:
+    mutations = ("none", "missing-programs", "missing-program", "duplicate-program", "unknown-program",
+                 "wrong-expect", "boolean-expect", "missing-process", "duplicate-process", "command", "cwd",
+                 "process-exit", "boolean-exit", "log-hash", "stream-length", "stream-hash", "source",
+                 "effective-input", "interpreter-input", "image", "image-size", "boolean-image-size",
+                 "interpreter-verdict", "interpreter-stderr", "interpreter-duplicate", "target-verdict",
+                 "target-trace", "target-empty", "summary-trace", "summary-count", "summary-roundtrip")
+    with tempfile.TemporaryDirectory(prefix="vela-slice-compiler-processes-") as temporary:
+        directory = Path(temporary) / "slice-fixture"
+        directory.mkdir()
+        for mutation in mutations:
+            report = _execution_fixture(directory, available=True)
+            compiler = cast("dict[str, object]", report["compcert_sail"])
+            programs = cast("list[dict[str, object]]", compiler["programs"])
+            program = programs[0]
+            processes = cast("list[dict[str, object]]", program["processes"])
+            if mutation == "missing-programs":
+                del compiler["programs"]
+            elif mutation == "missing-program":
+                programs.pop()
+            elif mutation == "duplicate-program":
+                programs[-1] = copy.deepcopy(program)
+            elif mutation == "unknown-program":
+                program["name"] = "unrelated"
+            elif mutation in {"wrong-expect", "boolean-expect"}:
+                program["expect"] = 7 if mutation == "wrong-expect" else False
+            elif mutation == "missing-process":
+                processes.pop()
+            elif mutation == "duplicate-process":
+                processes[-1] = copy.deepcopy(processes[0])
+            elif mutation in {"command", "cwd", "process-exit", "boolean-exit", "log-hash", "stream-length", "stream-hash"}:
+                field, changed = {
+                    "command": ("command", ["another-compiler"]), "cwd": ("cwd", str(directory)),
+                    "process-exit": ("returncode", 1), "boolean-exit": ("returncode", False),
+                    "log-hash": ("log_sha256", "0" * 64), "stream-length": ("stdout_bytes", True),
+                    "stream-hash": ("stderr_sha256", "0" * 64),
+                }[mutation]
+                processes[1][field] = changed
+            elif mutation in {"source", "effective-input", "interpreter-input", "image"}:
+                path = {"source": directory / "first_slice.c",
+                        "effective-input": directory / "first_slice/first_slice.i",
+                        "interpreter-input": directory / "first_slice.interp/first_slice.i",
+                        "image": directory / "first_slice.elf"}[mutation]
+                path.write_bytes(b"changed retained subject")
+            elif mutation in {"image-size", "boolean-image-size"}:
+                program["image_bytes"] = 1 if mutation == "image-size" else True
+            elif mutation in {"summary-trace", "summary-count", "summary-roundtrip"}:
+                field, changed = {"summary-trace": ("sail_trace_digest", "0" * 16),
+                                  "summary-count": ("sail_records", 4),
+                                  "summary-roundtrip": ("sail_cap_roundtrip", False)}[mutation]
+                compiler[field] = changed
+            elif mutation != "none":
+                process = processes[3 if mutation.startswith("interpreter-") else 4]
+                stdout = slice_harness._retained_stdout(process).decode()
+                stderr = "diagnostic \u03bb\n"
+                if mutation == "interpreter-verdict":
+                    stdout = "Time 42: program terminated (exit code = 7)\n"
+                elif mutation == "interpreter-stderr":
+                    stdout, stderr = "", stdout
+                elif mutation == "interpreter-duplicate":
+                    stdout += stdout
+                elif mutation == "target-verdict":
+                    stdout = stdout.replace("SUCCESS", "FAILURE: 7")
+                elif mutation == "target-trace":
+                    stdout = stdout.replace("00000013", "00000093")
+                else:
+                    stdout = "SUCCESS\n"
+                raw = (stdout + stderr).encode()
+                Path(str(process["log"])).write_bytes(raw)
+                process.update(log_sha256=hashlib.sha256(raw).hexdigest(), stdout_bytes=len(stdout.encode()),
+                               stdout_sha256=hashlib.sha256(stdout.encode()).hexdigest(), stderr_bytes=len(stderr.encode()),
+                               stderr_sha256=hashlib.sha256(stderr.encode()).hexdigest())
+            try:
+                slice_harness._retained_execution(report, directory, dict(slice_harness._artifacts(directory)))
+            except (ValueError, TypeError, OSError) as error:
+                ensure(mutation != "none", f"complete compiler processes refused: {error}")
+            else:
+                ensure(mutation == "none", f"{mutation} concealed changed compiler process evidence")
+
+
+def _compiler_observations() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-compiler-observations-") as temporary:
+        directory = Path(temporary)
+        stdout, stderr = "compiler output \u03bb\n", "diagnostic \U0001f680\n" * 100
+
+        def run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            working = Path(str(kwargs.get("cwd", directory)))
+            if "-E" in argv:
+                Path(argv[-1]).write_bytes((working / argv[-3]).read_bytes())
+            elif "-S" in argv:
+                (working / argv[-1]).write_bytes(b".text\n.globl main\nmain:\nli a0, 7\nret\n")
+            said = ("Time 1: program terminated (exit code = 7)\n" if "-interp" in argv else
+                    "I 1 0000000080000000 00000013\nFAILURE: 7\n" if "--config" in argv else stdout)
+            return subprocess.CompletedProcess(argv, 1 if "--config" in argv else 0, said, stderr)
+
+        observations: list[dict[str, object]] = []
+        program = slice_harness.cd.Program("independent", "given", "int main(void) { return 7; }\n", 1, 7)
+        with patch.object(slice_harness.cd.subprocess, "run", side_effect=run):
+            report = slice_harness.cd.run_program(program, ["ccomp", "-dclight"], directory, ["simulator"],
+                                                  directory / "profile.json", "", interp=True, observations=observations)
+        ensure(slice_harness.cd.as_expected(report) and report.interpreted is not None
+               and report.interpreted.code == 7 and len(observations) == 5,
+               "observing compiler stages changed interpretation or lost a process")
+        for observation in observations:
+            log = Path(str(observation["log"]))
+            raw = log.read_bytes()
+            ensure(observation["log_sha256"] == hashlib.sha256(raw).hexdigest()
+                   and observation["stderr_bytes"] == len(stderr.encode()) and raw.endswith(stderr.encode()),
+                   "compiler observation truncated or misbound diagnostics")
+            slice_harness._retained_stdout(observation)
+        ensure([Path(str(row["log"])).name for row in observations] == [
+            "independent.preprocess.log", "independent.compile.log", "independent.preprocess.log",
+            "independent.interpret.log", "independent.sail.log"], "compiler process order is incomplete")
+
+
 def _simulator_observation() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-simulator-observation-") as temporary:
         directory = Path(temporary)
@@ -817,6 +982,8 @@ def cases() -> list[Case]:
             Case("retained capacity and semantic refusal coverage", _control_coverage),
             Case("retained capability execution transcripts and images", _execution_coverage),
             Case("retained optional compiler availability and controls", _compiler_coverage),
+            Case("retained compiler process subjects and rehashed contradictions", _compiler_process_coverage),
+            Case("compiler observations retain complete stage streams", _compiler_observations),
             Case("simulator observation preserves exact process streams", _simulator_observation),
             Case("first-slice output directory and inventory bounds", _output_bounds),
             Case("first-slice binding CLI and refusal", _cli_dispatch)]
