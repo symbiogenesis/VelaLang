@@ -553,8 +553,8 @@ not establish checked source correspondence or machine/artifact acceptance.
   available, the main program and four perturbed controls retain all five
   preprocessing, compilation, interpreter-preprocessing, interpretation and
   simulator observations. Exact commands, working directories, process exits,
-  split stdout/stderr identities and retained C/effective-input hashes must
-  agree. The two effective inputs must have identical bytes. Interpreter stdout
+  split decoded UTF-8 stdout/stderr identities and retained C/effective-input
+  hashes must agree. The two effective inputs must have identical bytes. Interpreter stdout
   must contain exactly one expected termination; simulator logs must recover the
   expected target verdict and a nonempty commit trace. The main trace summary is
   recomputed, and every program's retained assembly must regenerate its exact

@@ -903,6 +903,18 @@ def _compiler_observations() -> None:
             "independent.preprocess.log", "independent.compile.log", "independent.preprocess.log",
             "independent.interpret.log", "independent.sail.log"], "compiler process order is incomplete")
 
+        def failed_interpreter(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            completed = run(argv, **kwargs)
+            if "-interp" in argv:
+                completed.returncode = 1
+            return completed
+
+        with patch.object(slice_harness.cd.subprocess, "run", side_effect=failed_interpreter):
+            interpreted = slice_harness.cd.interpret_c(["ccomp"], directory / "independent/independent.i",
+                                                       directory / "refused.interp")
+        ensure(interpreted.code is None and interpreted.exit_code == 1,
+               "failed interpreter process promoted a printed termination to a source verdict")
+
 
 def _simulator_observation() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-simulator-observation-") as temporary:

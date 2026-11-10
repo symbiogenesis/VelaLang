@@ -28,7 +28,7 @@ def _sha256(data: bytes) -> str:
 
 def _observe_process(command: list[str], done: subprocess.CompletedProcess[str], log: Path,
                      observations: list[dict[str, object]] | None, cwd: Path | None = None) -> None:
-    """Retain complete process streams only when an evidence consumer requests them."""
+    """Retain complete decoded streams only when an evidence consumer requests them."""
     if observations is None:
         return
     stdout, stderr = done.stdout.encode("utf-8"), done.stderr.encode("utf-8")
@@ -568,7 +568,7 @@ def interpret_c(ccomp: list[str], source: Path, fresh: Path,
             or _sha256(prepared.path.read_bytes()) != prepared.sha256):
         return Interpreted(tuple(argv), -1, None, "preprocessed input changed during interpretation")
     ended = _TERMINATED_RE.findall(done.stdout)
-    code = int(ended[0]) if len(ended) == 1 else None
+    code = int(ended[0]) if done.returncode == 0 and len(ended) == 1 else None
     return Interpreted(tuple(argv), done.returncode, code, said.strip()[-600:])
 
 
