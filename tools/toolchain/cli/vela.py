@@ -13,6 +13,7 @@ from typing import cast
 from toolchain import (
     MAX_SOURCE_BYTES,
     VelaError,
+    authoring_preview,
     compiler_trace,
     sarif,
     sarif_reader,
@@ -302,6 +303,10 @@ def main(argv: list[str] | None = None) -> int:
         if name == "emit":
             command.add_argument("--output", type=Path,
                                  help="atomically replace a file in an existing directory")
+    preview = commands.add_parser("lint-preview", help="preview one checked Boolean comparison edit without writes")
+    preview.add_argument("source", type=Path)
+    preview.add_argument("--line", type=int, required=True, help="one-based compiler equality-operator line")
+    preview.add_argument("--column", type=int, required=True, help="one-based compiler equality-operator column")
     trace = commands.add_parser("trace", help="record bounded pure compiler phase timings")
     trace.add_argument("source", type=Path)
     trace.add_argument("--output", type=Path, required=True)
@@ -385,6 +390,11 @@ def main(argv: list[str] | None = None) -> int:
     path = Path(args.source)
     try:
         source = _read_source(path)
+        if args.command == "lint-preview":
+            result = authoring_preview.preview(source.data, args.line, args.column)
+            _unchanged(source)
+            print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+            return 0
         if args.command == "inspect":
             snapshot = inspect(source.data, uri=path.resolve().as_uri())
             result = snapshot.export()

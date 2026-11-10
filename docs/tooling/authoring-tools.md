@@ -211,6 +211,39 @@ If bounded compiler inspection cannot supply complete lint facts, normal advisor
 compilation reports lints unavailable and continues. Explicit `vela lint` and a
 command with denied lints require complete findings and refuse without writes.
 
+## Checked Boolean comparison previews
+
+`python tools/run.py vela lint-preview SOURCE --line LINE --column COLUMN`
+prints one explicit `VELA103` edit as JSON. Coordinates are the one-based
+compiler location of the first `=` in `==`, as reported by the lint. The command
+preserves the source file and its modification time. It emits no preview if the
+source changes during checking.
+
+The bounded pure compiler's complete syntax and concrete-source snapshot select
+the comparison and its original byte spans. Comparing `value == true` or
+`true == value` proposes `(value)`; comparing with `false` proposes `!(value)`.
+Grouping around a literal is supported. Parentheses retain precedence and the
+operand occurs exactly once. One request changes one comparison; it preserves
+every byte outside that span. Comparisons containing comments refuse the edit.
+Naming, documentation and other lint findings remain independent.
+
+Both original and candidate must pass the existing parser and pure checker.
+The checker compares their complete syntax modulo grouping and the two Boolean
+equality identities, retaining calls, arguments, bindings and control flow.
+The schema-1 preview binds the original inspection snapshot, exact source,
+producer/configuration/target, replacement span and candidate SHA-256. The
+`authoring_preview.validate` library operation rechecks all fields against the
+current source and producer before returning candidate bytes. Unknown fields,
+changed candidates, stale bindings and malformed coordinates refuse. This is a
+development preview; it supplies no checked source or artifact correspondence.
+
+Independent expected edits and exhaustive two-variable truth tables cover both
+literal sides, negation, nested comparisons, precedence, Unicode and CRLF.
+Refusal controls cover comments, invalid source, nonliteral comparisons, changed
+source/producer and tampered fields; CLI controls verify source preservation and
+concurrent-edit refusal. Wider-language previews and editor code actions retain
+their qualified producer and protocol requirements.
+
 ## Generic type parameter naming
 
 Q25ae's [mathematical playground](playground.md#dependent-mathematics-increment)
