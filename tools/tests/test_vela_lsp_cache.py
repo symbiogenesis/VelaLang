@@ -39,7 +39,7 @@ def _query(server: Server, method: str = "textDocument/hover", uri: str = _URI) 
 def _reuses_validated_facts() -> None:
     raw = _facts()
     with (patch("toolchain.lsp.validate_inspection", wraps=validate_inspection) as validate,
-          patch("toolchain.lsp.inspect_document", return_value=raw) as inspect):
+          patch("toolchain.lsp.inspect_completions", return_value=raw) as inspect):
         server = _opened(inspect)
         for method in ("textDocument/hover", "textDocument/definition", "textDocument/references",
                        "textDocument/documentSymbol", "textDocument/inlayHint", "textDocument/semanticTokens/full"):
@@ -57,7 +57,7 @@ def _reuses_validated_facts() -> None:
 
 
 def _snapshot_and_lifecycle_invalidation() -> None:
-    with patch("toolchain.lsp.inspect_document", side_effect=lambda _: _facts()) as inspect:
+    with patch("toolchain.lsp.inspect_completions", side_effect=lambda _: _facts()) as inspect:
         server = _opened(inspect)
         ensure("result" in _query(server), "initial inspection failed")
         expected = 1
@@ -103,10 +103,10 @@ def _snapshot_and_lifecycle_invalidation() -> None:
 
 
 def _producer_replacement_and_generation() -> None:
-    with patch("toolchain.lsp.inspect_document", side_effect=lambda _: _facts()) as first:
+    with patch("toolchain.lsp.inspect_completions", side_effect=lambda _: _facts()) as first:
         server = _opened(first)
         ensure("result" in _query(server), "initial producer failed")
-        with patch("toolchain.lsp.inspect_document", side_effect=lambda _: _facts()) as second:
+        with patch("toolchain.lsp.inspect_completions", side_effect=lambda _: _facts()) as second:
             server.inspector = second
             ensure("result" in _query(server) and first.call_count == second.call_count == 1,
                    "replacing the producer reused the old producer's facts")
@@ -148,7 +148,7 @@ def _failures_retry() -> None:
         {"status": "unavailable", "reason": "syntax"},
     )
     for failure in failures:
-        with patch("toolchain.lsp.inspect_document", side_effect=[failure, _facts()]) as inspect:
+        with patch("toolchain.lsp.inspect_completions", side_effect=[failure, _facts()]) as inspect:
             server = _opened(inspect)
             first = _query(server)
             ensure("error" in first or first.get("result") is None, "failed inspection exposed facts")
@@ -158,7 +158,7 @@ def _failures_retry() -> None:
 
 
 def _cache_and_reply_bounds() -> None:
-    with patch("toolchain.lsp.inspect_document", side_effect=lambda _: _facts()) as inspect:
+    with patch("toolchain.lsp.inspect_completions", side_effect=lambda _: _facts()) as inspect:
         server = _opened(inspect)
         _query(server)
         for index in range(1, MAX_DOCUMENTS):

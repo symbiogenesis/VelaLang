@@ -19,7 +19,7 @@ from toolchain.lsp_services import (
     InspectionError,
     Inspector,
     QueryRange,
-    inspect_document,
+    inspect_completions,
     project_inspection,
     validate_inspection,
 )
@@ -139,7 +139,7 @@ class Server:
     def __init__(self, checker: Checker | None = None, inspector: Inspector | None = None,
                  formatter: Formatter | None = None) -> None:
         self.checker = diagnose if checker is None else checker
-        self.inspector = inspect_document if inspector is None else inspector
+        self.inspector = inspect_completions if inspector is None else inspector
         self.formatter = format_document if formatter is None else formatter
         self.documents: dict[str, SourceSnapshot] = {}
         self.desynchronized: set[str] = set()

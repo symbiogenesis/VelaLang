@@ -273,6 +273,8 @@ def _synthetic_session(
         )
     send_req("textDocument/completion", {
         "textDocument": {"uri": _URI}, "position": {"line": 6, "character": 22}})
+    send_req("textDocument/completion", {
+        "textDocument": {"uri": _URI}, "position": {"line": 7, "character": 15}})
     send_req("textDocument/signatureHelp", {
         "textDocument": {"uri": _URI}, "position": {"line": 6, "character": 27}})
     for pos in ((6, 20), (11, 11), (14, 11)):
@@ -786,6 +788,8 @@ def _callable_discovery_wire_controls() -> None:
 
     ensure(verify(transcript)["callable_discovery_responses"] == 2,
            "wire evidence omitted a callable discovery response")
+    ensure(verify(transcript)["value_completion_responses"] == 1,
+           "wire evidence omitted the static-compatible value completion response")
     for method in ("textDocument/completion", "textDocument/signatureHelp"):
         corrupted = copy.deepcopy(transcript)
         requested: set[object] = set()
@@ -806,6 +810,22 @@ def _callable_discovery_wire_controls() -> None:
     wrong_observation["signature_square_call"] = None
     _refuses(lambda: lsp_clients.verify_wire_transcript(transcript, require_ranged_change=True,
         discovery_observation=wrong_observation), "callable discovery observation disagrees with wire")
+    wrong_values = copy.deepcopy(observed)
+    wrong_values["completion_start_value"] = None
+    _refuses(lambda: lsp_clients.verify_wire_transcript(transcript, require_ranged_change=True,
+        discovery_observation=wrong_values), "value completion observation disagrees with wire")
+    omitted = copy.deepcopy(transcript)
+    frames = cast("list[dict[str, object]]", omitted["frames"])
+    value_requests: set[object] = set()
+    for frame in frames:
+        message = cast("dict[str, object]", frame["message"])
+        if frame["direction"] == "client_to_server" and message.get("method") == "textDocument/completion":
+            params = cast("dict[str, object]", message["params"])
+            if params.get("position") == {"line": 7, "character": 15}:
+                value_requests.add(message["id"])
+    omitted["frames"] = [frame for frame in frames
+                         if cast("dict[str, object]", frame["message"]).get("id") not in value_requests]
+    _refuses(lambda: verify(omitted), "missing value completion traffic")
 
 
 def cases() -> list[Case]:

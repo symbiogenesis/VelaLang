@@ -4,7 +4,7 @@
 import hashlib
 import subprocess
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import cast
 
 from toolchain.ast import (
@@ -18,7 +18,7 @@ from toolchain.ast import (
     ValueType,
 )
 from toolchain.documentation import DocumentationSource
-from toolchain.facts import MAX_OCCURRENCES, MAX_SYMBOLS, PureType
+from toolchain.facts import MAX_COMPLETION_OPTIONS, MAX_OCCURRENCES, MAX_SYMBOLS, PureType
 from toolchain.lsp_worker import worker_command
 from toolchain.protocol_json import MAX_BODY_BYTES, decode_message, encode_message
 from toolchain.source import SourceSnapshot
@@ -38,10 +38,12 @@ class InspectionError(ValueError):
     """The current source cannot supply a complete bounded inspection result."""
 
 
-def inspect_document(source: bytes, *, concrete: bool = False) -> dict[str, object]:
+def inspect_document(source: bytes, *, concrete: bool = False,
+                     completion: bool = False) -> dict[str, object]:
     """Run only the checkout's fixed fact producer, never a client-selected tool."""
     try:
-        done = subprocess.run(worker_command("--inspect-snapshot" if concrete else "--inspect"),
+        mode = "--inspect-snapshot" if concrete else "--inspect-completion" if completion else "--inspect"
+        done = subprocess.run(worker_command(mode),
                               input=source, capture_output=True,
                               timeout=INSPECTION_SECONDS, check=False)
         if done.returncode != 0 or len(done.stdout) > MAX_BODY_BYTES:
@@ -57,6 +59,11 @@ def inspect_document(source: bytes, *, concrete: bool = False) -> dict[str, obje
         return result
 
 
+def inspect_completions(source: bytes) -> dict[str, object]:
+    """Request the same pure facts with bounded resolver-owned value choices."""
+    return inspect_document(source, completion=True)
+
+
 @dataclass(frozen=True)
 class _Symbol:
     name: str
@@ -67,6 +74,7 @@ class _Symbol:
     end: Position
     type_hint: str | None
     documentation: str | None
+    required_static: bool = False
 
 
 @dataclass(frozen=True)
@@ -82,6 +90,7 @@ class Inspection:
     snapshot: str
     symbols: tuple[_Symbol, ...]
     occurrences: tuple[_Occurrence, ...]
+    completions: tuple[tuple[Position, tuple[int, ...]], ...] = ()
 
 
 def _object(value: object, fields: set[str]) -> dict[str, object]:
@@ -147,7 +156,10 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
         if record["reason"] in {"syntax", "name", "type", "unsupported", "limit", "encoding"}:
             return None
         raise InspectionError("Pure prototype inspection unavailable or exceeds its bounds")
-    record = _object(raw, {"status", "symbols", "occurrences"})
+    fields = {"status", "symbols", "occurrences"}
+    if "completions" in raw:
+        fields.add("completions")
+    record = _object(raw, fields)
     symbols_raw, occurrences_raw = record["symbols"], record["occurrences"]
     if (record["status"] != "ok" or not isinstance(symbols_raw, list)
             or not isinstance(occurrences_raw, list) or len(symbols_raw) > MAX_SYMBOLS
@@ -203,7 +215,8 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
         if "documentation" in symbol:
             site = Site(_integer(symbol["line"]), _integer(symbol["column"]))
             doc = documentation.validate(symbol["documentation"], Name(name, site), cast("str", kind))
-        symbols.append(_Symbol(name, cast("str", kind), detail, value_type, first, last, type_hint, doc))
+        symbols.append(_Symbol(name, cast("str", kind), detail, value_type, first, last, type_hint, doc,
+                               kind == "constant"))
     owned_parameters: set[int] = set()
     for index, symbol in enumerate(symbols):
         parameters = symbol.value_type.parameters
@@ -217,12 +230,14 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
             raise InspectionError("Pure prototype callable parameter inventory differs from its type")
         owned_parameters.update(range(index + 1, end))
         labels: list[str] = []
-        for parameter, (value_type, required_static) in zip(declared, parameters, strict=True):
+        for offset, (parameter, (value_type, required_static)) in enumerate(
+                zip(declared, parameters, strict=True), start=1):
             prefix = "const " if required_static else ""
             if (parameter.kind != "parameter" or parameter.value_type != PureType(value_type)
                     or parameter.detail != f"{prefix}{parameter.name}: {value_type}"):
                 raise InspectionError("Pure prototype callable type differs from its parameters")
             labels.append(f"{prefix}{value_type} {parameter.name}")
+            symbols[index + offset] = replace(parameter, required_static=required_static)
         prefix = "const " if symbol.value_type.const else ""
         expected = f"public {prefix}{symbol.value_type.result} {symbol.name}({', '.join(labels)})"
         if symbol.detail != expected:
@@ -251,7 +266,42 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
         occurrences.append(_Occurrence(identity, first, last, declaration))
     if len(declarations) != len(symbols):
         raise InspectionError("Pure prototype inspection omits declaration occurrences")
-    return Inspection(snapshot.identity, tuple(symbols), tuple(occurrences))
+    completions: list[tuple[Position, tuple[int, ...]]] = []
+    if "completions" in record:
+        choices_raw = record["completions"]
+        if not isinstance(choices_raw, list) or len(choices_raw) > MAX_OCCURRENCES:
+            raise InspectionError("Pure prototype completion sites exceed bounds")
+        uses = {item.start: item for item in occurrences if not item.declaration}
+        count = 0
+        for value in choices_raw:
+            choice = _object(value, {"line", "column", "symbols"})
+            point = snapshot.diagnostic_position(_integer(choice["line"]), _integer(choice["column"]))
+            start = point["line"], point["character"]
+            selected = uses.get(start)
+            candidates_raw = choice["symbols"]
+            if (selected is None or symbols[selected.symbol].kind == "function"
+                    or not isinstance(candidates_raw, list) or not candidates_raw
+                    or (completions and start <= completions[-1][0])):
+                raise InspectionError("Invalid pure prototype completion site")
+            count += len(candidates_raw)
+            if count > MAX_COMPLETION_OPTIONS:
+                raise InspectionError("Pure prototype completion options exceed bounds")
+            candidates = tuple(_integer(identity) for identity in candidates_raw)
+            if tuple(sorted(set(candidates))) != candidates or selected.symbol not in candidates:
+                raise InspectionError("Invalid pure prototype completion identities")
+            names: set[str] = set()
+            target = symbols[selected.symbol]
+            for identity in candidates:
+                if identity >= len(symbols):
+                    raise InspectionError("Unknown pure prototype completion identity")
+                candidate = symbols[identity]
+                if (candidate.kind == "function" or candidate.value_type != target.value_type
+                        or candidate.start >= start or candidate.name in names
+                        or (target.required_static and not candidate.required_static)):
+                    raise InspectionError("Incompatible pure prototype completion value")
+                names.add(candidate.name)
+            completions.append((start, candidates))
+    return Inspection(snapshot.identity, tuple(symbols), tuple(occurrences), tuple(completions))
 
 
 def _range(start: Position, end: Position) -> dict[str, object]:

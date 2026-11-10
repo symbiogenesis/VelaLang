@@ -10,6 +10,7 @@ from toolchain.documentation import DocumentationSource
 MAX_SYMBOLS = 1024
 MAX_OCCURRENCES = 4096
 MAX_EXPRESSIONS = 8192
+MAX_COMPLETION_OPTIONS = 8192
 type SymbolKind = Literal["function", "parameter", "variable", "constant"]
 
 
@@ -50,11 +51,14 @@ class Facts:
 
     def __init__(self, source: bytes | None = None,
                  declaration_sites: dict[Site, Site] | None = None, *,
-                 expression_types: bool = False) -> None:
+                 expression_types: bool = False, completion_options: bool = False) -> None:
         self.symbols: list[_Symbol] = []
         self.occurrences: list[_Occurrence] = []
         self.expression_types: dict[tuple[Site, str], ValueType] = {}
         self.collect_expression_types = expression_types
+        self.collect_completion_options = completion_options
+        self.completions: dict[Site, tuple[int, ...]] = {}
+        self.completion_count = 0
         self.documentation = None if source is None else DocumentationSource(source)
         self.declaration_sites = {} if declaration_sites is None else dict(declaration_sites)
 
@@ -88,6 +92,18 @@ class Facts:
         if previous != value_type:
             raise ValueError("pure inspection expression has inconsistent checked types")
 
+    def visible_values(self, site: Site, identities: tuple[int, ...]) -> None:
+        """Record the resolver's compatible visible values at one checked value use."""
+        if not self.collect_completion_options:
+            return
+        if site in self.completions:
+            raise ValueError("pure inspection repeats a completion site")
+        self.completion_count += len(identities)
+        if self.completion_count > MAX_COMPLETION_OPTIONS:
+            raise VelaError("inspection-limit", site.line, site.column,
+                            "pure completion facts exceed option limit")
+        self.completions[site] = identities
+
     def result(self, *, expression_types: bool = False) -> dict[str, object]:
         ordered = sorted(enumerate(self.symbols),
                          key=lambda item: (item[1].name.site.line, item[1].name.site.column))
@@ -114,6 +130,12 @@ class Facts:
             for occurrence in sorted(self.occurrences,
                                      key=lambda item: (item.site.line, item.site.column))]
         result: dict[str, object] = {"status": "ok", "symbols": symbols, "occurrences": occurrences}
+        if self.collect_completion_options:
+            result["completions"] = [
+                {"line": site.line, "column": site.column,
+                 "symbols": sorted(identities[identity] for identity in choices)}
+                for site, choices in sorted(self.completions.items(), key=lambda item: (
+                    item[0].line, item[0].column))]
         if expression_types:
             result["expressions"] = [
                 {"kind": kind, "line": site.line, "column": site.column,

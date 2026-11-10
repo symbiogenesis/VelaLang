@@ -49,7 +49,7 @@ Editors with standard inlay-hint support can also show inferred local `Nat` and
 The [pure editor operations](#pure-editor-operations) supply full semantic tokens
 for resolved identifiers and standard document formatting. A formatting request
 offers the compiler's canonical layout as an edit for the client to apply.
-The [callable discovery providers](#callable-discovery) offer explicit name
+The [discovery providers](#callable-discovery) offer explicit callable and value
 completion edits and argument-sensitive signature help in completely checked
 pure source.
 
@@ -385,10 +385,43 @@ call's argument interface. Every candidate is already callable at this source
 site. The conservative list has `isIncomplete: true`; it supplies no exhaustive
 scope claim. Items carry the compiler signature, plain-text documentation when
 present, function kind 3 and a single `textEdit` replacing the complete selected
-identifier. The server leaves the overlay untouched. Values, declarations,
-punctuation and unsupported contexts yield no candidates. General scope-wide,
+identifier. The server leaves the overlay untouched. Declarations,
+punctuation and unsupported contexts yield no candidates. Empty insertion sites,
 incomplete-input and cross-package completion retain their producer prerequisites.
 No completion resolver, snippets or additional edits are advertised.
+
+At a resolved value-expression identifier, the pure resolver supplies its visible
+same-type values: parameters, preceding locals and constants, with local names
+overriding same-spelled module constants. Choices exclude other functions'
+parameters, later declarations, sibling-branch locals and the binding currently
+being initialized. Callable and value namespaces remain separate. A selected
+required-static value offers only required-static parameters and constants;
+the adapter performs no evaluation or scope reconstruction. A named-argument
+label is a callable parameter reference and supplies no value choices.
+
+The worker's opt-in completion mode records source-ordered value sites and
+resolved symbol identities during the same complete check. The transport caps
+the aggregate at 8,192 choices across the existing 4,096-occurrence bound; a
+producer or consumer budget failure refuses the operation. Validation requires
+ordered unique sites, valid same-type value identities, unique visible names,
+the selected binding and agreement with static qualifiers. Cached facts contain
+immutable tuples and retain the normal producer/snapshot invalidation.
+Legacy inspection responses may omit the optional completion field, and an
+unrecorded site supplies no value suggestions. Neither absence nor an empty site
+inventory establishes that no compatible values exist. A present site record
+must contain the selected binding; an empty or malformed choice record refuses.
+
+Value items use variable kind 6 or constant kind 21, the compiler's type/value
+detail and available plain-text declaration documentation. Prefix matching and
+the single complete-identifier `textEdit` follow callable completion. Lists remain
+`isIncomplete: true`; they promise compatible choices at an existing checked
+identifier, without a whole-scope or successful edited-program verdict.
+No proposal applies itself or supplies an acceptance receipt. Independent host
+controls cover scope/order/shadowing, Boolean and static compatibility, malformed
+and over-budget facts, cache detachment, source/producer invalidation and complete
+reply bounds. A real stdio session checks value edits before and after an unsaved
+supplementary-comment/CRLF update. Two-client value-completion interoperability
+remains open; the retained pinned-client sessions below qualify callable discovery.
 
 Signature help selects the innermost checked call whose argument list contains
 the cursor, through the closing parenthesis's start. The existing compiler token
