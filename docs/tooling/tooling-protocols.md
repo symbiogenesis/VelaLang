@@ -407,6 +407,63 @@ Validate the pinned schema and import into an independent consumer; independentl
 expect Unicode locations, cross-file findings and fix edits, and corrupt locations,
 rule references and completion status to require visible rejection or degradation.
 
+### Qualified pure batch SARIF
+
+`python tools/run.py vela sarif <source> ... --schema <schema.json> --output <report.sarif>`
+exports the current pure `Nat`/`bool` diagnostic producer used by LSP. Its actual
+consumer is the pinned offline `sarif-tools` importer, providing portable batch
+review of multiple development files without a running language server. The
+qualified scope is 1–16 independent UTF-8 source files, each at most 65,536 bytes;
+the report is bounded to 1 MiB, 4,096 findings and 64 JSON nesting levels. Each
+pure diagnostic worker has the existing five-second budget. Sources remain
+unchanged, and output is atomically published after source, producer and schema
+freshness checks. The report cannot alias a source or the external schema.
+
+Stable rules are `VELA-SYNTAX`, `VELA-NAME`, `VELA-TYPE`, `VELA-ENCODING`,
+`VELA-UNSUPPORTED`, `VELA-LIMIT`, `VELA-TIMEOUT` and `VELA-INTERNAL`.
+An ordinary source rejection is a completed check with error findings; unsupported,
+limited, timed-out and failed checks set standard `executionSuccessful: false`
+and visible error notifications. Empty findings alone never supply completion.
+`properties.vela` binds the exact source URI/byte hashes, configuration, target,
+current compiler/runtime identity, supported scope, per-file outcomes and report
+bytes. These are development analysis judgments, with `unqualified: true`;
+neither a clean report nor its integrity binding supplies a source theorem.
+
+`--format-fixes` additionally requests the existing canonical formatter in its
+bounded worker. A `VELA-FORMAT` warning carries an explicit whole-file replacement
+using SARIF byte regions; this is a preview, and the command applies no edit.
+An unavailable requested formatter emits `VELA-FORMAT-UNAVAILABLE` and incomplete
+status. The current producers supply no related locations, code flows or semantic
+fixes, so those fields are absent. Findings in different batch files preserve
+their own source associations; imports and wider semantic producers retain their
+existing owners and unsupported verdicts.
+
+Reports use the exact external OASIS SARIF 2.1.0 schema recorded with the
+[reader pins and licence review](../../THIRD-PARTY.md#independent-sarif-importer).
+Supply that file explicitly; these commands download nothing.
+`vela sarif-validate <report.sarif> --sources <source> ... --schema <schema.json>`
+rechecks the schema, report binding, current producer and exact ordered inputs,
+including source bounds, rule references, UTF-16 source regions, fix ranges and
+consistent completion status. Both commands exit nonzero for rejected or
+incomplete analysis, preserving the report for inspection. A changed report,
+source, producer, scope or schema is refused before handoff.
+
+`vela sarif-qualify-reader --reader-directory <wheels> --schema <schema.json> --output <report.json>`
+runs the exact-pinned importer from verified external wheels in an isolated
+Python process, with a 15-second process budget and 64 KiB output bounds. Its
+independently expected real fixtures cover Unicode/space file URIs, CRLF sources,
+cross-file finding associations, source locations, canonical-format fix bytes and
+unsupported analysis. The stock importer independently interprets rule/severity,
+path and line records; the harness additionally checks the imported UTF-16 regions
+and applies the standard byte replacement independently of the exporter.
+Malformed and stale handoffs refuse through the Vela wrapper before import;
+stock `sarif-tools` alone grants no freshness or completion guarantee. The
+[behavioral controls](../../tools/tests/test_vela_sarif.py) additionally exercise
+supplementary-character coordinates, every unavailable worker outcome, missing
+findings, corrupt messages/rules/status/fixes, malformed JSON and publication
+aliases. The pure lexer permits Unicode in line comments only; its adapter's
+same-line supplementary-character control claims coordinate conversion alone.
+
 Export offline definitions, references, implementations and symbol relationships
 through [SCIP](https://github.com/scip-code/scip). Pin its Protobuf schema and
 consumer. Bind the index bytes and source/configuration/dependency identities
