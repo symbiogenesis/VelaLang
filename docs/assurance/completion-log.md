@@ -1564,8 +1564,20 @@ HTIF verdicts, normalized trace digests/counts and capability summaries. Rehashe
 images, incomplete control coverage and altered process subjects refuse.
 Optional CompCert availability must match the execution identity; retained
 Clight/assembly subjects and execution/perturbation summaries must agree. This
-optional check supplies no compiler-process transcript replay. Receipt matching
-does not replay or authenticate these proofs. Final binding publication rechecks
+optional path retains all five preprocessing, compilation, interpreter-preprocessing,
+interpretation and simulator processes for the main program and each of four
+perturbed controls. Commands, working directories, successful compiler/interpreter
+exits, decoded UTF-8 stdout/stderr identities and retained source/effective-input
+hashes must agree. Interpreter stdout must contain exactly one expected termination;
+simulator transcripts must recover the expected verdict and nonempty trace, and
+the main trace summary is recomputed. Each retained assembly must regenerate
+its exact image. Failed interpreter processes cannot publish a source verdict.
+Two additional [receipt cases](../../tools/tests/test_vela_first_slice_receipts.py)
+cover the observation producer and 31 independent process/subject/summary mutations,
+including rehashed contradictory transcripts and changed effective inputs or images.
+All 13 receipt cases pass. Local CompCert remains unavailable; optional fixtures
+supply no live compiler verdict. Receipt matching does not replay or authenticate
+these proofs. Final binding publication rechecks
 source/revision, execution/parser identities, retained outputs and the receipt
 bytes after the tool/runtime probes. Eight late-mutation controls refuse changes
 made during those probes.
@@ -1611,7 +1623,7 @@ whole-cell completion credit or additional hours are recorded for this increment
 
 Partial pure-producer delivery on 2026-11-09 under the
 [pure snapshot contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment).
-`vela inspect` exports immutable source-preserving snapshots with schema-3
+`vela inspect` exports immutable source-preserving snapshots with schema-4
 provenance, UTF-8 byte spans, structured scalar/callable identifier types and
 snapshot-scoped resolved symbols/references. Function types include parameter
 types, required-static flags, result types and constant-callable status.
@@ -1635,9 +1647,22 @@ independently reconstruct mixed newline/Unicode source, verify piece classificat
 and half-open queries, and exercise bounds, stale inputs, missing/forged trivia
 and source-reconstructing token splits. The worker boundary rechecks the canonical
 pure token partition before publication; failed semantic analysis cannot advertise
-checked concrete pieces.
+checked concrete pieces. The same checked parse and complete pure check supply
+a source-bound preorder syntax tree. Snapshot-scoped node handles carry parent
+and child links, field roles, list indices, constant qualifiers and exact UTF-8
+spans. Bounded syntax, syntax-at and syntax-children queries enforce snapshot
+freshness and Unicode/CRLF coordinates.
+Four [syntax consumers](../../tools/tests/test_vela_inspection_syntax.py)
+independently check a complete authored tree with constant qualifiers, typed
+locals, branch nesting, named arguments and parentheses. Malformed, omitted and
+escaping worker nodes, stale schema versions and foreign handles refuse. All
+19 inspection cases and both-platform typechecking pass. Independent review
+identified and corrected coordinated omitted semantic inventories and an
+in-bounds expanded module span. Source-tree identifier coverage cross-checks
+every declaration, callee, value and argument-label occurrence without
+duplicating resolution; trailing trivia cannot enter a forged root span.
 Combined local gate and behavioral validation cover integration.
-Q25ch remains open for syntax/typed trees, imports, generated/proof and
+Q25ch remains open for typed-expression trees, structural scopes, imports, generated/proof and
 lowering views and their qualified producers. No whole-cell completion credit
 or additional hours are recorded for this development increment.
 
@@ -1665,10 +1690,22 @@ wire JSON plus hashes after temporary session cleanup. Replay checks enforce
 current-base lifetimes and expected tokens, and join all five observed responses
 to wire result IDs, request chains and source snapshots. Corrupted token streams,
 invalidated bases and detached observations refuse.
+Pure local `let` variables also support `prepareRename` and versioned `rename`
+previews. Candidate source is rechecked by the existing pure producer and every
+declaration, type and reference binding is compared before publication.
+Type-correct capture, stale overlays and producer changes refuse. Functions,
+parameters and constants remain outside this single-document increment.
+Four [rename cases](../../tools/tests/test_vela_lsp_rename.py) check independent
+expected edits, capture, coordinates, negotiation and freshness. Seven
+[client cases](../../tools/tests/test_vela_lsp_clients.py) check retained
+observations and wire joins, including version and edit corruption.
+The live schema-2 client report qualifies successful versioned previews in pinned
+Neovim and explicit `RequestFailed` refusal in pinned Vim's full and incremental
+sessions, whose plugin omits versioned `documentChanges` support.
 Combined local gate and behavioral validation cover integration.
 
-Q25ci remains open for wider qualified producers, the remaining selected editor
-operations. This increment supplies no wider
+Q25ci remains open for a second successful version-capable rename client, wider
+qualified producers and the remaining selected editor operations. This increment supplies no wider
 language or proof admission and records no whole-cell completion credit or hours.
 
 <a id="q25cp-expose-bounded-compiler-performance-traces"></a>
@@ -1704,8 +1741,20 @@ summaries; `vela trace-benchmark-validate` rejects stale or malformed reports.
 Five [benchmark cases](../../tools/tests/test_vela_trace_benchmark.py) cover
 independent timing arithmetic, bounds, clock faults, changed outputs, cancellation
 and atomic publication. A local seven-pair benchmark and its validator pass.
+The offline `vela trace-qualify-viewer` command checks exact-pinned Perfetto v58.2
+executable and revision identities before an independent import. Seven stale,
+malformed and incomplete trace controls refuse before handoff. The actual reader
+recovers independently expected nanosecond spans, nesting, worker identities and
+byte counters from a deterministic fixture. Bound reports retain the fixture,
+SQL, raw and parsed reader observations, version/diagnostic transcripts and harness
+identity. Five [importer cases](../../tools/tests/test_vela_trace_viewer.py) cover
+wrong observations, disabled controls, unknown readers, timeout/output bounds,
+alias/cancellation and late changes. Actual Windows AMD64 under ARM64 emulation
+and Linux ARM64 reader qualifications pass, along with all 19 trace cases and
+both-platform typechecking. The [license record](../../THIRD-PARTY.md) records
+the selected reader's own terms; the optional command downloads nothing.
 Combined local gate and behavioral validation cover integration.
-Q25cp remains open for wider phases/workers, pinned external-viewer qualification,
-and exact runtime closure. The comparison measures warm-process wall time,
+Q25cp remains open for wider phases/workers, browser UI rendering and exact
+runtime closure. The comparison measures warm-process wall time,
 including parser waits, and supplies no hard overhead limit. No whole-cell
 completion credit, emitted-program timing verdict or additional hours are recorded.
