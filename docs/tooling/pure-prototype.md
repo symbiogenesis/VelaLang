@@ -342,6 +342,7 @@ python tools/run.py vela trace-validate out/pure-trace.json --source examples/pu
 python tools/run.py vela trace-benchmark examples/pure.vela --output out/pure-trace-comparison.json
 python tools/run.py vela trace-benchmark-validate out/pure-trace-comparison.json --source examples/pure.vela
 python tools/run.py vela trace-qualify-viewer --trace-processor /path/to/trace_processor_shell --output out/trace-viewer.json
+python tools/run.py vela trace-viewer-validate out/trace-viewer.json --trace-processor /path/to/trace_processor_shell
 ```
 
 The read-only trace command records `compile`, nested `parse` and
@@ -456,6 +457,17 @@ existing evidence after failures or cancellation and refuses output aliases.
 [Reader qualification tests](../../tools/tests/test_vela_trace_viewer.py) cover
 wrong independent observations, disabled negative checks, unknown binaries,
 timeouts, output bounds, aliases and late identity changes.
+
+`trace-viewer-validate` rechecks a retained qualification receipt without executing
+the external reader. It bounds receipt bytes and nesting, rejects duplicate
+fields, and checks the exact fixture, source, producer, negative-control inventory,
+queries, CSV observations and retained result rows against independently chosen
+expectations. Non-successful reader outcomes, a changed release, malformed or
+oversized transcripts, changed reader bytes and stale harness identities refuse.
+Current identities are checked again after receipt inspection. Rehashing an
+altered duration, counter, declaration kind or omitted control cannot restore
+acceptance. This checks retained data consistency and freshness; it supplies no
+transcript authentication or fresh reader observation.
 
 This qualifies the selected Perfetto importer for the deterministic pure trace
 profile. Browser UI rendering, wider phase/worker coverage, exact runtime closure

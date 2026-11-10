@@ -22,6 +22,7 @@ PINS = {
 }
 MAX_READER_BYTES = 20_000_000
 MAX_OUTPUT_BYTES = 65_536
+MAX_REPORT_BYTES = 524_288
 TIMEOUT_SECONDS = 30
 SOURCE = b"module Timed; public Nat Twice(Nat x) => x + x;"
 FIXTURE_PRODUCER = "a" * 64
@@ -79,6 +80,70 @@ def check_current(executable: Path, report: Object) -> None:
     if (reader_identity(executable) != report["reader"]
             or harness_identity() != report["harness_sha256"]):
         raise ValueError("reader or qualification harness changed before publication")
+
+
+def decode(raw: bytes) -> Object:
+    """Decode a bounded retained receipt, refusing duplicates and deep objects."""
+    if len(raw) > MAX_REPORT_BYTES:
+        raise ValueError("trace viewer report exceeds byte limit")
+    return trace.decode(raw)
+
+
+def _transcript(value: object) -> Object:
+    if not isinstance(value, dict) or set(value) != {"stdout", "stderr", "returncode"}:
+        raise ValueError("invalid retained reader transcript")
+    transcript = cast("Object", value)
+    if type(transcript["returncode"]) is not int or transcript["returncode"] != 0:
+        raise ValueError("retained reader did not complete successfully")
+    for field in ("stdout", "stderr"):
+        output = transcript[field]
+        if not isinstance(output, str) or len(output.encode("utf-8")) > MAX_OUTPUT_BYTES:
+            raise ValueError("invalid or oversized retained reader output")
+    return transcript
+
+
+def validate(document: object, executable: Path) -> Object:
+    """Recheck retained observations and current identities without rerunning a reader.
+
+    These checks detect stale or inconsistent data and authenticate no transcript.
+    A fresh external observation still requires the qualification command.
+    """
+    fields = {"schema", "scope", "accepted", "reader", "harness_sha256", "version", "trace",
+              "source", "producer_sha256", "negative_controls", "queries", "binding_sha256"}
+    if (not isinstance(document, dict) or set(document) != fields
+            or len(json.dumps(document).encode("utf-8")) > MAX_REPORT_BYTES):
+        raise ValueError("unsupported or oversized trace viewer report")
+    report = cast("Object", document)
+    unsigned = {key: value for key, value in report.items() if key != "binding_sha256"}
+    if report["binding_sha256"] != _digest(unsigned):
+        raise ValueError("trace viewer report binding mismatch")
+    if (type(report["schema"]) is not int or report["schema"] != 1
+            or report["scope"] != "pure-trace-independent-importer" or report["accepted"] is not True
+            or report["source"] != SOURCE.decode("ascii")
+            or report["producer_sha256"] != FIXTURE_PRODUCER):
+        raise ValueError("unsupported trace viewer qualification subject or outcome")
+    check_current(executable, report)
+    trace.validate(report["trace"], SOURCE, FIXTURE_PRODUCER)
+    fixture = cast("Object", report["trace"])
+    if (fixture["traceEvents"] != _fixture()["traceEvents"]
+            or report["negative_controls"] != list(NEGATIVE_CONTROLS)
+            or _negative_controls(fixture) != list(NEGATIVE_CONTROLS)):
+        raise ValueError("retained fixture or negative controls disagree with qualification")
+    version = _transcript(report["version"])
+    if f"Perfetto {RELEASE}-add693d8b ({REVISION})" not in cast("str", version["stdout"]):
+        raise ValueError("retained reader version disagrees with its pinned release")
+    queries = report["queries"]
+    if not isinstance(queries, dict) or set(queries) != {"slices", "counters"}:
+        raise ValueError("invalid retained reader queries")
+    for name, sql, expected in (("slices", SLICES_SQL, EXPECTED_SLICES),
+                                 ("counters", COUNTERS_SQL, EXPECTED_COUNTERS)):
+        query = queries[name]
+        if (not isinstance(query, dict) or set(query) != {"sql", "transcript", "rows"}
+                or query["sql"] != sql or query["rows"] != expected
+                or _rows(_transcript(query["transcript"])) != expected):
+            raise ValueError("retained reader disagrees with expected query observations")
+    check_current(executable, report)
+    return report
 
 
 def _fixture() -> Object:

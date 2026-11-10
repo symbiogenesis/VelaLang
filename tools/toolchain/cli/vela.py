@@ -197,6 +197,12 @@ def _trace_benchmark(args: argparse.Namespace) -> int:
 
 def _trace_viewer(args: argparse.Namespace) -> int:
     try:
+        if args.command == "trace-viewer-validate":
+            with args.report.open("rb") as stream:
+                data = stream.read(trace_viewer.MAX_REPORT_BYTES + 1)
+            trace_viewer.validate(trace_viewer.decode(data), args.trace_processor)
+            print(f"vela: {args.report}: current pinned Perfetto importer evidence")
+            return 0
         _destination(args.trace_processor, args.output)
         report = trace_viewer.qualify(args.trace_processor)
         _destination(args.trace_processor, args.output)
@@ -253,6 +259,10 @@ def main(argv: list[str] | None = None) -> int:
     viewer = commands.add_parser("trace-qualify-viewer", help="qualify a pinned offline Perfetto importer")
     viewer.add_argument("--trace-processor", type=Path, required=True)
     viewer.add_argument("--output", type=Path, required=True)
+    viewer_validation = commands.add_parser(
+        "trace-viewer-validate", help="recheck retained pinned importer evidence without execution")
+    viewer_validation.add_argument("report", type=Path)
+    viewer_validation.add_argument("--trace-processor", type=Path, required=True)
     generated = commands.add_parser(
         "generated-tests",
         help="qualify isolated Hypothesis generated development tests (Q25x)",
@@ -270,7 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         return _trace(args)
     if args.command in {"trace-benchmark", "trace-benchmark-validate"}:
         return _trace_benchmark(args)
-    if args.command == "trace-qualify-viewer":
+    if args.command in {"trace-qualify-viewer", "trace-viewer-validate"}:
         return _trace_viewer(args)
     if args.command == "generated-tests":
         root = Path(__file__).resolve().parents[3]

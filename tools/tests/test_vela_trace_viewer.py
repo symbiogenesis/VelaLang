@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Independent importer observations, wrong-reader controls and atomic evidence."""
 
+import copy
 import hashlib
 import json
 import subprocess
@@ -166,9 +167,106 @@ def _publication() -> None:
             ensure(output.read_bytes() == previous, "cancelled qualification replaced evidence")
 
 
+def _bind(report: viewer.Object) -> None:
+    unsigned = {key: value for key, value in report.items() if key != "binding_sha256"}
+    report["binding_sha256"] = hashlib.sha256(json.dumps(
+        unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False).encode("ascii")).hexdigest()
+
+
+def _retained_observations() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-viewer-retained-") as directory:
+        binary, receipt = Path(directory) / "reader", Path(directory) / "receipt.json"
+        binary.write_bytes(READER_BYTES)
+        with patch.object(viewer, "PINS", {"test": DIGEST}):
+            with patch.object(viewer, "_run", side_effect=_reader):
+                report = viewer.qualify(binary)
+            with patch.object(viewer, "_run", side_effect=AssertionError("offline validation executed reader")):
+                ensure(viewer.validate(report, binary) == report, "retained receipt did not validate")
+                receipt.write_text(json.dumps(report), encoding="utf-8")
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    ensure(cli.main(["trace-viewer-validate", str(receipt), "--trace-processor", str(binary)]) == 0,
+                           "offline receipt command failed")
+                ensure(json.loads(receipt.read_bytes()) == report, "offline command changed evidence")
+                for field in ("schema", "scope", "accepted", "source", "producer", "negative", "query",
+                              "rows", "csv", "version", "returncode", "transcript", "fixture", "extra"):
+                    changed = copy.deepcopy(report)
+                    queries = cast("dict[str, viewer.Object]", changed["queries"])
+                    if field == "schema":
+                        changed["schema"] = True
+                    elif field == "scope":
+                        changed["scope"] = "another qualification"
+                    elif field == "accepted":
+                        changed["accepted"] = False
+                    elif field == "source":
+                        changed["source"] = str(changed["source"]) + " "
+                    elif field == "producer":
+                        changed["producer_sha256"] = "b" * 64
+                    elif field == "negative":
+                        changed["negative_controls"] = list(viewer.NEGATIVE_CONTROLS[:-1])
+                    elif field == "query":
+                        queries["slices"]["sql"] = "SELECT 1"
+                    elif field == "rows":
+                        cast("list[list[str]]", queries["slices"]["rows"])[1][2] = "9001"
+                    elif field == "csv":
+                        cast("viewer.Object", queries["counters"]["transcript"])["stdout"] = (
+                            '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",8000,49\n')
+                    elif field == "version":
+                        cast("viewer.Object", changed["version"])["stdout"] = "Perfetto v58.1"
+                    elif field == "returncode":
+                        cast("viewer.Object", changed["version"])["returncode"] = False
+                    elif field == "transcript":
+                        cast("viewer.Object", changed["version"])["stderr"] = "x" * (viewer.MAX_OUTPUT_BYTES + 1)
+                    elif field == "fixture":
+                        fixture = cast("viewer.Object", changed["trace"])
+                        event = cast("list[viewer.Object]", fixture["traceEvents"])[4]
+                        cast("viewer.Object", event["args"])["kind"] = "constant"
+                        manifest = cast("viewer.Object", fixture["vela"])
+                        manifest.pop("binding_sha256")
+                        manifest["binding_sha256"] = hashlib.sha256(json.dumps(
+                            fixture, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                            allow_nan=False).encode("ascii")).hexdigest()
+                    else:
+                        changed["extra"] = True
+                    _bind(changed)
+                    try:
+                        viewer.validate(changed, binary)
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError(f"rebound wrong {field} retained qualification")
+                with patch.object(viewer, "harness_identity", side_effect=[viewer.harness_identity(), "b" * 64]):
+                    try:
+                        viewer.validate(report, binary)
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError("late harness change retained offline qualification")
+                binary.write_bytes(b"changed reader")
+                try:
+                    viewer.validate(report, binary)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("stale reader retained offline qualification")
+
+
+def _bounded_retained_receipts() -> None:
+    for raw in (b"{}", b'{"schema":1,"schema":1}', b"[" * 30 + b"0" + b"]" * 30,
+                b" " * (viewer.MAX_REPORT_BYTES + 1)):
+        try:
+            viewer.validate(viewer.decode(raw), Path("reader"))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("malformed or unbounded retained receipt accepted")
+
+
 def cases() -> list[Case]:
     return [Case("independent-nanosecond-nesting-workers-and-counter-rows", _independent_observations),
             Case("wrong-reader-observations-and-late-identity-refusal", _wrong_results_and_late_changes),
             Case("negative-completeness-controls-precede-handoff", _negative_gate_failure),
             Case("bounded-output-and-reader-timeouts", _bounded_reader_failures),
-            Case("atomic-evidence-alias-freshness-and-cancellation", _publication)]
+            Case("atomic-evidence-alias-freshness-and-cancellation", _publication),
+            Case("offline-receipts-recheck-independent-observations-and-identities", _retained_observations),
+            Case("malformed-and-unbounded-offline-receipts-refuse", _bounded_retained_receipts)]
