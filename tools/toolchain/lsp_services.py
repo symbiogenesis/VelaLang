@@ -7,7 +7,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import cast
 
+from toolchain import concrete
 from toolchain.ast import (
+    DECIMAL,
     IDENTIFIER,
     KEYWORDS,
     MAX_LITERAL_DIGITS,
@@ -16,6 +18,7 @@ from toolchain.ast import (
     Name,
     Site,
     ValueType,
+    VelaError,
 )
 from toolchain.documentation import DocumentationSource
 from toolchain.facts import MAX_COMPLETION_OPTIONS, MAX_OCCURRENCES, MAX_SYMBOLS, PureType
@@ -91,6 +94,7 @@ class Inspection:
     symbols: tuple[_Symbol, ...]
     occurrences: tuple[_Occurrence, ...]
     completions: tuple[tuple[Position, tuple[int, ...]], ...] = ()
+    literal_completions: tuple[tuple[Position, Position, tuple[int, ...]], ...] = ()
 
 
 def _object(value: object, fields: set[str]) -> dict[str, object]:
@@ -159,6 +163,8 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
     fields = {"status", "symbols", "occurrences"}
     if "completions" in raw:
         fields.add("completions")
+    if "literal_completions" in raw:
+        fields.add("literal_completions")
     record = _object(raw, fields)
     symbols_raw, occurrences_raw = record["symbols"], record["occurrences"]
     if (record["status"] != "ok" or not isinstance(symbols_raw, list)
@@ -267,12 +273,12 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
     if len(declarations) != len(symbols):
         raise InspectionError("Pure prototype inspection omits declaration occurrences")
     completions: list[tuple[Position, tuple[int, ...]]] = []
+    count = 0
     if "completions" in record:
         choices_raw = record["completions"]
         if not isinstance(choices_raw, list) or len(choices_raw) > MAX_OCCURRENCES:
             raise InspectionError("Pure prototype completion sites exceed bounds")
         uses = {item.start: item for item in occurrences if not item.declaration}
-        count = 0
         for value in choices_raw:
             choice = _object(value, {"line", "column", "symbols"})
             point = snapshot.diagnostic_position(_integer(choice["line"]), _integer(choice["column"]))
@@ -301,7 +307,56 @@ def _validate(snapshot: SourceSnapshot, raw: dict[str, object]) -> Inspection | 
                     raise InspectionError("Incompatible pure prototype completion value")
                 names.add(candidate.name)
             completions.append((start, candidates))
-    return Inspection(snapshot.identity, tuple(symbols), tuple(occurrences), tuple(completions))
+    literal_completions: list[tuple[Position, Position, tuple[int, ...]]] = []
+    if "literal_completions" in record:
+        # Reuse the compiler token producer to bind complete literal tokens;
+        # the resolver owns type, scope and static eligibility decisions.
+        choices_raw = record["literal_completions"]
+        if (not isinstance(choices_raw, list)
+                or len(choices_raw) + len(completions) > MAX_OCCURRENCES):
+            raise InspectionError("Pure prototype literal completion sites exceed bounds")
+        try:
+            tokens = {tuple(cast("list[int]", piece["span"])): piece["text"]
+                      for piece in concrete.parts(snapshot.source)
+                      if piece["kind"] in {"decimal", "keyword"}}
+        except VelaError as error:
+            raise InspectionError("Literal completion token context is unavailable") from error
+        for value in choices_raw:
+            choice = _object(value, {"line", "column", "spelling", "type", "required_static", "symbols"})
+            spelling = choice["spelling"]
+            value_type = _value_type(choice["type"])
+            required_static, candidates_raw = choice["required_static"], choice["symbols"]
+            if (not isinstance(spelling, str) or type(required_static) is not bool
+                    or not isinstance(candidates_raw, list)
+                    or (value_type == "Nat" and DECIMAL.fullmatch(spelling) is None)
+                    or (value_type == "bool" and spelling not in {"true", "false"})):
+                raise InspectionError("Invalid pure prototype literal completion context")
+            point = snapshot.diagnostic_position(_integer(choice["line"]), _integer(choice["column"]))
+            start = point["line"], point["character"]
+            end = start[0], start[1] + len(spelling)
+            first, last = snapshot.position_byte_offset(*start), snapshot.position_byte_offset(*end)
+            if (tokens.get((first, last)) != spelling
+                    or (literal_completions and start <= literal_completions[-1][0])):
+                raise InspectionError("Literal completion differs from its complete source token")
+            count += len(candidates_raw)
+            if count > MAX_COMPLETION_OPTIONS:
+                raise InspectionError("Pure prototype completion options exceed bounds")
+            candidates = tuple(_integer(identity) for identity in candidates_raw)
+            if tuple(sorted(set(candidates))) != candidates:
+                raise InspectionError("Invalid pure prototype literal completion identities")
+            names: set[str] = set()
+            for identity in candidates:
+                if identity >= len(symbols):
+                    raise InspectionError("Unknown pure prototype literal completion identity")
+                candidate = symbols[identity]
+                if (candidate.kind == "function" or candidate.value_type != PureType(value_type)
+                        or candidate.start >= start or candidate.name in names
+                        or (required_static and not candidate.required_static)):
+                    raise InspectionError("Incompatible pure prototype literal completion value")
+                names.add(candidate.name)
+            literal_completions.append((start, end, candidates))
+    return Inspection(snapshot.identity, tuple(symbols), tuple(occurrences), tuple(completions),
+                      tuple(literal_completions))
 
 
 def _range(start: Position, end: Position) -> dict[str, object]:

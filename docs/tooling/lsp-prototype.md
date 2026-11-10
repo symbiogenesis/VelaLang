@@ -426,6 +426,38 @@ constant and required-static parameter choices, edit ranges and details join to
 the retained source, cursor, wire response and client observation. Missing probe
 traffic, altered choices and mismatched observations refuse qualification.
 
+Completion also accepts checked natural-number and Boolean literal tokens. The
+compiler records their same-type visible values while checking each expression;
+the server proposes replacing the complete literal, including every numeric
+separator, with a selected value name. All cursor positions within the literal,
+including its end, use that same edit range. Literal spelling supplies no name
+prefix filter. Scope, shadowing and declaration order follow the resolver's
+identifier choices; a binding is unavailable inside its own initializer.
+
+When a literal occurs in a constant initializer or a required-static call
+argument, the compiler narrows its choices to constants and required-static
+parameters throughout the enclosing expression. Ordinary call arguments retain
+runtime choices. This records the producer's static-input requirement without
+evaluating proposed edits or inferring another type in the adapter.
+
+The optional `literal_completions` inventory binds each site's exact spelling,
+scalar type, static requirement and ordered symbol identities. The consumer
+checks the complete token against the existing compiler token producer and
+validates candidate types, source order, uniqueness and static eligibility.
+Identifier and literal sites share the 4,096-site and 8,192-choice budgets;
+budget exhaustion refuses the entire operation. Empty literal choices are valid;
+omitted inventories provide no literal suggestions. Cached tuples detach from
+mutable producer replies and invalidate with source, producer and configuration
+changes. Literal lists remain `isIncomplete: true` and are explicit proposals.
+
+The [literal completion controls](../../tools/tests/test_vela_lsp_literal_completion.py)
+cover full separator-containing edits, Boolean types, sibling scopes,
+self-initializers, shadowed constants, nested static arguments, malformed facts,
+shared budgets and cache invalidation. A real stdio session verifies exact edits
+before and after an unsaved supplementary-comment/CRLF update. Empty insertion
+sites, unfinished source and wider-language completion retain their producer
+prerequisites; literal completion adds no advertised semantic acceptance claim.
+
 Signature help selects the innermost checked call whose argument list contains
 the cursor, through the closing parenthesis's start. The existing compiler token
 producer supplies bounded punctuation and trivia boundaries; resolved function

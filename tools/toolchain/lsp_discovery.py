@@ -31,18 +31,26 @@ def _completion(snapshot: SourceSnapshot, inspection: Inspection, position: Posi
     selected = next((item for item in inspection.occurrences
                      if not item.declaration and item.start <= position <= item.end), None)
     if selected is None:
-        return {"isIncomplete": False, "items": []}
-    symbol = inspection.symbols[selected.symbol]
-    first = snapshot.position_byte_offset(*selected.start)
-    cursor = snapshot.position_byte_offset(*position)
-    prefix = snapshot.source[first:cursor].decode("ascii")
-    callable_use = symbol.kind == "function"
-    parameters = _parameters(inspection, selected.symbol) if callable_use else []
-    choices = next((identities for start, identities in inspection.completions
-                    if start == selected.start), ())
+        literal = next((item for item in inspection.literal_completions
+                        if item[0] <= position <= item[1]), None)
+        if literal is None:
+            return {"isIncomplete": False, "items": []}
+        start, end, choices = literal
+        prefix, callable_use, parameters = "", False, []
+        symbol = None
+    else:
+        start, end = selected.start, selected.end
+        symbol = inspection.symbols[selected.symbol]
+        first = snapshot.position_byte_offset(*start)
+        cursor = snapshot.position_byte_offset(*position)
+        prefix = snapshot.source[first:cursor].decode("ascii")
+        callable_use = symbol.kind == "function"
+        parameters = _parameters(inspection, selected.symbol) if callable_use else []
+        choices = next((identities for site, identities in inspection.completions
+                        if site == start), ())
     items: list[dict[str, object]] = []
     for identity, candidate in enumerate(inspection.symbols):
-        if callable_use and (candidate.kind != "function" or candidate.start > symbol.start
+        if callable_use and symbol is not None and (candidate.kind != "function" or candidate.start > symbol.start
                 or candidate.value_type != symbol.value_type or not candidate.name.startswith(prefix)
                 or _parameters(inspection, identity) != parameters):
             continue
@@ -50,7 +58,7 @@ def _completion(snapshot: SourceSnapshot, inspection: Inspection, position: Posi
             continue
         item: dict[str, object] = {"label": candidate.name, "kind": 3 if callable_use else (
                                       21 if candidate.kind == "constant" else 6), "detail": candidate.detail,
-                                  "textEdit": {"range": _range(selected.start, selected.end),
+                                  "textEdit": {"range": _range(start, end),
                                                "newText": candidate.name}}
         if candidate.documentation is not None:
             item["documentation"] = {"kind": "plaintext", "value": candidate.documentation}

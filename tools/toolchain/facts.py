@@ -63,6 +63,7 @@ class Facts:
         self.occurrence_scopes: list[int] = []
         self.collect_completion_options = completion_options
         self.completions: dict[Site, tuple[int, ...]] = {}
+        self.literal_completions: dict[Site, tuple[str, ValueType, bool, tuple[int, ...], tuple[int, ...]]] = {}
         self.completion_count = 0
         self.documentation = None if source is None else DocumentationSource(source)
         self.declaration_sites = {} if declaration_sites is None else dict(declaration_sites)
@@ -128,10 +129,31 @@ class Facts:
         if site in self.completions:
             raise ValueError("pure inspection repeats a completion site")
         self.completion_count += len(identities)
-        if self.completion_count > MAX_COMPLETION_OPTIONS:
+        if (self.completion_count > MAX_COMPLETION_OPTIONS
+                or len(self.literal_completions) + len(self.completions) >= MAX_OCCURRENCES):
             raise VelaError("inspection-limit", site.line, site.column,
                             "pure completion facts exceed option limit")
         self.completions[site] = identities
+
+    def literal_values(self, site: Site, spelling: str, value_type: ValueType,
+                       identities: tuple[int, ...], static: tuple[int, ...]) -> None:
+        """Retain resolver choices at a checked literal, including its static alternatives."""
+        if not self.collect_completion_options:
+            return
+        if site in self.literal_completions:
+            raise ValueError("pure inspection repeats a literal completion site")
+        self.completion_count += len(identities)
+        if (self.completion_count > MAX_COMPLETION_OPTIONS
+                or len(self.literal_completions) + len(self.completions) >= MAX_OCCURRENCES):
+            raise VelaError("inspection-limit", site.line, site.column,
+                            "pure literal completion facts exceed limit")
+        self.literal_completions[site] = spelling, value_type, False, identities, static
+
+    def require_static_literal(self, site: Site) -> None:
+        """Narrow an already checked literal when its enclosing use requires static input."""
+        if site in self.literal_completions:
+            spelling, value_type, _, _, static = self.literal_completions[site]
+            self.literal_completions[site] = spelling, value_type, True, static, static
 
     def result(self, *, expression_types: bool = False) -> dict[str, object]:
         ordered = sorted(enumerate(self.symbols),
@@ -165,6 +187,12 @@ class Facts:
                  "symbols": sorted(identities[identity] for identity in choices)}
                 for site, choices in sorted(self.completions.items(), key=lambda item: (
                     item[0].line, item[0].column))]
+            result["literal_completions"] = [
+                {"line": site.line, "column": site.column, "spelling": spelling,
+                 "type": value_type, "required_static": required_static,
+                 "symbols": sorted(identities[identity] for identity in choices)}
+                for site, (spelling, value_type, required_static, choices, _) in sorted(
+                    self.literal_completions.items(), key=lambda item: (item[0].line, item[0].column))]
         if expression_types:
             result["scopes"] = {
                 "scopes": [{"kind": kind, "line": site.line, "column": site.column, "parent": parent}

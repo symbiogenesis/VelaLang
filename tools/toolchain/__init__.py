@@ -232,6 +232,8 @@ class _Elaborator:
         while pending:
             current = pending.pop()
             self._static_tick(current.site)
+            if self.facts is not None:
+                self.facts.require_static_literal(current.site)
             if current.kind == "name":
                 name = cast("str", current.value)
                 local = environment.get(name, self.constants.get(name))
@@ -416,6 +418,16 @@ class _Elaborator:
         checked = self._checked_expression(expression, environment)
         if self.facts is not None:
             self.facts.expression(expression.kind, expression.site, checked.value_type)
+            if self.facts.collect_completion_options and expression.kind in {"nat", "bool"}:
+                available = {**self.constants, **environment}
+                candidates = tuple(local for local in available.values()
+                                   if local.symbol is not None and local.value_type == checked.value_type)
+                choices = tuple(local.symbol for local in candidates if local.symbol is not None)
+                static = tuple(local.symbol for local in candidates if local.symbol is not None
+                               and (local.required_static or local.static is not None))
+                spelling = (cast("str", expression.value) if expression.kind == "nat"
+                            else "true" if expression.value else "false")
+                self.facts.literal_values(expression.site, spelling, checked.value_type, choices, static)
         return checked
 
     def _checked_expression(self, expression: syntax.Expression,
