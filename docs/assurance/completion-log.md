@@ -1580,7 +1580,18 @@ its exact image. Failed interpreter processes cannot publish a source verdict.
 Two additional [receipt cases](../../tools/tests/test_vela_first_slice_receipts.py)
 cover the observation producer and 31 independent process/subject/summary mutations,
 including rehashed contradictory transcripts and changed effective inputs or images.
-All 14 receipt cases pass. Local CompCert remains unavailable; optional fixtures
+Simulator transcripts require exactly one well-formed terminal verdict consistent
+with the process exit, at least one instruction retirement, strictly increasing
+instruction counters and complete supported trace records with exact memory
+widths. The pinned failure spelling's optional hexadecimal status must agree with
+its decimal status; plain decimal remains supported. Trace records following the terminal verdict, duplicate/conflicting
+verdicts, malformed records previously discarded by normalization, non-ASCII trace
+data and trap-loop diagnostics refuse. The same
+checks run before native first-slice publication. A fifteenth
+[receipt case](../../tools/tests/test_vela_first_slice_receipts.py) exercises
+rehashed transcript mutations across passing and trapping capability controls
+and optional compiler main/control observations, with valid stderr-carried records.
+All 15 receipt cases pass. Local CompCert remains unavailable; optional fixtures
 supply no live compiler verdict. Receipt matching does not replay or authenticate
 these proofs. Final binding publication rechecks
 source/revision, execution/parser identities, retained outputs and the receipt
@@ -1628,7 +1639,7 @@ whole-cell completion credit or additional hours are recorded for this increment
 
 Partial pure-producer delivery on 2026-11-09 under the
 [pure snapshot contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment).
-`vela inspect` exports immutable source-preserving snapshots with schema-5
+`vela inspect` exports immutable source-preserving snapshots with schema-6
 provenance, UTF-8 byte spans, structured scalar/callable identifier types and
 snapshot-scoped resolved symbols/references. Function types include parameter
 types, required-static flags, result types and constant-callable status.
@@ -1661,7 +1672,7 @@ Four [syntax consumers](../../tools/tests/test_vela_inspection_syntax.py)
 independently check a complete authored tree with constant qualifiers, typed
 locals, branch nesting, named arguments and parentheses. Malformed, omitted and
 escaping worker nodes, stale schema versions and foreign handles refuse. All
-22 inspection cases and both-platform typechecking pass. Independent review
+25 inspection cases and both-platform typechecking pass. Independent review
 identified and corrected coordinated omitted semantic inventories and an
 in-bounds expanded module span. Source-tree identifier coverage cross-checks
 every declaration, callee, value and argument-label occurrence without
@@ -1674,8 +1685,18 @@ types. Three [typed-expression consumers](../../tools/tests/test_vela_inspection
 independently check expected source meanings, named/static calls, callee shadowing,
 operator/group sites, Unicode/CRLF, bounded/stale/foreign queries and malformed,
 omitted or inconsistent worker decisions. Failed overlays withdraw the snapshot.
-Combined local gate and behavioral validation cover integration.
-Q25ch remains open for structural scopes, imports, wider typed trees, generated/proof and
+The same resolver records module, function and block environments, declaration
+owners and reference use environments. Schema-6 scope records join those
+decisions to source syntax nodes, parent/child links and exact byte spans;
+symbols also expose declaration-order availability offsets. Named argument
+labels retain caller environments and callee parameter identities. Bounded
+`scopes`, `scope-at` and `scope-symbols` queries reject stale/foreign handles and
+report truncation explicitly. Three
+[scope consumer cases](../../tools/tests/test_vela_inspection_scopes.py) check
+nine independently expected environments, shadowing, sibling identities,
+availability, named labels and malformed/omitted worker facts. Combined local
+gate and behavioral validation cover integration.
+Q25ch remains open for imports, wider typed trees, generated/proof and
 lowering views and their qualified producers. No whole-cell completion credit
 or additional hours are recorded for this development increment.
 
@@ -1730,10 +1751,21 @@ zero-argument calls, static/parameter-name compatibility and output bounds.
 Both pinned clients, including both Vim synchronization modes, qualify completion
 and signatures; retained observations join their exact source/cursor requests and
 responses to the wire transcripts. Corrupted or detached observations refuse.
+At resolved value-expression identifiers, the compiler also records the visible
+same-typed local, parameter and constant choices from its active environment.
+The projection preserves shadowing, branch and declaration order, separate call
+and value namespaces and required-static readiness without reconstructing scope
+in the editor adapter. Candidate inventories are bounded and worker validation
+rejects malformed, stale, over-budget and incompatible choice records. Absent
+optional choices yield no value suggestions and retain incomplete status. Seven
+[value-completion cases](../../tools/tests/test_vela_lsp_value_completion.py)
+cover independently expected edits, static compatibility, cache invalidation,
+bounds, Unicode/CRLF and unsaved stdio updates. Both pinned clients recover the
+expected static-compatible value edit with retained source/cursor/wire joins.
 Combined local gate and behavioral validation cover integration.
 
 Q25ci remains open for a second successful version-capable rename client, wider
-qualified producers, general completion and the remaining selected editor operations. This increment supplies no wider
+qualified producers, completion outside checked identifier sites and the remaining selected editor operations. This increment supplies no wider
 language or proof admission and records no whole-cell completion credit or hours.
 
 <a id="q25cp-expose-bounded-compiler-performance-traces"></a>
@@ -1764,9 +1796,16 @@ Producer identity includes Python/opam lock owners, the command bootstrap and
 selected host/guest Python and validated checked-parser executable bytes.
 Same-version executable replacements and changed/missing lock owners invalidate
 recordings; validation rechecks producer identity after reading the recording.
-Windows-to-WSL recording, a three-pair benchmark and both validators pass with
-the real locked toolchain. Installed libraries and operating-system closure
-remain outside this selected-executable binding.
+Both Python identities also bind bounded standard-library source/bytecode,
+extension modules, installation archives and Python shared-library inventories.
+Missing, unreadable, changed, added or removed files withdraw freshness; inventory
+observation refuses over 20,000 files or 512 MiB. Three
+[runtime inventory cases](../../tools/tests/test_vela_trace_runtime.py) check
+independent Linux/Windows file selections and manifest hashes, same-executable
+source/cache/extension/library/archive changes, unavailable inputs and bounds.
+Windows-to-WSL recording and validation pass with the real locked toolchain.
+Third-party package trees and operating-system libraries remain outside this
+installation-file binding; newly created import caches also change its identity.
 `vela trace-benchmark` measures bounded alternating plain/traced compilation pairs,
 excludes declared warmups and checks identical outputs and complete recordings.
 The source/producer-bound report retains raw timings and independently recomputed
@@ -1783,7 +1822,7 @@ SQL, raw and parsed reader observations, version/diagnostic transcripts and harn
 identity. Five [importer cases](../../tools/tests/test_vela_trace_viewer.py) cover
 wrong observations, disabled controls, unknown readers, timeout/output bounds,
 alias/cancellation and late changes. Actual Windows AMD64 under ARM64 emulation
-and Linux ARM64 reader qualifications pass, along with all 21 trace cases and
+and Linux ARM64 reader qualifications pass, along with all 24 trace cases and
 both-platform typechecking. The [license record](../../THIRD-PARTY.md) records
 the selected reader's own terms; the optional command downloads nothing.
 Combined local gate and behavioral validation cover integration.
