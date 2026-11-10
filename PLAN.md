@@ -15,14 +15,14 @@ investigation is complete, while full first-slice artifact acceptance remains op
 | Measure | Value |
 | --- | --- |
 | Total estimate midpoint h | 21,457.9 |
-| Total estimate range h | 11,221.9–31,693.9 |
-| Completed scope h | 509.9 |
-| Complete by estimate % | 2.4 |
-| Remaining h | 20,948 |
-| Open class I h | 2,864 |
+| Total estimate range h | 11,251.9–31,663.9 |
+| Completed scope h | 571.9 |
+| Complete by estimate % | 2.7 |
+| Remaining h | 20,886 |
+| Open class I h | 2,802 |
 | Open class X h | 18,084 |
-| Retained completion estimate h | 506.5 |
-| Unmeasured completed items | 33 |
+| Retained completion estimate h | 568.5 |
+| Unmeasured completed items | 37 |
 <!-- estimate-summary:end -->
 
 The [checklist](#checklist-items-q25-series) owns completion status and the
@@ -56,14 +56,15 @@ local receipt integration:
 | Slice | Delivered development behavior | Open acceptance boundary |
 | --- | --- | --- |
 | Mathematical elaboration | Guarded `Option`/`Result` propagation preserves Boolean short-circuiting; unsupported effect sequencing is refused under the [elaboration contract](docs/tooling/elaboration-prototype.md#commands-and-acceptance) | General checked source correspondence and machine-connected composition remain with Q25as/at |
-| Pure compiler inspection | `vela inspect` exports schema-6 source-preserving token/trivia partitions, pure syntax trees, lexical scopes, compiler-owned expression and identifier types and bounded concrete/syntax/scope/resolved queries under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, imports, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
-| Pure semantic editor | Compiler-backed callable and visible-value completion, argument-sensitive signature help and token deltas qualify in both pinned clients; literal completion adds checked whole-token edits and static argument restrictions; checked local-variable rename previews qualify in Neovim and refuse unsupported versioned edits in pinned Vim under the [LSP contract](docs/tooling/lsp-prototype.md) | Q25ci retains a second successful rename client, empty or unfinished completion sites, wider producers and editor operations |
+| Pure compiler inspection | `vela inspect` exports schema-6 source-preserving token/trivia partitions, pure syntax trees, lexical scopes and compiler-owned types; an independent serialized reader validates current inputs and bounded queries without invoking a parser under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, imports, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
+| Pure semantic editor | Compiler-backed callable/value/literal completion, signatures and token deltas consume current facts; bounded single-expression recovery supplies edits for empty or unfinished sites while retaining original diagnostics; versioned local rename qualifies in Neovim and refuses unsupported pinned Vim edits under the [LSP contract](docs/tooling/lsp-prototype.md) | Q25ci retains a second successful rename client, general incomplete source, wider producers and editor operations |
+| Pure authoring previews | Explicit `VELA103` Boolean-comparison previews bind source/producer identities and recheck both sources against the [authoring contract](docs/tooling/authoring-tools.md#checked-boolean-comparison-previews) | Q25ck retains wider formatting/lints/actions and their qualified producers |
 | Batch diagnostic export | Qualified SARIF 2.1.0 projects the current pure diagnostic producer across bounded standalone inputs, preserves incomplete outcomes, binds source/producer/configuration identities and offers explicit canonical-format fix previews; a pinned independent reader qualifies source locations and edits under the [export contract](docs/tooling/tooling-protocols.md#qualified-pure-batch-sarif) | Wider diagnostic meanings, imported resolution and source/artifact admission remain with their existing producers |
 | Editor syntax assets | Menhir-derived Tree-sitter and TextMate distributions qualify in pinned independent consumers against all 395 canonical cases, explicit recovery dispositions, Unicode scopes and eight incremental edits under the [syntax-assets contract](docs/tooling/highlighting.md) | Syntax coloring and recovered editor trees confer no semantic, proof or artifact acceptance |
 | Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
 | Local first-slice source proofs | All 69 exports kernel-replay with an empty solver-trust ledger within unchanged elaboration budgets under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ba retains source correspondence and exact-artifact producer joins |
 | Local first-slice receipts | Schema-2 binding checks verify exact capacity and negative-control source subjects, the intended proof-corruption refusal, retained proof/control coverage, unambiguous Sail verdicts and well-formed traces, capability images and optional CompCert process chains, effective inputs and image regeneration as well as producer/tool/runtime/parser identities | Q25ar remains open for external checked producer receipts and complete declared coverage |
-| Pure compiler traces | Schema-3 recordings include checked-parser/decode subphases and source-located declaration timings; bounded paired comparisons bind source, selected executables, Python installation files and measurement metadata; pinned Perfetto consumers and offline receipt checks recover the expected nested fixture under the [trace increment](docs/tooling/pure-prototype.md#bounded-compiler-traces) | Q25cp retains wider phases/workers, browser rendering and complete runtime closure |
+| Pure compiler traces | Schema-3 recordings include parser/decode and source-located declaration work; bounded paired comparisons bind current inputs; pinned Perfetto consumers and an independently qualified offline browser timeline recover nested spans/counters under the [trace increment](docs/tooling/pure-prototype.md#bounded-compiler-traces) | Q25cp retains wider phases/workers, overhead qualification and complete runtime closure |
 
 The full first-slice replay reports zero solver-trusted obligations and source
 `accepted: true`; its binding check verifies retained evidence without proof replay.
@@ -71,7 +72,7 @@ The full first-slice replay reports zero solver-trusted obligations and source
 retains unavailable local CompCert replay and the external artifact-acceptance joins.
 
 The [completion log](docs/assurance/completion-log.md) records the scoped landing
-evidence. Q25ci and Q25cp retain separately priced residual children; completed
+evidence. Q25ch, Q25ci, Q25ck and Q25cp retain separately priced residual children; completed
 children record only their accepted increments within unchanged parent totals.
 Q25am–aq and the supported-release cells retain their stated entry and
 acceptance predicates; these development increments close no whole release cell.
@@ -161,6 +162,9 @@ The standalone host syntax-asset and pure-diagnostic-export cells qualify their
 declared existing development producers independently of production release.
 They supply no wider frontend, missing-law or source/artifact admission receipt;
 other conditional adapter and surface work retains its entry predicates.
+The bounded pure inspection, completion, lint-preview and trace-viewer children
+likewise consume the existing checked pure producer; their explicit residuals
+retain wider producers and whole-cell acceptance without duplicate credit.
 
 - [x] **Q25 · Design the full graded dependent language and its control and mutation rules**
   - The graded, control, mutation and assurance-policy designs are reviewed together, with implementation debts and admission decisions recorded by Q25d ([note](docs/assurance/completion-log.md#q25-design-the-full-graded-dependent-language-and-its-control-and-mutation-rules))
@@ -488,19 +492,29 @@ other conditional adapter and surface work retains its entry predicates.
 
 <a id="q25ch"></a>
 
-- [ ] **Q25ch · Publish qualified compiler inspection services** · 112 h, range 64–160 · I
+- [ ] **Q25ch · Publish qualified compiler inspection services**
   - **Owner:** `vela-compiler-services`. **Start:** Qualified frontend/diagnostic producers; backend for lowering views. **Check:** Meet the [inspection contract](docs/tooling/tooling-protocols.md#compiler-inspection-api) with versioned schemas, bounded snapshots/queries, origins, source reconstruction and stale-handle/input refusal in an independent consumer. Shared identities and producer semantics are charged once here and at their existing producers.
   - The existing pure producer supplies schema-6 source/token/trivia/syntax-tree snapshots, compiler-recorded lexical scopes and memberships, structured identifier and expression types and bounded concrete/tree/expression/scope/resolved queries; [partial evidence](docs/assurance/completion-log.md#q25ch-publish-qualified-compiler-inspection-services) retains wider views and their producer prerequisites.
+  - Its original 112 h (64–160) allocation is partitioned once below; the standalone reader consumes the existing pure producer without admitting wider views.
+  - [x] **Q25ds · Qualify independent offline compiler inspection queries** · 24 h retained estimate, range 12–36, actual n/a · agent-parallel
+    - A serialized-snapshot reader independently checks schema, exact source/bindings, syntax/scope/declaration/reference inventories and bounded queries without invoking a parser worker. [Landing evidence](docs/assurance/completion-log.md#q25ds-qualify-independent-offline-compiler-inspection-queries).
+  - [ ] **Q25dt · Complete the remaining compiler inspection qualification** · 88 h, range 52–124 · I
+    - Retain qualified wider-language/import/generated/proof/lowering producers and all Q25ch acceptance duties beyond the independently consumed pure snapshots.
 
 <a id="q25ci"></a>
 
 - [ ] **Q25ci · Extend semantic editor services beyond the pure prototype**
   - **Owner:** `vela-lsp`. **Start:** Compiler services and qualified wider-language facts. **Check:** Meet the [LSP contract](docs/tooling/tooling-protocols.md#language-server-protocol) for selected workspace navigation, completion/signatures, rename, checked actions, token deltas and read-only proof inspection in two clients. Reuse Q25n/o/u and refuse stale or capturing edits.
-  - Compiler-backed callable and visible-value completion, argument-sensitive signatures, pure token deltas and checked local-variable rename previews invalidate stale producer generations; both pinned clients qualify discovery and deltas, while rename evidence covers Neovim's versioned previews and pinned Vim's refusal without versioned-edit support. [Partial evidence](docs/assurance/completion-log.md#q25ci-extend-semantic-editor-services-beyond-the-pure-prototype) retains a second successful rename client, empty or unfinished completion sites and wider editor scope. Its original 112 h (64–160) allocation is partitioned once below.
+  - Compiler-backed callable/value/literal discovery, signatures, token deltas and bounded single-expression recovery invalidate stale producer generations; both pinned clients qualify discovery, recovery and deltas. Rename evidence covers Neovim's versioned previews and pinned Vim's refusal without versioned-edit support. [Partial evidence](docs/assurance/completion-log.md#q25ci-extend-semantic-editor-services-beyond-the-pure-prototype) retains a second successful rename client, general incomplete-source support and wider editor scope. Its original 112 h (64–160) allocation is partitioned once below.
   - [x] **Q25do · Qualify compiler-backed completion at checked literals** · 8 h retained estimate, range 4–12, actual n/a · agent-parallel
     - The pure resolver supplies type- and scope-compatible whole-literal edits, narrows nested static arguments and shares bounded source-bound completion inventories; independent controls and an unsaved Unicode/CRLF stdio session pass. [Landing evidence](docs/assurance/completion-log.md#q25do-qualify-compiler-backed-completion-at-checked-literals).
-  - [ ] **Q25dp · Complete the remaining semantic editor qualification** · 104 h, range 60–148 · I
+  - [ ] **Q25dp · Complete the remaining semantic editor qualification**
     - Retain Q25ci's full wider-producer, workspace, proof/action, incomplete-source and two-successful-client acceptance duties; reuse completed pure discovery, deltas and rename without duplicate credit.
+    - Its 104 h (60–148) allocation is partitioned once into the following existing-producer increment and residual.
+    - [x] **Q25du · Qualify completion at incomplete pure expression sites** · 16 h retained estimate, range 8–24, actual n/a · agent-parallel
+      - At a single empty or unfinished scalar expression, bounded compiler repairs recover current typed/static choices while preserving original diagnostics and source; ambiguous or unrelated failures refuse. [Landing evidence](docs/assurance/completion-log.md#q25du-qualify-completion-at-incomplete-pure-expression-sites).
+    - [ ] **Q25dv · Complete the wider semantic editor and client qualification** · 88 h, range 52–124 · I
+      - Retain wider producers, workspace/proof/actions, general incomplete-source support and the second successful versioned-rename client; single-site recovery supplies no accepted source.
 
 <a id="q25cj"></a>
 
@@ -510,8 +524,13 @@ other conditional adapter and surface work retains its entry predicates.
 
 <a id="q25ck"></a>
 
-- [ ] **Q25ck · Extend canonical formatting, lints and checked previews** · 72 h, range 40–104 · I
+- [ ] **Q25ck · Extend canonical formatting, lints and checked previews**
   - **Owner:** `vela-authoring`. **Start:** Qualified wider syntax and semantic fact producers. **Check:** Meet the [authoring contract](docs/tooling/authoring-tools.md) with token/comment/documentation preservation, reparse equivalence, idempotence and source-bound explicit previews. Reuse Q25t/z/ah; default commands preserve source bytes.
+  - Its original 72 h (40–104) allocation is partitioned once below. The standalone pure preview uses existing checked syntax/types; wider formatting retains its original entry predicate.
+  - [x] **Q25dy · Qualify checked Boolean comparison lint previews** · 8 h retained estimate, range 4–12, actual n/a · agent-parallel
+    - Explicit single-comparison previews recheck source and candidate, preserve operand evaluation and outside bytes, bind exact source/producer identities and refuse comments, malformed or stale edits. [Landing evidence](docs/assurance/completion-log.md#q25dy-qualify-checked-boolean-comparison-lint-previews).
+  - [ ] **Q25dz · Complete the remaining authoring qualification** · 64 h, range 36–92 · I
+    - Retain wider canonical formatting/lints/previews and their qualified syntax/semantic producers; the pure Boolean action supplies no wider or editor acceptance.
 
 <a id="q25cl"></a>
 
@@ -538,11 +557,16 @@ other conditional adapter and surface work retains its entry predicates.
 
 - [ ] **Q25cp · Expose bounded compiler performance traces**
   - **Owner:** `vela-traces`. **Start:** Named compiler phases and an independent trace consumer. **Check:** Meet the trace contract for clocks, nesting/workers, overhead and bounded recording; dropped events, truncation and cancellation remain explicit. Compiler timing supplies no emitted-program WCET proof.
-  - The pure compiler records bounded schema-3 traces with checked-parser/decode subphases and source-located declaration work, bound to inputs, locks, selected executable bytes and bounded Python standard-library/cache/extension/shared-library inventories; exact-pinned Perfetto imports recover deterministic expected nested spans/counters and retained receipts support offline rechecks. [Partial evidence](docs/assurance/completion-log.md#q25cp-expose-bounded-compiler-performance-traces) retains complete runtime closure, browser rendering and wider measurement coverage. Its original 28 h (16–40) allocation is partitioned once below.
+  - The pure compiler records bounded schema-3 traces with checked-parser/decode and source-located declaration work, bound to inputs, locks, selected executable bytes and bounded Python installation inventories. Exact-pinned Perfetto imports and qualified offline browser rendering recover independently expected nested spans/counters. [Partial evidence](docs/assurance/completion-log.md#q25cp-expose-bounded-compiler-performance-traces) retains complete runtime closure and wider measurement/overhead coverage. Its original 28 h (16–40) allocation is partitioned once below.
   - [x] **Q25dq · Qualify parser trace attribution and retained viewer receipts** · 6 h retained estimate, range 4–8, actual n/a · agent-parallel
     - Record the actual checked-parse/decode work and independently expected nested reader observations; strictly recheck exact reader/harness identities, controls and retained observations. Actual Windows and Linux Perfetto consumers pass. [Landing evidence](docs/assurance/completion-log.md#q25dq-qualify-parser-trace-attribution-and-retained-viewer-receipts).
-  - [ ] **Q25dr · Complete the remaining compiler trace qualification** · 22 h, range 12–32 · I
+  - [ ] **Q25dr · Complete the remaining compiler trace qualification**
     - Retain Q25cp's complete runtime closure, browser UI, broader worker/phase and overhead qualification; existing importer and parser receipts discharge only their named subset.
+    - Its 22 h (12–32) allocation is partitioned once below.
+    - [x] **Q25dw · Qualify offline browser rendering of compiler traces** · 14 h retained estimate, range 8–20, actual n/a · agent-parallel
+      - A source-bound offline timeline displays phases, declarations and counters; an explicitly pinned real Chromium browser checks independent geometry, source details, focus and filtering. [Landing evidence](docs/assurance/completion-log.md#q25dw-qualify-offline-browser-rendering-of-compiler-traces).
+    - [ ] **Q25dx · Complete runtime and broader compiler trace qualification** · 8 h, range 4–12 · I
+      - Retain complete runtime closure, broader phases/workers and overhead qualification; bounded warm-process comparisons supply no hard overhead or program timing bound.
 
 <a id="q25cq"></a>
 
@@ -755,17 +779,21 @@ other conditional adapter and surface work retains its entry predicates.
 | Q25ce | X | 96 | 48–144 | n/a | n/a |
 | Q25cf | X | 96 | 48–144 | n/a | n/a |
 | Q25cg | X | 32 | 16–48 | n/a | n/a |
-| Q25ch | I | 112 | 64–160 | n/a | n/a |
+| Q25ds | I | 24 | 12–36 | n/a | n/a |
+| Q25dt | I | 88 | 52–124 | n/a | n/a |
 | Q25do | I | 8 | 4–12 | n/a | n/a |
-| Q25dp | I | 104 | 60–148 | n/a | n/a |
+| Q25du | I | 16 | 8–24 | n/a | n/a |
+| Q25dv | I | 88 | 52–124 | n/a | n/a |
 | Q25cj | I | 56 | 32–80 | n/a | n/a |
-| Q25ck | I | 72 | 40–104 | n/a | n/a |
+| Q25dy | I | 8 | 4–12 | n/a | n/a |
+| Q25dz | I | 64 | 36–92 | n/a | n/a |
 | Q25cl | I | 28 | 16–40 | n/a | n/a |
 | Q25cm | I | 44 | 24–64 | n/a | n/a |
 | Q25cn | I | 44 | 24–64 | n/a | n/a |
 | Q25co | I | 28 | 16–40 | n/a | n/a |
 | Q25dq | I | 6 | 4–8 | n/a | n/a |
-| Q25dr | I | 22 | 12–32 | n/a | n/a |
+| Q25dw | I | 14 | 8–20 | n/a | n/a |
+| Q25dx | I | 8 | 4–12 | n/a | n/a |
 | Q25cq | I | 144 | 80–208 | n/a | n/a |
 | Q25cr | I | 96 | 48–144 | n/a | n/a |
 | Q25cs | I | 112 | 64–160 | n/a | n/a |

@@ -1,6 +1,7 @@
 # Vela formatting, documentation and lints
 
-This contract owns [Q25r, Q25s and Q25t](../../PLAN.md#q-assessment-actions).
+This contract owns [Q25r, Q25s and Q25t](../../PLAN.md#q-assessment-actions)
+and [Q25ck's authoring follow-through](../../PLAN.md#q25ck).
 The [surface grammar](../language/surface-grammar.md) owns syntax and the
 [pure prototype](pure-prototype.md) owns its executable semantic boundary.
 The compiler includes a formatter and an advisory lint pass. The design keeps

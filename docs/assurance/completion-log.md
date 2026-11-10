@@ -1696,9 +1696,9 @@ report truncation explicitly. Three
 nine independently expected environments, shadowing, sibling identities,
 availability, named labels and malformed/omitted worker facts. Combined local
 gate and behavioral validation cover integration.
-Q25ch remains open for imports, wider typed trees, generated/proof and
-lowering views and their qualified producers. No whole-cell completion credit
-or additional hours are recorded for this development increment.
+Q25ds records acceptance of the independent offline reader. Q25ch remains open
+for imports, wider typed trees, generated/proof and lowering views and their
+qualified producers; the parent carries no duplicate completion hours.
 
 <a id="q25ci-extend-semantic-editor-services-beyond-the-pure-prototype"></a>
 
@@ -1765,9 +1765,9 @@ expected static-compatible value edit with retained source/cursor/wire joins.
 Combined local gate and behavioral validation cover integration.
 
 Q25ci remains open for a second successful version-capable rename client, wider
-qualified producers, empty or unfinished completion sites and the remaining
+qualified producers, general incomplete-source support and the remaining
 selected editor operations. Q25do records the separately accepted literal-site
-increment; the parent carries no duplicate completion hours. These development
+increment and Q25du records bounded single-expression recovery; the parent carries no duplicate completion hours. These development
 tools supply no wider language or proof admission.
 
 <a id="q25cp-expose-bounded-compiler-performance-traces"></a>
@@ -1831,10 +1831,11 @@ and Linux ARM64 reader qualifications pass, along with all 26 trace cases and
 both-platform typechecking. The [license record](../../THIRD-PARTY.md) records
 the selected reader's own terms; the optional command downloads nothing.
 Combined local gate and behavioral validation cover integration.
-Q25cp remains open for wider phases/workers, browser UI rendering and exact
+Q25cp remains open for wider phases/workers, overhead qualification and exact
 runtime closure. The comparison measures warm-process wall time,
 including parser waits, and supplies no hard overhead limit. Q25dq records the
-accepted parser attribution and retained-reader validation increment; the parent
+accepted parser attribution and retained-reader validation increment, and Q25dw
+records browser rendering; the parent
 carries no duplicate hours or emitted-program timing verdict.
 
 <a id="q25do-qualify-compiler-backed-completion-at-checked-literals"></a>
@@ -1859,8 +1860,9 @@ invalidation. A real stdio session recovers the exact expected edit before and
 after an unsaved supplementary-comment/CRLF update. Independent implementation
 review found no blocking issue. Both-platform typechecking, Ruff, Markdown and
 the existing editor regression controls pass; combined local gate and behavioral
-validation cover integration. Empty insertion sites, unfinished source, wider
-producers and the second successful rename client remain in Q25dp.
+validation cover integration. Q25du records bounded single-expression recovery;
+general unfinished source, wider producers and the second successful rename
+client remain in Q25dv within Q25dp.
 
 <a id="q25dq-qualify-parser-trace-attribution-and-retained-viewer-receipts"></a>
 
@@ -1882,8 +1884,8 @@ controls. Malformed, rehashed, stale and altered observations cannot pass by
 retaining a successful status alone. All 26 trace controls and both-platform
 typechecking pass, including actual independent reader import and offline
 receipt rechecks. Combined local gate and behavioral validation cover integration.
-Full runtime closure, browser rendering, broader workers/phases and overhead
-qualification remain in Q25dr; trace timing supplies no program WCET evidence.
+Q25dw records browser rendering; full runtime closure, broader workers/phases
+and overhead qualification remain in Q25dx. Trace timing supplies no program WCET evidence.
 
 <a id="q25cl-export-qualified-batch-diagnostics-as-sarif"></a>
 
@@ -1951,3 +1953,113 @@ interpolation, corpus and publication boundaries. Combined local gate and
 behavioral validation cover integration. Reports bind exact input, asset,
 consumer and canonical-parser identities with explicit bounds and
 `semantic_acceptance: false`; no recovered editor tree admits Vela source.
+
+<a id="q25ds-qualify-independent-offline-compiler-inspection-queries"></a>
+
+#### Q25ds · Qualify independent offline compiler inspection queries
+
+Landed on 2026-11-09 with a 24 h retained estimate (12–36), actual n/a because
+effort was shared across this parallel batch. Q25dt retains 88 h (52–124),
+preserving Q25ch's original 112 h (64–160) exactly. The
+[inspection contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment)
+qualifies the existing pure producer through an independent serialized reader.
+`vela inspect SOURCE --snapshot EXPORT.json` validates exact current source,
+producer/configuration/target bindings and schema before answering stored queries;
+it invokes no compiler parser worker. Complete concrete partitions, source
+spellings, syntax/scope trees, declaration and occurrence inventories, lexical
+owners, availability and typed-expression coverage are cross-checked independently.
+Bounded queries preserve partial/unavailable outcomes and reject stale inputs,
+foreign handles and invalid UTF-8/CRLF offsets.
+
+The [offline-reader controls](../../tools/tests/test_vela_inspection_reader.py)
+cover independently expected definitions/references, typed calls and shadowing,
+serialization/CLI round trips, malformed graphs, omitted references and coordinated
+inventory omissions. Independent review identified and corrected missing-use
+absence claims before acceptance. All 30 inspection cases and the full static
+gate pass. Wider imports/generated/proof/lowering views
+and their producer prerequisites remain with Q25dt; structural validation does
+not establish source correspondence or authenticate a malicious publisher.
+Combined local gate and behavioral validation cover integration.
+
+<a id="q25du-qualify-completion-at-incomplete-pure-expression-sites"></a>
+
+#### Q25du · Qualify completion at incomplete pure expression sites
+
+Landed on 2026-11-09 with a 16 h retained estimate (8–24), actual n/a because
+effort was shared across this parallel batch. Q25dv retains 88 h (52–124),
+preserving Q25dp's 104 h (60–148) and Q25ci's original total exactly. The
+[LSP contract](../tooling/lsp-prototype.md) covers one empty or unfinished
+scalar-expression site in an otherwise checkable pure source. An isolated
+compiler worker checks at most two literal repairs, requiring a unique checked
+type. It projects current visible/static candidates as insertion or whole-token
+edits against the original immutable overlay. Prefix filtering, scope and
+required-static arguments retain compiler decisions. Original diagnostics remain
+published; recovered facts confer no accepted-source status.
+
+Six [recovery controls](../../tools/tests/test_vela_lsp_recovery.py) cover exact
+typed/static edits, lexical scopes, ambiguity/unrelated-error refusal, token
+boundaries, malformed/stale worker bindings and generation invalidation. A real
+stdio session verifies unsaved supplementary Unicode/CRLF edits and retained
+diagnostics. Actual pinned Neovim and both full/incremental pinned Vim sessions
+also recover the exact unfinished-identifier edit, joined to their current
+source/cursor request, wire response and original diagnostic. Changed or omitted
+wire/observation bindings refuse. General incomplete-source/workspace/proof/action support and a second
+successful versioned-rename client remain in Q25dv.
+Independent review found no blocking issue; combined local gate and behavioral
+validation cover integration.
+
+<a id="q25dw-qualify-offline-browser-rendering-of-compiler-traces"></a>
+
+#### Q25dw · Qualify offline browser rendering of compiler traces
+
+Landed on 2026-11-09 with a 14 h retained estimate (8–20), actual n/a because
+effort was shared across this parallel batch. Q25dx retains 8 h (4–12),
+preserving Q25dr's 22 h (12–32) and Q25cp's original total exactly. The
+[trace contract](../tooling/pure-prototype.md#bounded-compiler-traces) qualifies
+`vela trace-render` as an offline HTML timeline over a complete, current
+source/producer-bound recording. Phase/declaration spans, nesting, exact times,
+byte counters and source details remain visible; explicit filtering and keyboard
+focus require no network. Incomplete/stale recordings and aliased or changed
+inputs refuse before atomic publication.
+
+An explicitly selected SHA-256-bound Edge 157.0.4341.42 headless browser renders
+the deterministic independent fixture. Qualification checks six span geometries,
+nesting/colors, byte counters, source tooltips, focusability and live filtering;
+changed layout or consumer bytes refuse. The browser and its dependencies are
+locally provisioned instruments; this receipt supplies no complete browser runtime
+closure or Perfetto UI claim. All 31 trace controls and the full static gate pass;
+the [timeline controls](../../tools/tests/test_vela_trace_html.py) include stale,
+incomplete, changed-input and atomic-publication refusals. Complete compiler runtime closure, broader
+phases/workers and overhead qualification remain in Q25dx.
+Combined local gate and behavioral validation cover integration.
+
+<a id="q25dy-qualify-checked-boolean-comparison-lint-previews"></a>
+
+#### Q25dy · Qualify checked Boolean comparison lint previews
+
+Landed on 2026-11-09 with an 8 h retained estimate (4–12), actual n/a because
+effort was shared across this parallel batch. Q25dz retains 64 h (36–92),
+preserving Q25ck's original 72 h (40–104) exactly. The
+[authoring contract](../tooling/authoring-tools.md#checked-boolean-comparison-previews)
+qualifies `vela lint-preview` for one `VELA103` equality at a compiler-reported
+operator site. Existing checked syntax/types select the original operand and byte
+span; explicit parentheses retain precedence and single operand evaluation.
+Both source and candidate are rechecked and their syntax compared modulo grouping
+and Boolean equality identities. The exact source/producer snapshot, replacement
+and candidate digest bind the preview. Comments within the comparison, malformed
+sites and stale or changed preview fields refuse; the command never writes source.
+
+Four [preview controls](../../tools/tests/test_vela_authoring_preview.py) cover
+independently expected bytes and exhaustive two-variable truth tables, both
+literal sides, nesting/precedence, Unicode/CRLF, source/producer changes and
+tampered fields. CLI checks preserve modification time and refuse concurrent
+source changes without output. All 16 authoring regression cases and both-platform
+typechecking pass. Independent review added a final producer check after the last
+source read, with an injected late-change CLI refusal. Wider formatting/lints/previews and editor code actions retain
+Q25dz's producer and protocol requirements; these edits supply no source/artifact
+correspondence theorem.
+
+The integrated default `python tools/run.py validate` handoff passes the full
+static gate and 612 behavioral cases for this four-increment batch. The runner
+separately reports one slow case and three unavailable-lane cases skipped; this
+is the default qualification profile, with no broader `--full` verdict.
