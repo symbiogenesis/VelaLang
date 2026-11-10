@@ -1806,6 +1806,8 @@ source/cache/extension/library/archive changes, unavailable inputs and bounds.
 Windows-to-WSL recording and validation pass with the real locked toolchain.
 Third-party package trees and operating-system libraries remain outside this
 installation-file binding; newly created import caches also change its identity.
+The proof-replay input manifest includes the imported runtime-identity helper;
+the independent checker-import audit and all nine replay-control cases pass.
 `vela trace-benchmark` measures bounded alternating plain/traced compilation pairs,
 excludes declared warmups and checks identical outputs and complete recordings.
 The source/producer-bound report retains raw timings and independently recomputed
