@@ -14,6 +14,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import cast
 
+from toolchain import trace_runtime
 from toolchain.jsonutil import unique_object
 
 MAX_EVENTS = 4096
@@ -36,6 +37,7 @@ def _digest(value: object) -> str:
 
 def _python_identity() -> Object:
     return {"executable_sha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),
+            "runtime_sha256": trace_runtime.identity(),
             "version": sys.version, "implementation": platform.python_implementation(),
             "platform": platform.system(), "machine": platform.machine()}
 
@@ -75,9 +77,10 @@ def _runtime_identity(root: Path) -> Object:
         raise ValueError("malformed checked parser runtime identity") from error
     if (not isinstance(descriptor, dict) or set(descriptor) != {"python", "parser_sha256"}
             or not isinstance(descriptor["python"], dict)
-            or set(descriptor["python"]) != {"executable_sha256", "version", "implementation", "platform", "machine"}
+            or set(descriptor["python"]) != {"executable_sha256", "runtime_sha256", "version", "implementation", "platform", "machine"}
             or any(not isinstance(value, str) or not value for value in descriptor["python"].values())
             or not _SHA256.fullmatch(descriptor["python"]["executable_sha256"])
+            or not _SHA256.fullmatch(descriptor["python"]["runtime_sha256"])
             or not isinstance(descriptor["parser_sha256"], str)
             or not _SHA256.fullmatch(descriptor["parser_sha256"])):
         raise ValueError("malformed checked parser runtime identity")

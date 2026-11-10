@@ -373,7 +373,16 @@ bytes, local Python/compiler/parser input files and Python/platform versions.
 The producer identity also binds the Python and opam lock owners, the command
 bootstrap, host Python executable bytes and the checked parser executable bytes
 validated against its build receipt. On Windows it observes the selected WSL
-parser and guest Python executable in the same checkout. Identity observation
+parser and guest Python executable in the same checkout. Both Python identities
+also bind a bounded installation-file inventory: standard-library source and
+cached bytecode, extension modules, installation archives and Python shared
+libraries. Windows includes installation DLLs and its `DLLs` directory; Linux
+uses the configured extension and shared-library paths. Added, removed, unreadable
+or changed files withdraw freshness. Inventory observation refuses missing
+standard-library/extension/shared-library inputs and totals above 20,000 files or
+512 MiB. Third-party `site-packages`/`dist-packages` trees and operating-system
+libraries remain outside this inventory. Cache creation also changes identity;
+rerun a measurement after normal import caches have settled. Identity observation
 lies outside the measured intervals; unavailable or changed executables refuse.
 These hashes detect changed data; they authenticate no producer and carry no
 complete installed-library/operating-system closure, theorem or artifact-admission verdict. The validation

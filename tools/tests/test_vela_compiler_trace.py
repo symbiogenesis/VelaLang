@@ -240,6 +240,7 @@ def _producer_file_freshness() -> None:
             path.write_bytes(b"first dependency owner")
         runtime: trace.Object = {"parser_sha256": "a" * 64}
         with patch.object(trace, "__file__", str(module)), \
+                patch.object(trace.trace_runtime, "identity", return_value="c" * 64), \
                 patch.object(trace, "_runtime_identity", return_value=runtime):
             first = trace.producer_identity()
             module.write_text("changed implementation", encoding="utf-8")
@@ -265,13 +266,17 @@ def _producer_file_freshness() -> None:
 
 
 def _runtime_executable_identity() -> None:
-    with tempfile.TemporaryDirectory(prefix="vela-trace-runtime-") as directory:
+    with tempfile.TemporaryDirectory(prefix="vela-trace-runtime-") as directory, \
+            patch.object(trace.trace_runtime, "identity", return_value="c" * 64):
         executable = Path(directory) / "python"
         executable.write_bytes(b"first interpreter")
         with patch.object(trace.sys, "executable", str(executable)):
             first = trace._python_identity()
             executable.write_bytes(b"changed interpreter")
             ensure(trace._python_identity() != first, "same-version interpreter bytes omitted")
+            second = trace._python_identity()
+            with patch.object(trace.trace_runtime, "identity", return_value="d" * 64):
+                ensure(trace._python_identity() != second, "same-executable runtime files omitted")
         parser = Path(directory) / "vela-checked-parser"
         parser.write_bytes(b"native parser")
         digest = hashlib.sha256(parser.read_bytes()).hexdigest()
@@ -291,8 +296,11 @@ def _runtime_executable_identity() -> None:
             with patch.object(trace.subprocess, "run", return_value=result) as launch:
                 ensure(trace._runtime_identity(Path(directory)) == native, "guest runtime identity differs")
                 ensure(launch.call_args.kwargs["cwd"] == Path(directory), "guest identity uses another checkout")
+            bad_runtime = copy.deepcopy(native)
+            cast("trace.Object", bad_runtime["python"])["runtime_sha256"] = "invalid"
             for raw in (b"{}", b'{"python":{},"parser_sha256":"bad"}',
                         b'{"python":{},"python":{},"parser_sha256":"bad"}', b"[]", b"x" * 8193,
+                        json.dumps(bad_runtime).encode(),
                         b"[" * 1200 + b"0" + b"]" * 1200):
                 with patch.object(trace.subprocess, "run", return_value=subprocess.CompletedProcess(["wsl"], 0, raw, b"")):
                     try:
