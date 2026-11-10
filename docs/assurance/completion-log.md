@@ -1884,3 +1884,35 @@ typechecking pass, including actual independent reader import and offline
 receipt rechecks. Combined local gate and behavioral validation cover integration.
 Full runtime closure, browser rendering, broader workers/phases and overhead
 qualification remain in Q25dr; trace timing supplies no program WCET evidence.
+
+<a id="q25cl-export-qualified-batch-diagnostics-as-sarif"></a>
+
+#### Q25cl · Export qualified batch diagnostics as SARIF
+
+Landed on 2026-11-09 with the original 28 h retained estimate (16–40), actual
+n/a because effort was shared across this parallel batch. The
+[qualified pure batch projection](../tooling/tooling-protocols.md#qualified-pure-batch-sarif)
+exports SARIF 2.1.0 from the same isolated diagnostic producer used by LSP.
+It binds 1–16 explicit UTF-8 inputs, exact source/producer/schema identities,
+configuration and the pure target. Stable rule IDs, UTF-16 locations and
+per-source checked/rejected/unsupported/limit/timeout/internal outcomes preserve
+the actual producer verdict. Incomplete analysis records unsuccessful execution
+and visible notifications. Opt-in canonical-format findings carry exact-source
+whole-file edit previews from the existing checked formatter.
+
+The exact OASIS schema and independently provisioned sarif-tools 3.0.5 reader
+qualify real multi-file findings with Unicode/space URIs, independently expected
+locations, severities and exact canonical-format bytes. A real unsupported input
+retains incomplete execution. Nine stale-source/producer, location, rule,
+missing-finding, fix-range, corruption and completion controls refuse before
+handoff. Seven behavioral cases additionally cover strict JSON/depth limits,
+schema/producer freshness and output preservation at publication. Both-platform
+typechecking, Ruff and local static checks pass; combined gate and behavioral
+validation cover integration. Independent review covers incomplete-state and
+source/producer/configuration binding duties.
+
+The [dependency record](../../THIRD-PARTY.md) fixes consumer/schema provenance
+and their reviewed licensing. The qualified inputs are standalone pure files;
+imported resolution, proof/resource diagnostics, related locations and code flows
+remain producer duties where unavailable. This completes the declared host
+projection and supplies no checked synchronous frontend or artifact admission.

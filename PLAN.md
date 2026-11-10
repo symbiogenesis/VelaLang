@@ -15,14 +15,14 @@ investigation is complete, while full first-slice artifact acceptance remains op
 | Measure | Value |
 | --- | --- |
 | Total estimate midpoint h | 21,457.9 |
-| Total estimate range h | 11,185.9–31,729.9 |
-| Completed scope h | 425.9 |
-| Complete by estimate % | 2.0 |
-| Remaining h | 21,032 |
-| Open class I h | 2,948 |
+| Total estimate range h | 11,197.9–31,717.9 |
+| Completed scope h | 453.9 |
+| Complete by estimate % | 2.1 |
+| Remaining h | 21,004 |
+| Open class I h | 2,920 |
 | Open class X h | 18,084 |
-| Retained completion estimate h | 422.5 |
-| Unmeasured completed items | 31 |
+| Retained completion estimate h | 450.5 |
+| Unmeasured completed items | 32 |
 <!-- estimate-summary:end -->
 
 The [checklist](#checklist-items-q25-series) owns completion status and the
@@ -50,13 +50,15 @@ record. Update this scope description when the priced backlog changes.
 ## Current execution
 
 The current parallel delivery qualifies existing development producers within
-their frozen scope and strengthens local receipt integration:
+their frozen scope, their standalone host syntax/diagnostic projections, and
+local receipt integration:
 
 | Slice | Delivered development behavior | Open acceptance boundary |
 | --- | --- | --- |
 | Mathematical elaboration | Guarded `Option`/`Result` propagation preserves Boolean short-circuiting; unsupported effect sequencing is refused under the [elaboration contract](docs/tooling/elaboration-prototype.md#commands-and-acceptance) | General checked source correspondence and machine-connected composition remain with Q25as/at |
 | Pure compiler inspection | `vela inspect` exports schema-6 source-preserving token/trivia partitions, pure syntax trees, lexical scopes, compiler-owned expression and identifier types and bounded concrete/syntax/scope/resolved queries under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, imports, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
 | Pure semantic editor | Compiler-backed callable and visible-value completion, argument-sensitive signature help and token deltas qualify in both pinned clients; literal completion adds checked whole-token edits and static argument restrictions; checked local-variable rename previews qualify in Neovim and refuse unsupported versioned edits in pinned Vim under the [LSP contract](docs/tooling/lsp-prototype.md) | Q25ci retains a second successful rename client, empty or unfinished completion sites, wider producers and editor operations |
+| Batch diagnostic export | Qualified SARIF 2.1.0 projects the current pure diagnostic producer across bounded standalone inputs, preserves incomplete outcomes, binds source/producer/configuration identities and offers explicit canonical-format fix previews; a pinned independent reader qualifies source locations and edits under the [export contract](docs/tooling/tooling-protocols.md#qualified-pure-batch-sarif) | Wider diagnostic meanings, imported resolution and source/artifact admission remain with their existing producers |
 | Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
 | Local first-slice source proofs | All 69 exports kernel-replay with an empty solver-trust ledger within unchanged elaboration budgets under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ba retains source correspondence and exact-artifact producer joins |
 | Local first-slice receipts | Schema-2 binding checks verify exact capacity and negative-control source subjects, the intended proof-corruption refusal, retained proof/control coverage, unambiguous Sail verdicts and well-formed traces, capability images and optional CompCert process chains, effective inputs and image regeneration as well as producer/tool/runtime/parser identities | Q25ar remains open for external checked producer receipts and complete declared coverage |
@@ -506,8 +508,9 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 
 <a id="q25cl"></a>
 
-- [ ] **Q25cl · Export qualified batch diagnostics as SARIF** · 28 h, range 16–40 · I
+- [x] **Q25cl · Export qualified batch diagnostics as SARIF** · 28 h retained estimate, range 16–40, actual n/a · agent-parallel
   - **Owner:** `vela-sarif`. **Start:** Diagnostic producers and compiler-service snapshots. **Check:** Meet the [diagnostic export contract](docs/tooling/tooling-protocols.md#diagnostic-and-semantic-index-exports) with a pinned schema and independent importer for Unicode/cross-file locations, fixes and incomplete status; partial analysis cannot appear clean.
+  - The [qualified pure batch projection](docs/tooling/tooling-protocols.md#qualified-pure-batch-sarif) consumes the existing diagnostic/format producers, passes an exact-pinned schema and independent reader, and refuses stale, malformed or incomplete handoffs. [Landing evidence](docs/assurance/completion-log.md#q25cl-export-qualified-batch-diagnostics-as-sarif) preserves wider-producer and admission boundaries.
 
 <a id="q25cm"></a>
 
