@@ -420,8 +420,11 @@ No proposal applies itself or supplies an acceptance receipt. Independent host
 controls cover scope/order/shadowing, Boolean and static compatibility, malformed
 and over-budget facts, cache detachment, source/producer invalidation and complete
 reply bounds. A real stdio session checks value edits before and after an unsaved
-supplementary-comment/CRLF update. Two-client value-completion interoperability
-remains open; the retained pinned-client sessions below qualify callable discovery.
+supplementary-comment/CRLF update. The pinned Neovim and Vim full/incremental
+sessions additionally qualify an explicit value-completion probe: the exact
+constant and required-static parameter choices, edit ranges and details join to
+the retained source, cursor, wire response and client observation. Missing probe
+traffic, altered choices and mismatched observations refuse qualification.
 
 Signature help selects the innermost checked call whose argument list contains
 the cursor, through the closing parenthesis's start. The existing compiler token
@@ -535,7 +538,7 @@ transcript JSON text alongside its SHA-256 digest and traffic summary, preservin
 reviewable evidence after temporary editor staging is removed. Use `--output FILE`
 to retain the report. This qualifies the existing pure token-delta transport;
 Q25ci's wider producer and editor-operation prerequisites remain open. The same
-retained sessions also qualify the bounded callable discovery providers above.
+retained sessions also qualify the bounded callable and value discovery providers above.
 User-managed Host CI and Guest CI verdicts remain separate from local client
 qualification for Q25n, Q25o, and Q25u. Broader asynchronous services require
 explicit cancellation and deliberately late-result controls before advertising
