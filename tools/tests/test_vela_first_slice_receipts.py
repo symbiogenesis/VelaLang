@@ -948,6 +948,84 @@ def _compiler_process_coverage() -> None:
                 ensure(mutation == "none", f"{mutation} concealed changed compiler process evidence")
 
 
+def _simulator_transcript_integrity() -> None:
+    """Rehashed logs cannot conceal contradictory outcomes or discarded trace rows."""
+    mutations = ("none", "diagnostic-stderr", "duplicate-verdict", "indented-verdict", "conflicting-verdict",
+                 "embedded-verdict", "malformed-verdict", "malformed-instruction", "malformed-write",
+                 "wrong-memory-width", "zero-memory-width", "odd-memory-value", "duplicate-order",
+                 "decreasing-order", "memory-without-instruction", "trap-loop")
+    with tempfile.TemporaryDirectory(prefix="vela-slice-simulator-integrity-") as temporary:
+        directory = Path(temporary) / "slice-fixture"
+        directory.mkdir()
+        for subject in ("pass", "bounds-trap", "compiler", "compiler-control"):
+            fixture = _execution_fixture(directory, available=subject.startswith("compiler"))
+            if subject.startswith("compiler"):
+                compiler = cast("dict[str, object]", fixture["compcert_sail"])
+                programs = cast("list[dict[str, object]]", compiler["programs"])
+                program = programs[0 if subject == "compiler" else 1]
+                original = cast("list[dict[str, object]]", program["processes"])[-1]
+            else:
+                runs = cast("dict[str, dict[str, object]]", fixture["purecap_cheri_runs"])
+                original = cast("dict[str, object]", runs[subject]["process"])
+            original_stdout = slice_harness._retained_stdout(original).decode("utf-8")
+            for mutation in mutations:
+                report = copy.deepcopy(fixture)
+                if subject.startswith("compiler"):
+                    compiler = cast("dict[str, object]", report["compcert_sail"])
+                    programs = cast("list[dict[str, object]]", compiler["programs"])
+                    program = programs[0 if subject == "compiler" else 1]
+                    process = cast("list[dict[str, object]]", program["processes"])[-1]
+                else:
+                    runs = cast("dict[str, dict[str, object]]", report["purecap_cheri_runs"])
+                    process = cast("dict[str, object]", runs[subject]["process"])
+                stdout = original_stdout
+                lines = stdout.splitlines()
+                terminal = lines[-1]
+                stderr = "diagnostic λ\n"
+                if mutation == "diagnostic-stderr":
+                    stdout, stderr = "", stdout + stderr
+                elif mutation == "duplicate-verdict":
+                    stdout += terminal + "\n"
+                elif mutation == "indented-verdict":
+                    stdout += " " + terminal + "\n"
+                elif mutation == "conflicting-verdict":
+                    stdout += ("FAILURE: 7" if terminal == "SUCCESS" else "SUCCESS") + "\n"
+                elif mutation == "embedded-verdict":
+                    stdout = stdout.replace(terminal, "diagnostic mentions " + terminal)
+                elif mutation == "malformed-verdict":
+                    stdout = stdout.replace(terminal, terminal + " ignored suffix")
+                elif mutation == "malformed-instruction":
+                    stdout = "I 2 0000000080000004 not-an-instruction\n" + stdout
+                elif mutation == "malformed-write":
+                    stdout = "W 80008000 8 invalid-tag 0000000000000000\n" + stdout
+                elif mutation == "wrong-memory-width":
+                    stdout += "W 80008000 4 0 0000000000000000\n"
+                elif mutation == "zero-memory-width":
+                    stdout += "W 80008000 0 0 00\n"
+                elif mutation == "odd-memory-value":
+                    stdout += "W 80008000 1 0 F\n"
+                elif mutation == "duplicate-order":
+                    stdout = lines[0] + "\n" + stdout
+                elif mutation == "decreasing-order":
+                    stdout = "I 2 0000000080000004 00000013\n" + stdout
+                elif mutation == "memory-without-instruction":
+                    stdout = "\n".join(lines[1:]) + "\n"
+                elif mutation == "trap-loop":
+                    stdout += "trap loop\n"
+                raw = (stdout + stderr).encode("utf-8")
+                Path(str(process["log"])).write_bytes(raw)
+                process.update(log_sha256=hashlib.sha256(raw).hexdigest(),
+                               **slice_harness._stream_identity(stdout, stderr))
+                try:
+                    slice_harness._retained_execution(report, directory, dict(slice_harness._artifacts(directory)))
+                except (ValueError, TypeError, OSError) as error:
+                    ensure(mutation not in {"none", "diagnostic-stderr"},
+                           f"valid {subject} simulator transcript refused: {error}")
+                else:
+                    ensure(mutation in {"none", "diagnostic-stderr"},
+                           f"rehashed {subject}/{mutation} concealed an invalid simulator transcript")
+
+
 def _compiler_observations() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-compiler-observations-") as temporary:
         directory = Path(temporary)
@@ -1075,6 +1153,7 @@ def cases() -> list[Case]:
             Case("retained capability execution transcripts and images", _execution_coverage),
             Case("retained optional compiler availability and controls", _compiler_coverage),
             Case("retained compiler process subjects and rehashed contradictions", _compiler_process_coverage),
+            Case("simulator transcripts refuse ambiguous verdicts and malformed traces", _simulator_transcript_integrity),
             Case("compiler observations retain complete stage streams", _compiler_observations),
             Case("simulator observation preserves exact process streams", _simulator_observation),
             Case("first-slice output directory and inventory bounds", _output_bounds),

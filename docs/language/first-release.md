@@ -555,6 +555,14 @@ not establish checked source correspondence or machine/artifact acceptance.
   reassembles the frozen control images and derives their verdicts, record counts,
   trace digests and capability round trips from those logs. Missing observations,
   substituted images, malformed streams and changed execution summaries refuse.
+  Capability and optional compiler simulator transcripts must contain exactly one
+  complete terminal verdict and at least one retired instruction. Duplicate,
+  conflicting, embedded-only or malformed verdicts, trap-loop diagnostics,
+  malformed commit records, repeated or regressing retirement counters and memory
+  records whose byte widths disagree with their values refuse even when the
+  retained hashes are refreshed. Both stdout and stderr may carry simulator
+  records; their byte identities remain separately checked. The same execution
+  checks run before publishing a new first-slice receipt.
   Optional CompCert availability must agree with the execution identity. When
   available, the main program and four perturbed controls retain all five
   preprocessing, compilation, interpreter-preprocessing, interpretation and

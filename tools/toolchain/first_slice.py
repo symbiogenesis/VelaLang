@@ -444,6 +444,38 @@ def _retained_stdout(step: dict[str, object]) -> bytes:
     return stdout
 
 
+def _simulator_transcript(said: str, returncode: int) -> tuple[str, int | None, list[str]]:
+    """Require one unambiguous terminal verdict and a complete, well-formed trace."""
+    terminals: list[str] = []
+    instruction_order = -1
+    for raw in said.splitlines():
+        line = raw.rstrip()
+        if line.lstrip().startswith(("SUCCESS", "FAILURE")):
+            if re.fullmatch(r"(?:SUCCESS|FAILURE: [0-9]+)", line) is None:
+                raise ValueError("first-slice simulator terminal verdict is malformed")
+            terminals.append(line)
+        parts = line.split()
+        if not parts or parts[0] not in {"I", "X", "S", "C", "R", "W", "T"}:
+            continue
+        if not line.isascii() or trace.COMMIT_RE.fullmatch(line) is None:
+            raise ValueError("first-slice simulator commit record is malformed")
+        if parts[0] == "I":
+            order = int(parts[1])
+            if order <= instruction_order:
+                raise ValueError("first-slice simulator instruction order repeats or regresses")
+            instruction_order = order
+        elif parts[0] in {"R", "W"}:
+            width = int(parts[2])
+            if width < 1 or len(parts[4]) != width * 2:
+                raise ValueError("first-slice simulator memory record width differs from its value")
+    if len(terminals) != 1 or "trap loop" in said or instruction_order < 0:
+        raise ValueError("first-slice simulator transcript lacks an unambiguous completed execution")
+    verdict, code, _ = cd.htif_verdict("\n".join(terminals), returncode)
+    if verdict == "no-verdict":
+        raise ValueError("first-slice simulator process contradicts its terminal verdict")
+    return verdict, code, trace.normalize_commit(said.splitlines())
+
+
 def _corrupted_proof(gallina: str) -> str:
     return gallina + (
         "\nDefinition vela_corrupted_check : @Corelib.Init.Logic.eq Corelib.Init.Datatypes.bool "
@@ -603,8 +635,7 @@ def _retained_execution(report: dict[str, object], directory: Path,
             stdout = _retained_stdout(process).decode("utf-8")
             raw = log.read_bytes()
             said = stdout + raw[len(stdout.encode("utf-8")):].decode("utf-8")
-            observed_verdict, observed_code, _ = cd.htif_verdict(said, process["returncode"])
-            records = trace.normalize_commit(said.splitlines())
+            observed_verdict, observed_code, records = _simulator_transcript(said, process["returncode"])
             regenerated = Path(temporary) / elf.name
             refused, image_bytes = cd.assemble(_purecap_cheri_asm_stream(mode), elf.stem, regenerated)
             if (refused or regenerated.read_bytes() != elf.read_bytes()
@@ -714,8 +745,7 @@ def _retained_compiler(compiler: dict[str, object], files: dict[str, object], di
                         raise ValueError("first-slice receipt interpreter transcript contradicts its verdict")
                 elif log.endswith(".sail.log"):
                     said = Path(log).read_bytes().decode("utf-8")
-                    verdict, code, _ = cd.htif_verdict(said, process["returncode"])
-                    records = trace.normalize_commit(said.splitlines())
+                    verdict, code, records = _simulator_transcript(said, process["returncode"])
                     if ((verdict, code) != ("pass" if expected[name] == 0 else "fail", expected[name])
                             or not records):
                         raise ValueError("first-slice receipt compiler target transcript contradicts its verdict")
@@ -2091,6 +2121,8 @@ def _qualify_attempt(
             "programs": programs,
         })
 
+    _retained_execution({"execution_inputs": _execution_inputs(ccomp_path), "purecap_cheri_runs": purecap_runs,
+                         "compcert_sail": ccomp_evidence}, directory, dict(_artifacts(directory)))
     inventory = build_foundation_inventory()
     inventory["solver_trusted_obligations"] = [entry.as_json() for entry in trusted]
     inventory["global_assumptions"] = (
