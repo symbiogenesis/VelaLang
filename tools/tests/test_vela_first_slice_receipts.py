@@ -34,7 +34,8 @@ def _execution_fixture(outputs: Path, *, available: bool = False) -> dict[str, o
         elf = outputs / f"purecap_{mode}.elf"
         refused, size = slice_harness.cd.assemble(slice_harness._purecap_cheri_asm_stream(mode), elf.stem, elf)
         ensure(not refused, "independent receipt fixture image did not assemble")
-        stdout = ("\n".join(trace_lines) + ("\nSUCCESS\n" if mode == "pass" else "\nFAILURE: 284\n")).encode()
+        stdout = ("\n".join(trace_lines)
+                  + ("\nSUCCESS\n" if mode == "pass" else "\nFAILURE: 284 (0x0000011c)\n")).encode()
         stderr = "diagnostic λ\n".encode()
         log = outputs / f"purecap_{mode}.sail.log"
         log.write_bytes(stdout + stderr)
@@ -101,7 +102,7 @@ def _compiler_fixture(directory: Path, files: dict[str, object], trace_lines: li
             (directory / f"{name}.sail.log",
              [simulator, "--config", profile, "--trace-commit", "--inst-limit", "1000000",
               "--terminal-log", str(directory / f"{name}.term"), str(elf)], None,
-             "\n".join(trace_lines) + ("\nSUCCESS\n" if code == 0 else f"\nFAILURE: {code}\n")),
+             "\n".join(trace_lines) + ("\nSUCCESS\n" if code == 0 else f"\nFAILURE: {code} (0x{code:08x})\n")),
         )
         processes: list[dict[str, object]] = []
         for log, argv, working, stdout in stages:
@@ -950,7 +951,9 @@ def _compiler_process_coverage() -> None:
 
 def _simulator_transcript_integrity() -> None:
     """Rehashed logs cannot conceal contradictory outcomes or discarded trace rows."""
-    mutations = ("none", "diagnostic-stderr", "duplicate-verdict", "indented-verdict", "conflicting-verdict",
+    valid = {"none", "diagnostic-stderr", "plain-decimal-verdict"}
+    mutations = ("none", "diagnostic-stderr", "plain-decimal-verdict", "contradictory-hex", "malformed-hex",
+                 "duplicate-verdict", "indented-verdict", "conflicting-verdict",
                  "embedded-verdict", "malformed-verdict", "malformed-instruction", "malformed-write",
                  "wrong-memory-width", "zero-memory-width", "odd-memory-value", "duplicate-order",
                  "decreasing-order", "memory-without-instruction", "trap-loop", "terminal-before-trace",
@@ -985,6 +988,12 @@ def _simulator_transcript_integrity() -> None:
                 stderr = "diagnostic λ\n"
                 if mutation == "diagnostic-stderr":
                     stdout, stderr = "", stdout + stderr
+                elif mutation == "plain-decimal-verdict":
+                    stdout = stdout.replace(terminal, terminal.split(" (", 1)[0])
+                elif mutation in {"contradictory-hex", "malformed-hex"}:
+                    code = 0 if terminal == "SUCCESS" else int(terminal.split()[1])
+                    suffix = f"{code + 1:08x}" if mutation == "contradictory-hex" else "0000000z"
+                    stdout = stdout.replace(terminal, f"FAILURE: {code} (0x{suffix})")
                 elif mutation == "duplicate-verdict":
                     stdout += terminal + "\n"
                 elif mutation == "indented-verdict":
@@ -1024,10 +1033,10 @@ def _simulator_transcript_integrity() -> None:
                 try:
                     slice_harness._retained_execution(report, directory, dict(slice_harness._artifacts(directory)))
                 except (ValueError, TypeError, OSError) as error:
-                    ensure(mutation not in {"none", "diagnostic-stderr"},
+                    ensure(mutation not in valid,
                            f"valid {subject} simulator transcript refused: {error}")
                 else:
-                    ensure(mutation in {"none", "diagnostic-stderr"},
+                    ensure(mutation in valid,
                            f"rehashed {subject}/{mutation} concealed an invalid simulator transcript")
 
 
