@@ -9,7 +9,14 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from toolchain import MAX_SOURCE_BYTES, VelaError, compiler_trace, trace_benchmark, translate
+from toolchain import (
+    MAX_SOURCE_BYTES,
+    VelaError,
+    compiler_trace,
+    trace_benchmark,
+    trace_viewer,
+    translate,
+)
 from toolchain.atomic import atomic_path
 from toolchain.authoring import LINT_CODES, format_source, lint_source
 from toolchain.generated_tests import (
@@ -188,6 +195,23 @@ def _trace_benchmark(args: argparse.Namespace) -> int:
         return 0
 
 
+def _trace_viewer(args: argparse.Namespace) -> int:
+    try:
+        _destination(args.trace_processor, args.output)
+        report = trace_viewer.qualify(args.trace_processor)
+        _destination(args.trace_processor, args.output)
+        with atomic_path(args.output) as pending:
+            pending.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
+                               encoding="utf-8", newline="")
+            trace_viewer.check_current(args.trace_processor, report)
+    except (OSError, ValueError) as error:
+        print(f"trace-qualify-viewer:1:1: qualification: {error}", file=sys.stderr)
+        return 1
+    else:
+        print(f"vela: {args.output}: pinned Perfetto importer qualification passed")
+        return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(suggest_on_error=True, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -226,6 +250,9 @@ def main(argv: list[str] | None = None) -> int:
         "trace-benchmark-validate", help="refuse stale or inconsistent tracing comparisons")
     benchmark_validation.add_argument("report", type=Path)
     benchmark_validation.add_argument("--source", type=Path, required=True)
+    viewer = commands.add_parser("trace-qualify-viewer", help="qualify a pinned offline Perfetto importer")
+    viewer.add_argument("--trace-processor", type=Path, required=True)
+    viewer.add_argument("--output", type=Path, required=True)
     generated = commands.add_parser(
         "generated-tests",
         help="qualify isolated Hypothesis generated development tests (Q25x)",
@@ -243,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
         return _trace(args)
     if args.command in {"trace-benchmark", "trace-benchmark-validate"}:
         return _trace_benchmark(args)
+    if args.command == "trace-qualify-viewer":
+        return _trace_viewer(args)
     if args.command == "generated-tests":
         root = Path(__file__).resolve().parents[3]
         try:
