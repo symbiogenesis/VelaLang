@@ -30,7 +30,10 @@ def _fixture(*, max_events: int = trace.MAX_EVENTS) -> trace.Object:
     with recorder.span("compile"):
         recorder.counter("source_bytes", len(SOURCE))
         with recorder.span("parse"):
-            pass
+            with recorder.span("checked-parse"):
+                pass
+            with recorder.span("syntax-decode"):
+                pass
         with recorder.span("elaborate-and-emit"):
             pass
         recorder.counter("gallina_bytes", 48)
@@ -60,11 +63,12 @@ def _independent_timeline() -> None:
     decoded = json.loads(json.dumps(document))
     slices = [(event["name"], event["ts"], event["dur"], event["pid"], event["tid"])
               for event in decoded["traceEvents"] if event["ph"] == "X"]
-    ensure(slices == [("compile", 0, 7, 1, 1), ("parse", 2, 1, 1, 1),
-                      ("elaborate-and-emit", 4, 1, 1, 1)], "independent timeline differs")
+    ensure(slices == [("compile", 0, 11, 1, 1), ("parse", 2, 5, 1, 1),
+                      ("checked-parse", 3, 1, 1, 1), ("syntax-decode", 5, 1, 1, 1),
+                      ("elaborate-and-emit", 8, 1, 1, 1)], "independent timeline differs")
     counters = [(event["name"], event["ts"], event["args"]["bytes"])
                 for event in decoded["traceEvents"] if event["ph"] == "C"]
-    ensure(counters == [("source_bytes", 1, len(SOURCE)), ("gallina_bytes", 6, 48)],
+    ensure(counters == [("source_bytes", 1, len(SOURCE)), ("gallina_bytes", 10, 48)],
            "independent counter interpretation differs")
 
 
@@ -76,7 +80,10 @@ def _declarations() -> None:
     with recorder.span("compile"):
         recorder.counter("source_bytes", len(source))
         with recorder.span("parse"):
-            pass
+            with recorder.span("checked-parse"):
+                pass
+            with recorder.span("syntax-decode"):
+                pass
         with recorder.span("elaborate-and-emit"):
             with recorder.declaration("Base", "constant", 3, 18):
                 pass
@@ -89,19 +96,19 @@ def _declarations() -> None:
     ensure(manifest["declaration_count"] == 2, "declaration inventory omitted")
     ensure([(event["ts"], event["dur"], event["args"]) for event in events
             if event["name"] == "declaration"] == [
-                (5, 1, {"name": "Base", "kind": "constant", "line": 3, "column": 18}),
-                (7, 1, {"name": "Twice", "kind": "function", "line": 4, "column": 12})],
+                (9, 1, {"name": "Base", "kind": "constant", "line": 3, "column": 18}),
+                (11, 1, {"name": "Twice", "kind": "function", "line": 4, "column": 12})],
            "declaration source sites or independently expected durations differ")
     for field, value in (("name", "Missing"), ("name", "ase"), ("kind", "proof"),
                          ("line", True), ("line", 50), ("column", 19), ("column", 65537)):
         changed = copy.deepcopy(document)
-        cast("list[trace.Object]", changed["traceEvents"])[4]["args"] = {
-            **cast("trace.Object", events[4]["args"]), field: value}
+        cast("list[trace.Object]", changed["traceEvents"])[6]["args"] = {
+            **cast("trace.Object", events[6]["args"]), field: value}
         _bind(changed)
         _refuses(changed, source=source)
     for field, value in (("dur", 4), ("ts", 3)):
         changed = copy.deepcopy(document)
-        cast("list[trace.Object]", changed["traceEvents"])[4][field] = value
+        cast("list[trace.Object]", changed["traceEvents"])[6][field] = value
         _bind(changed)
         _refuses(changed, source=source)
     changed = copy.deepcopy(document)
@@ -109,7 +116,7 @@ def _declarations() -> None:
     _bind(changed)
     _refuses(changed, source=source)
     changed = copy.deepcopy(document)
-    cast("list[trace.Object]", changed["traceEvents"])[5]["args"] = events[4]["args"]
+    cast("list[trace.Object]", changed["traceEvents"])[7]["args"] = events[6]["args"]
     _bind(changed)
     _refuses(changed, source=source)
     for name, kind, line, column in (("bad name", "function", 1, 1), ("X", "proof", 1, 1),
@@ -143,7 +150,7 @@ def _bindings_and_completeness() -> None:
         _refuses(changed)
     truncated = _fixture(max_events=2)
     summary = trace.validate(truncated, SOURCE, PRODUCER, require_complete=False)
-    ensure(summary["dropped_events"] == 3 and summary["complete"] is False,
+    ensure(summary["dropped_events"] == 5 and summary["complete"] is False,
            "overflow did not retain its dropped count")
     _refuses(truncated)
 
@@ -156,7 +163,8 @@ def _malformed_timeline() -> None:
         events[2][field] = value
         _bind(changed)
         _refuses(changed)
-    for mutate in ("missing-phase", "missing-counter", "bad-counter", "out-of-order", "extra-field"):
+    for mutate in ("missing-phase", "missing-counter", "bad-counter", "out-of-order", "extra-field",
+                   "missing-parser-stage", "crossing-parser-stages", "obsolete-schema"):
         changed = _fixture()
         events = cast("list[trace.Object]", changed["traceEvents"])
         if mutate == "missing-phase":
@@ -168,6 +176,12 @@ def _malformed_timeline() -> None:
             events[1]["args"] = {"bytes": len(SOURCE) + 1}
         elif mutate == "out-of-order":
             events[3]["ts"] = 1
+        elif mutate == "missing-parser-stage":
+            events[3]["name"] = "syntax-decode"
+        elif mutate == "crossing-parser-stages":
+            events[3]["dur"] = 4
+        elif mutate == "obsolete-schema":
+            cast("trace.Object", changed["vela"])["schema"] = 2
         else:
             events[2]["unexpected"] = True
         _bind(changed)
@@ -200,13 +214,16 @@ def _clock_and_open_spans() -> None:
 
 
 def _quantized_boundaries() -> None:
-    for readings in ((0, 0, 0, 0, 0, 0, 0, 0), (0, 1000, 2000, 3000, 4000, 5000, 6000, 6000)):
+    for readings in ((0,) * 12, (0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 10000)):
         ticks = iter(readings)
         recorder = trace.Recorder(clock=ticks.__next__)
         with recorder.span("compile"):
             recorder.counter("source_bytes", len(SOURCE))
             with recorder.span("parse"):
-                pass
+                with recorder.span("checked-parse"):
+                    pass
+                with recorder.span("syntax-decode"):
+                    pass
             with recorder.span("elaborate-and-emit"):
                 pass
             recorder.counter("gallina_bytes", 0)
@@ -363,7 +380,7 @@ def _compiler_declarations() -> None:
     ensure(vela.translate(source, trace=bounded) == expected, "dropping events changed compiler output")
     manifest = trace.validate(bounded.export(source, PRODUCER, outcome="success"),
                               source, PRODUCER, require_complete=False)
-    ensure(manifest["declaration_count"] == 2 and manifest["dropped_events"] == 3
+    ensure(manifest["declaration_count"] == 2 and manifest["dropped_events"] == 5
            and manifest["complete"] is False, "dropped declaration inventory was hidden")
 
 

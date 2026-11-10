@@ -27,7 +27,10 @@ def _compile(source: bytes, *, trace: compiler_trace.Recorder | None = None) -> 
         with trace.span("compile"):
             trace.counter("source_bytes", len(source))
             with trace.span("parse"):
-                pass
+                with trace.span("checked-parse"):
+                    pass
+                with trace.span("syntax-decode"):
+                    pass
             with trace.span("elaborate-and-emit"):
                 pass
             trace.counter("gallina_bytes", 6)

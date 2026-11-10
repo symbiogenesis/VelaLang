@@ -142,7 +142,7 @@ class Recorder:
 
     @contextmanager
     def span(self, name: str) -> Generator[None]:
-        if name not in {"compile", "parse", "elaborate-and-emit"}:
+        if name not in {"compile", "parse", "checked-parse", "syntax-decode", "elaborate-and-emit"}:
             raise ValueError("unsupported pure compiler phase")
         with self._span(name):
             yield
@@ -192,7 +192,7 @@ class Recorder:
         if outcome not in {"success", "refused", "cancelled"} or not _SHA256.fullmatch(producer):
             raise ValueError("invalid trace outcome or producer identity")
         manifest: Object = {
-            "schema": 2, "scope": "pure-compiler-timing", "clock": "perf_counter_ns",
+            "schema": 3, "scope": "pure-compiler-timing", "clock": "perf_counter_ns",
             "timestamp_unit": "microseconds", "origin": "recording-relative",
             "worker": "synchronous-host-including-parser-wait", "source_sha256": hashlib.sha256(source).hexdigest(),
             "producer_sha256": producer, "max_events": self.max_events,
@@ -237,7 +237,7 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
     binding = manifest["binding_sha256"]
     unsigned = {key: value for key, value in manifest.items() if key != "binding_sha256"}
     _require(binding == _digest({**data, "vela": unsigned}), "trace binding mismatch")
-    _require(type(manifest["schema"]) is int and manifest["schema"] == 2
+    _require(type(manifest["schema"]) is int and manifest["schema"] == 3
              and manifest["scope"] == "pure-compiler-timing"
              and manifest["clock"] == "perf_counter_ns"
              and manifest["timestamp_unit"] == "microseconds"
@@ -281,7 +281,7 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
         _require(start >= previous, "events out of start order")
         previous = start
         if phase == "X":
-            _require(event["name"] in ("compile", "parse", "elaborate-and-emit", "declaration") and _natural(event["dur"]), "invalid phase or duration")
+            _require(event["name"] in ("compile", "parse", "checked-parse", "syntax-decode", "elaborate-and-emit", "declaration") and _natural(event["dur"]), "invalid phase or duration")
             end = start + cast("int", event["dur"])
             _require(end <= MAX_TIME, "overflowing span")
             name = cast("str", event["name"])
@@ -308,12 +308,13 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
     _require(len(declarations) <= count <= len(declarations) + cast("int", manifest["dropped_events"]),
              "declaration inventory mismatch")
     if complete:
-        _require(phases == ["compile", "parse", "elaborate-and-emit"]
+        _require(phases == ["compile", "parse", "checked-parse", "syntax-decode", "elaborate-and-emit"]
                  and set(counters) == {"source_bytes", "gallina_bytes"}, "incomplete compiler phase inventory")
         _require(counters["source_bytes"] == len(source), "source byte counter mismatch")
-        _require(ordered_names == ["compile", "source_bytes", "parse", "elaborate-and-emit", "gallina_bytes"], "incorrect compiler event order")
+        _require(ordered_names == ["compile", "source_bytes", "parse", "checked-parse", "syntax-decode", "elaborate-and-emit", "gallina_bytes"], "incorrect compiler event order")
         _require(0 == spans["compile"][0] <= counter_times["source_bytes"]
-                 <= spans["parse"][0] <= spans["parse"][1]
+                 <= spans["parse"][0] <= spans["checked-parse"][0] <= spans["checked-parse"][1]
+                 <= spans["syntax-decode"][0] <= spans["syntax-decode"][1] <= spans["parse"][1]
                  <= spans["elaborate-and-emit"][0] <= spans["elaborate-and-emit"][1]
                  <= counter_times["gallina_bytes"] <= spans["compile"][1], "crossing or incorrectly nested compiler spans")
         previous_end = spans["elaborate-and-emit"][0]
