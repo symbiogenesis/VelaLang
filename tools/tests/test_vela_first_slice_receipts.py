@@ -953,7 +953,8 @@ def _simulator_transcript_integrity() -> None:
     mutations = ("none", "diagnostic-stderr", "duplicate-verdict", "indented-verdict", "conflicting-verdict",
                  "embedded-verdict", "malformed-verdict", "malformed-instruction", "malformed-write",
                  "wrong-memory-width", "zero-memory-width", "odd-memory-value", "duplicate-order",
-                 "decreasing-order", "memory-without-instruction", "trap-loop")
+                 "decreasing-order", "memory-without-instruction", "trap-loop", "terminal-before-trace",
+                 "trace-after-terminal")
     with tempfile.TemporaryDirectory(prefix="vela-slice-simulator-integrity-") as temporary:
         directory = Path(temporary) / "slice-fixture"
         directory.mkdir()
@@ -999,11 +1000,11 @@ def _simulator_transcript_integrity() -> None:
                 elif mutation == "malformed-write":
                     stdout = "W 80008000 8 invalid-tag 0000000000000000\n" + stdout
                 elif mutation == "wrong-memory-width":
-                    stdout += "W 80008000 4 0 0000000000000000\n"
+                    stdout = stdout.replace(terminal, "W 80008000 4 0 0000000000000000\n" + terminal)
                 elif mutation == "zero-memory-width":
-                    stdout += "W 80008000 0 0 00\n"
+                    stdout = stdout.replace(terminal, "W 80008000 0 0 00\n" + terminal)
                 elif mutation == "odd-memory-value":
-                    stdout += "W 80008000 1 0 F\n"
+                    stdout = stdout.replace(terminal, "W 80008000 1 0 F\n" + terminal)
                 elif mutation == "duplicate-order":
                     stdout = lines[0] + "\n" + stdout
                 elif mutation == "decreasing-order":
@@ -1012,6 +1013,10 @@ def _simulator_transcript_integrity() -> None:
                     stdout = "\n".join(lines[1:]) + "\n"
                 elif mutation == "trap-loop":
                     stdout += "trap loop\n"
+                elif mutation == "terminal-before-trace":
+                    stdout = terminal + "\n" + "\n".join(lines[:-1]) + "\n"
+                elif mutation == "trace-after-terminal":
+                    stdout += "I 2 0000000080000004 00000013\n"
                 raw = (stdout + stderr).encode("utf-8")
                 Path(str(process["log"])).write_bytes(raw)
                 process.update(log_sha256=hashlib.sha256(raw).hexdigest(),
