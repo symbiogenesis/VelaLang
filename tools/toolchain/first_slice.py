@@ -619,6 +619,86 @@ def _retained_execution(report: dict[str, object], directory: Path,
             or any(type(row.get(key)) is not int for row in controls
                    for key in ("check_id", "target_code", "interp_code"))):
         raise ValueError("first-slice receipt perturbed compiler coverage is incomplete")
+    _retained_compiler(compiler, files, directory, artifacts)
+
+
+def _retained_compiler(compiler: dict[str, object], files: dict[str, object], directory: Path,
+                       artifacts: dict[str, object]) -> None:
+    """Bind each compiler reading and target verdict to retained process subjects."""
+    programs = compiler.get("programs")
+    expected = {"first_slice": 0, **{label: check for check, label in PERTURBED_CASES}}
+    if not isinstance(programs, list) or len(programs) != len(expected):
+        raise ValueError("first-slice receipt compiler process coverage is incomplete")
+    ccomp, simulator, profile = (cast("dict[str, object]", files[key])["path"]
+                                for key in ("ccomp", "simulator", "profile"))
+    command = [ccomp, "-fverifiedos-typed", "-dclight"]
+    seen: set[str] = set()
+    with tempfile.TemporaryDirectory(prefix="compiler-bindings-", dir=directory.parent) as temporary:
+        for program in programs:
+            if not isinstance(program, dict) or not isinstance(program.get("name"), str):
+                raise TypeError("first-slice receipt compiler program is malformed")
+            name = program["name"]
+            if (name not in expected or name in seen or type(program.get("expect")) is not int
+                    or program["expect"] != expected[name]):
+                raise ValueError("first-slice receipt compiler program subject changed")
+            seen.add(name)
+            fresh, interpreted = directory / name, directory / f"{name}.interp"
+            source, unit, interp_unit = directory / f"{name}.c", fresh / f"{name}.i", interpreted / f"{name}.i"
+            assembly, elf = fresh / f"{name}.s", directory / f"{name}.elf"
+            subjects = ((source, "source_sha256"), (unit, "preprocessed_sha256"),
+                        (interp_unit, "preprocessed_sha256"))
+            if any(str(path) not in artifacts or artifacts[str(path)] != program.get(field)
+                   for path, field in subjects) or str(assembly) not in artifacts or str(elf) not in artifacts:
+                raise ValueError("first-slice receipt compiler source or effective input changed")
+            required = {
+                str(fresh / f"{name}.preprocess.log"):
+                    ([*command, "-E", source.name, "-o", str(unit)], str(directory)),
+                str(fresh / f"{name}.compile.log"):
+                    ([*command, "-S", unit.name, "-o", assembly.name], str(fresh)),
+                str(interpreted / f"{name}.preprocess.log"):
+                    ([*command, "-E", unit.name, "-o", str(interp_unit)], str(fresh)),
+                str(interpreted / f"{name}.interpret.log"):
+                    ([*command, "-interp", interp_unit.name], str(interpreted)),
+                str(directory / f"{name}.sail.log"):
+                    ([simulator, "--config", profile, "--trace-commit", "--inst-limit", str(cd.INST_LIMIT),
+                      "--terminal-log", str(directory / f"{name}.term"), str(elf)], None),
+            }
+            processes = program.get("processes")
+            if not isinstance(processes, list) or len(processes) != len(required):
+                raise ValueError("first-slice receipt compiler process coverage is incomplete")
+            observed: dict[str, str] = {}
+            for process in processes:
+                if not isinstance(process, dict) or not isinstance(process.get("log"), str):
+                    raise TypeError("first-slice receipt compiler process is malformed")
+                log = process["log"]
+                if (log not in required or log in observed or process.get("command") != required[log][0]
+                        or process.get("cwd") != required[log][1] or log not in artifacts
+                        or process.get("log_sha256") != artifacts[log]
+                        or type(process.get("returncode")) is not int or process["returncode"] < 0
+                        or (not log.endswith(".sail.log") and process["returncode"] != 0)):
+                    raise ValueError("first-slice receipt compiler process subject or verdict changed")
+                stdout = _retained_stdout(process).decode("utf-8")
+                observed[log] = stdout
+                if log.endswith(".interpret.log"):
+                    ended = cd._TERMINATED_RE.findall(stdout)
+                    if len(ended) != 1 or int(ended[0]) != expected[name]:
+                        raise ValueError("first-slice receipt interpreter transcript contradicts its verdict")
+                elif log.endswith(".sail.log"):
+                    said = Path(log).read_bytes().decode("utf-8")
+                    verdict, code, _ = cd.htif_verdict(said, process["returncode"])
+                    records = trace.normalize_commit(said.splitlines())
+                    if ((verdict, code) != ("pass" if expected[name] == 0 else "fail", expected[name])
+                            or not records):
+                        raise ValueError("first-slice receipt compiler target transcript contradicts its verdict")
+                    if name == "first_slice" and (compiler.get("sail_records") != len(records)
+                            or compiler.get("sail_trace_digest") != trace.digest(records)
+                            or compiler.get("sail_cap_roundtrip") is not cd.cap_roundtrip(records)):
+                        raise ValueError("first-slice receipt compiler target summary changed")
+            regenerated = Path(temporary) / elf.name
+            refused, image_bytes = cd.assemble(assembly.read_text(encoding="utf-8"), name, regenerated)
+            if (refused or regenerated.read_bytes() != elf.read_bytes()
+                    or type(program.get("image_bytes")) is not int or program["image_bytes"] != image_bytes):
+                raise ValueError("first-slice receipt compiler image differs from retained assembly")
 
 
 def _retained_proof(root: Path, report: dict[str, object], directory: Path,
@@ -1914,7 +1994,9 @@ def _qualify_attempt(
     if resolved_ccomp is not None:
         ccomp_cmd = [str(resolved_ccomp), "-fverifiedos-typed", "-dclight"]
         main_prog = cd.Program("first_slice", "given", c_source, check_count, 0)
-        main_rep = cd.run_program(main_prog, ccomp_cmd, directory, simulator, profile, "", interp=True)
+        main_processes: list[dict[str, object]] = []
+        main_rep = cd.run_program(main_prog, ccomp_cmd, directory, simulator, profile, "", interp=True,
+                                  observations=main_processes)
         if (
             main_rep.verdict != "pass"
             or main_rep.interpreted is None
@@ -1930,12 +2012,20 @@ def _qualify_attempt(
         if not clight_file.is_file():
             raise ValueError("CompCert -dclight did not emit first_slice.light.c")
 
+        programs: list[dict[str, object]] = [{
+            "name": main_prog.name, "expect": 0, "source_sha256": main_rep.source_sha256,
+            "preprocessed_sha256": main_rep.compiled.preprocessed.sha256,
+            "image_bytes": main_rep.image_bytes, "processes": main_processes,
+        }]
         perturbed_runs: list[dict[str, object]] = []
         for check_id, label in PERTURBED_CASES:
             p_src, p_checks = lower_to_c(source, parsed, perturb_check=check_id)
             p_prog = cd.Program(label, "given", p_src, p_checks, check_id)
-            p_rep = cd.run_program(p_prog, ccomp_cmd, directory, simulator, profile, "", interp=True)
-            if not cd.as_expected(p_rep) or p_rep.interpreted is None or p_rep.interpreted.code != check_id:
+            processes: list[dict[str, object]] = []
+            p_rep = cd.run_program(p_prog, ccomp_cmd, directory, simulator, profile, "", interp=True,
+                                   observations=processes)
+            if (not cd.as_expected(p_rep) or p_rep.interpreted is None or p_rep.interpreted.code != check_id
+                    or p_rep.compiled is None):
                 raise ValueError(
                     f"perturbed C control {label} (check {check_id}) did not fail as expected: "
                     f"verdict={p_rep.verdict}, detail={p_rep.detail}, interp={p_rep.interpreted}"
@@ -1946,6 +2036,11 @@ def _qualify_attempt(
                 "verdict": p_rep.verdict,
                 "target_code": cd.target_code(p_rep.ran),
                 "interp_code": p_rep.interpreted.code,
+            })
+            programs.append({
+                "name": label, "expect": check_id, "source_sha256": p_rep.source_sha256,
+                "preprocessed_sha256": p_rep.compiled.preprocessed.sha256,
+                "image_bytes": p_rep.image_bytes, "processes": processes,
             })
 
         ccomp_evidence.update({
@@ -1961,6 +2056,7 @@ def _qualify_attempt(
             "sail_trace_digest": main_rep.ran.digest,
             "sail_cap_roundtrip": main_rep.ran.cap_roundtrip,
             "perturbed_controls": perturbed_runs,
+            "programs": programs,
         })
 
     inventory = build_foundation_inventory()

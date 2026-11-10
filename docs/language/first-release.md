@@ -550,10 +550,21 @@ not establish checked source correspondence or machine/artifact acceptance.
   trace digests and capability round trips from those logs. Missing observations,
   substituted images, malformed streams and changed execution summaries refuse.
   Optional CompCert availability must agree with the execution identity. When
-  available, its declared compiler, retained Clight/assembly hashes and four
-  perturbed-control summaries are checked; an unavailable compiler cannot carry
-  execution claims. This rechecks retained evidence without simulator, compiler
-  or interpreter replay, and supplies no independent source-to-machine theorem.
+  available, the main program and four perturbed controls retain all five
+  preprocessing, compilation, interpreter-preprocessing, interpretation and
+  simulator observations. Exact commands, working directories, process exits,
+  split stdout/stderr identities and retained C/effective-input hashes must
+  agree. The two effective inputs must have identical bytes. Interpreter stdout
+  must contain exactly one expected termination; simulator logs must recover the
+  expected target verdict and a nonempty commit trace. The main trace summary is
+  recomputed, and every program's retained assembly must regenerate its exact
+  image. Missing or repeated processes, changed source/image subjects, rehashed
+  contradictory transcripts and invented summaries refuse. An unavailable
+  compiler cannot carry execution claims. Local CompCert remains unavailable;
+  independent process fixtures qualify these optional binding checks without
+  supplying a live compiler verdict. This rechecks retained evidence without
+  simulator, compiler or interpreter replay, and supplies no independent
+  source-to-machine theorem.
   Output directories must belong to the current checkout's local lane; inventories
   reject aliases and exceedance of 4,096 entries or 256 MiB. Runtime identity
   normalizes only the qualification working-directory load-path entry, retaining

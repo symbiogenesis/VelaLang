@@ -26,6 +26,25 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _observe_process(command: list[str], done: subprocess.CompletedProcess[str], log: Path,
+                     observations: list[dict[str, object]] | None, cwd: Path | None = None) -> None:
+    """Retain complete process streams only when an evidence consumer requests them."""
+    if observations is None:
+        return
+    stdout, stderr = done.stdout.encode("utf-8"), done.stderr.encode("utf-8")
+    raw = stdout + stderr
+    log.write_bytes(raw)
+    observation: dict[str, object] = {
+        "command": command, "returncode": done.returncode,
+        "log": str(log), "log_sha256": _sha256(raw),
+        "stdout_bytes": len(stdout), "stdout_sha256": _sha256(stdout),
+        "stderr_bytes": len(stderr), "stderr_sha256": _sha256(stderr),
+    }
+    if cwd is not None:
+        observation["cwd"] = str(cwd)
+    observations.append(observation)
+
+
 # =====================================================================================
 # The scan: what the in-tree assembler refuses in an emitted stream, by name and by line
 # =====================================================================================
@@ -293,7 +312,8 @@ class Preprocessed:
 
 
 def preprocess_c(ccomp: list[str], source: Path, fresh: Path,
-                 timeout: int = COMPILE_TIMEOUT) -> Preprocessed:
+                 timeout: int = COMPILE_TIMEOUT, *,
+                 observations: list[dict[str, object]] | None = None) -> Preprocessed:
     source, fresh = source.resolve(), fresh.resolve()
     fresh.mkdir(parents=True, exist_ok=True)
     unit = fresh / f"{source.stem}.i"
@@ -305,6 +325,8 @@ def preprocess_c(ccomp: list[str], source: Path, fresh: Path,
         unit.unlink(missing_ok=True)
         done = subprocess.run(argv, cwd=source.parent, capture_output=True, encoding="utf-8",
                               errors="replace", timeout=timeout, check=False)
+        _observe_process(list(argv), done, fresh / f"{source.stem}.preprocess.log",
+                         observations, source.parent)
         said = (done.stderr + done.stdout).strip()[:600]
         if done.returncode != 0 or not unit.is_file():
             return Preprocessed(argv, str(source.parent), done.returncode,
@@ -335,7 +357,8 @@ class Compiled:
 
 
 def compile_c(ccomp: list[str], source: Path, fresh: Path,
-              timeout: int = COMPILE_TIMEOUT) -> Compiled:
+              timeout: int = COMPILE_TIMEOUT, *,
+              observations: list[dict[str, object]] | None = None) -> Compiled:
     """Run `ccomp -S` over one source in `fresh`, a directory holding nothing else.
 
     The source is preprocessed once and the resulting `.i` compiled there. This directory is
@@ -350,7 +373,7 @@ def compile_c(ccomp: list[str], source: Path, fresh: Path,
     out = fresh / f"{source.stem}.s"
     out.unlink(missing_ok=True)
     out.with_name(f"{out.name}.partial").unlink(missing_ok=True)
-    prepared = preprocess_c(ccomp, source, fresh, timeout)
+    prepared = preprocess_c(ccomp, source, fresh, timeout, observations=observations)
     argv = [*ccomp, "-S", prepared.path.name, "-o", out.name]
     if not prepared.sha256:
         return Compiled(tuple(argv), prepared.exit_code, prepared.said, None, "", 0, prepared)
@@ -364,6 +387,7 @@ def compile_c(ccomp: list[str], source: Path, fresh: Path,
     except OSError as err:
         said = f"could not run: {err}"
     else:
+        _observe_process(argv, done, fresh / f"{source.stem}.compile.log", observations, fresh)
         exit_code = done.returncode
         said = (done.stderr + done.stdout).strip()[:600]
     try:
@@ -469,16 +493,7 @@ def run_image(simulator: list[str], profile: Path, elf: Path, workdir: Path,
     except OSError as err:
         return Ran("no-verdict", None, 0, "", False, b"", f"the emulator could not run: {err}")
     said = done.stdout + done.stderr
-    if observations is not None:
-        log = workdir / f"{elf.stem}.sail.log"
-        log.write_text(said, encoding="utf-8", newline="")
-        stdout, stderr = done.stdout.encode("utf-8"), done.stderr.encode("utf-8")
-        observations.append({
-            "command": argv, "returncode": done.returncode,
-            "log": str(log), "log_sha256": _sha256(log.read_bytes()),
-            "stdout_bytes": len(stdout), "stdout_sha256": _sha256(stdout),
-            "stderr_bytes": len(stderr), "stderr_sha256": _sha256(stderr),
-        })
+    _observe_process(argv, done, workdir / f"{elf.stem}.sail.log", observations)
     records = trace.normalize_commit(said.splitlines())
     emitted = term.read_bytes() if term.is_file() else b""
     verdict, code, detail = htif_verdict(said, done.returncode)
@@ -526,7 +541,8 @@ _TERMINATED_RE = re.compile(
 
 
 def interpret_c(ccomp: list[str], source: Path, fresh: Path,
-                timeout: int = COMPILE_TIMEOUT, *, expected_sha256: str = "") -> Interpreted:
+                timeout: int = COMPILE_TIMEOUT, *, expected_sha256: str = "",
+                observations: list[dict[str, object]] | None = None) -> Interpreted:
     """Run the same compiler's `-interp` over one source in `fresh`.
 
     The reading is the exit code the interpreter reports for `main`, and only where it
@@ -534,7 +550,7 @@ def interpret_c(ccomp: list[str], source: Path, fresh: Path,
     interpreter detects, a timeout or a second termination line leave it `None`.
     """
     fresh = fresh.resolve()
-    prepared = preprocess_c(ccomp, source, fresh, timeout)
+    prepared = preprocess_c(ccomp, source, fresh, timeout, observations=observations)
     argv = [*ccomp, "-interp", prepared.path.name]
     if not prepared.sha256 or (expected_sha256 and prepared.sha256 != expected_sha256):
         return Interpreted(tuple(argv), -1, None,
@@ -546,6 +562,7 @@ def interpret_c(ccomp: list[str], source: Path, fresh: Path,
         return Interpreted(tuple(argv), -1, None, f"no exit within {timeout}s")
     except OSError as err:
         return Interpreted(tuple(argv), -1, None, f"could not run: {err}")
+    _observe_process(argv, done, fresh / f"{source.stem}.interpret.log", observations, fresh)
     said = done.stdout + done.stderr
     if (not prepared.path.is_file()
             or _sha256(prepared.path.read_bytes()) != prepared.sha256):
@@ -596,7 +613,8 @@ def as_expected(report: Report) -> bool:
 def run_program(program: Program, ccomp: list[str], workdir: Path,
                 simulator: list[str] | None, profile: Path, waits: str, *,
                 compile_timeout: int = COMPILE_TIMEOUT, run_timeout: int = RUN_TIMEOUT,
-                inst_limit: int = INST_LIMIT, interp: bool = False) -> Report:
+                inst_limit: int = INST_LIMIT, interp: bool = False,
+                observations: list[dict[str, object]] | None = None) -> Report:
     """Compile, scan, assemble, and run one program, stopping at the first thing that
     does not go through and saying which it was.
 
@@ -606,11 +624,12 @@ def run_program(program: Program, ccomp: list[str], workdir: Path,
     """
     source = workdir / f"{program.name}.c"
     source.write_text(program.source, encoding="utf-8", newline="\n")
-    compiled = compile_c(ccomp, source, workdir / program.name, compile_timeout)
+    compiled = compile_c(ccomp, source, workdir / program.name, compile_timeout,
+                         observations=observations)
     digest = compiled.preprocessed.source_sha256
     interpreted = (interpret_c(ccomp, compiled.preprocessed.path,
                                workdir / f"{program.name}.interp", compile_timeout,
-                               expected_sha256=compiled.preprocessed.sha256)
+                               expected_sha256=compiled.preprocessed.sha256, observations=observations)
                    if interp and compiled.stream is not None else None)
 
     def report(compiled: Compiled | None, found: tuple[Refusal, ...], size: int,
@@ -631,7 +650,8 @@ def run_program(program: Program, ccomp: list[str], workdir: Path,
     if simulator is None:
         return report(compiled, (), size, None, "assembled",
                       f"{size} bytes of image; {waits}")
-    ran = run_image(simulator, profile, elf, workdir, run_timeout, inst_limit)
+    ran = run_image(simulator, profile, elf, workdir, run_timeout, inst_limit,
+                    observations=observations)
     target = target_code(ran)
     if interpreted is not None and target is not None and interpreted.code != target:
         return report(compiled, (), size, ran, "source-disagrees",
