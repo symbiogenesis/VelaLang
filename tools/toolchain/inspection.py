@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from toolchain import VelaError, concrete, inspection_syntax, inspection_types
+from toolchain import VelaError, concrete, inspection_scopes, inspection_syntax, inspection_types
 from toolchain.lsp_services import (
     Inspection,
     InspectionError,
@@ -17,7 +17,7 @@ from toolchain.lsp_services import (
 )
 from toolchain.source import SourceSnapshot
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 CONFIGURATION = "pure-default-v1"
 TARGET = "gallina-pure-v1"
 MAX_QUERY_RESULTS = 256
@@ -117,15 +117,18 @@ class Snapshot:
         operation = query.get("operation")
         if not isinstance(operation, str) or operation not in {
                 "symbol-at", "type-at", "references", "symbols", "tokens", "token-at",
-                "syntax", "syntax-at", "syntax-children", "expressions", "expression-at", "expression-type"}:
+                "syntax", "syntax-at", "syntax-children", "expressions", "expression-at", "expression-type",
+                "scopes", "scope-at", "scope-symbols"}:
             return refuse("unsupported-operation", "unsupported")
         required = {"schema", "snapshot", "operation"}
-        if operation in {"symbol-at", "type-at", "token-at", "syntax-at", "expression-at"}:
+        if operation in {"symbol-at", "type-at", "token-at", "syntax-at", "expression-at", "scope-at"}:
             required.add("offset")
         elif operation == "references":
             required.add("symbol")
         elif operation in {"syntax-children", "expression-type"}:
             required.add("node")
+        elif operation == "scope-symbols":
+            required.add("scope")
         if set(query) - {"limit"} != required:
             return refuse("malformed-request")
         limit = query.get("limit", MAX_QUERY_RESULTS)
@@ -144,6 +147,13 @@ class Snapshot:
             items = cast("list[dict[str, object]]", current["syntax"])
         elif operation == "expressions":
             items = cast("list[dict[str, object]]", current["expressions"])
+        elif operation == "scopes":
+            items = cast("list[dict[str, object]]", current["scopes"])
+        elif operation == "scope-symbols":
+            scopes = cast("list[dict[str, object]]", current["scopes"])
+            if not any(item["id"] == query["scope"] for item in scopes):
+                return refuse("stale-or-unknown-scope")
+            items = [item for item in symbols if item["scope"] == query["scope"]]
         elif operation == "expression-type":
             nodes = cast("list[dict[str, object]]", current["syntax"])
             if not any(item["id"] == query["node"] for item in nodes):
@@ -167,9 +177,9 @@ class Snapshot:
                 self.document.byte_position(cast("int", offset))
             except (ValueError, TypeError):
                 return refuse("invalid-offset")
-            if operation in {"syntax-at", "expression-at"}:
+            if operation in {"syntax-at", "expression-at", "scope-at"}:
                 candidates = cast("list[dict[str, object]]", current[
-                    "syntax" if operation == "syntax-at" else "expressions"])
+                    {"syntax-at": "syntax", "expression-at": "expressions", "scope-at": "scopes"}[operation]])
                 containing = [item for item in reversed(candidates)
                               if cast("list[int]", item["span"])[0] <= cast("int", offset)
                               < cast("list[int]", item["span"])[1]]
@@ -208,9 +218,9 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
         "schema": SCHEMA_VERSION, "scope": "vela-pure-inspection",
         "snapshot": identity, "binding": binding, "status": "unavailable", "complete": False,
         "reason": None, "source": document.text, "symbols": [], "occurrences": [], "concrete": [], "syntax": [],
-        "expressions": [],
+        "expressions": [], "scopes": [],
         "supported_views": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree",
-                            "pure-typed-expressions"],
+                            "pure-typed-expressions", "pure-lexical-scopes"],
         "unsupported_views": ["imports", "generated-origins", "proof", "lowering"]}
     if configuration != CONFIGURATION or target != TARGET:
         publication.update(status="unsupported", reason="unsupported-configuration-or-target")
@@ -220,6 +230,7 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
             raw_concrete = raw.pop("concrete", None)
             raw_syntax = raw.pop("syntax", None)
             raw_expressions = raw.pop("expressions", None)
+            raw_scopes = raw.pop("scopes", None)
             facts = validate_inspection(document, raw)
             if facts is None:
                 publication["reason"] = raw["reason"]
@@ -229,8 +240,10 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
                 nodes = inspection_syntax.nodes(source, raw_syntax, identity)
                 inspection_syntax.validate_inventory(nodes, symbols, occurrences)
                 expressions = inspection_types.expressions(document, raw_expressions, nodes, symbols, occurrences)
+                scopes = inspection_scopes.scopes(document, raw_scopes, nodes, symbols, occurrences, identity)
                 publication.update(status="checked", complete=True, symbols=symbols,
-                                   occurrences=occurrences, concrete=pieces, syntax=nodes, expressions=expressions)
+                                   occurrences=occurrences, concrete=pieces, syntax=nodes, expressions=expressions,
+                                   scopes=scopes)
         except InspectionError as error:
             timed_out = "exceeded 5 seconds" in str(error)
             publication.update(status="timed-out" if timed_out else "unavailable",
@@ -241,11 +254,11 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
             publication["reason"] = "producer-failure"
     if _binding(document, configuration, target) != binding:
         publication.update(status="refused", complete=False, reason="producer-changed",
-                           symbols=[], occurrences=[], concrete=[], syntax=[], expressions=[])
+                           symbols=[], occurrences=[], concrete=[], syntax=[], expressions=[], scopes=[])
     encoded = _encoded(publication)
     if len(encoded) > MAX_EXPORT_BYTES:
         publication.update(status="unavailable", complete=False, reason="export-limit",
-                           symbols=[], occurrences=[], concrete=[], syntax=[], expressions=[])
+                           symbols=[], occurrences=[], concrete=[], syntax=[], expressions=[], scopes=[])
         encoded = _encoded(publication)
         if len(encoded) > MAX_EXPORT_BYTES:
             raise ValueError("inspection source and provenance exceed export limit")

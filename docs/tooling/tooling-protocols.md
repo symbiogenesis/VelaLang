@@ -228,7 +228,7 @@ checked-generation requests retain their separate metaprogramming obligations.
 
 ### Pure development snapshot increment
 
-`python tools/run.py vela inspect SOURCE` exports version 5 of the bounded
+`python tools/run.py vela inspect SOURCE` exports version 6 of the bounded
 pure inspection view. Its [JSON Schema](../../tools/toolchain/inspection.schema.json)
 covers bulk snapshots and query replies; the
 [implementation](../../tools/toolchain/inspection.py) consumes the existing
@@ -257,8 +257,8 @@ the corresponding `bool` object. Callable types carry `kind: "function"`, a
 `Nat`/`bool` result, ordered parameters with `type` and Boolean `required_static`
 fields, and a Boolean `const` field identifying constant-callable functions.
 The worker boundary checks type shapes, declaration kinds, parameter order and
-display-label agreement before publishing facts. It does not supply a structural
-scope tree, inferred argument terms or generated definitions. Same-spelled declarations
+display-label agreement before publishing facts. It does not supply inferred
+argument terms or generated definitions. Same-spelled declarations
 retain distinct identities; a symbol handle contains its complete snapshot digest.
 
 The `syntax` array is a bounded preorder tree projected from that same check's
@@ -292,6 +292,26 @@ expansion to this authored view. A call expression's scalar result remains disti
 from its callee identifier's callable type. These are development compiler decisions,
 with the same source-correspondence and proof-acceptance limits as identifier types.
 
+The `scopes` array exports the resolver's lexical module, function and block
+environments in preorder. Each scope has a snapshot-scoped `id`, its source syntax
+`node` and byte `span`, a nullable `parent`, ordered `children` and source-ordered
+declared `symbols`. Expression bodies have block environments linked to their
+`expression-body` syntax nodes. Symbols and occurrences carry their compiler-recorded
+`scope`: declarations name their owning environment, while references name their
+use environment. A named argument label therefore retains the caller's environment
+and its resolved link to the callee's parameter. The adapter checks the full scope
+inventory, sites, nesting and membership against the checked source syntax; it
+does not resolve names again. Sibling blocks and parameters shadowing module
+constants retain separate identities.
+
+Each symbol's `available_from` byte offset states its declaration-order boundary:
+parameters start at their function body's opening, and other declarations start
+at the end of their complete declaration or binding. A local is unavailable in
+its initializer; functions remain unavailable in their own bodies. These offsets
+describe availability within the symbol's owning environment and descendants;
+they do not assert visibility in sibling environments. Callable lookup and scalar
+value lookup remain distinct, as in the pure compiler.
+
 Snapshot identity binds the source URI and digest, the fixed `pure-default-v1`
 configuration and `gallina-pure-v1` target, Python implementation/version, and a
 conservative digest manifest of local compiler Python/parser sources and locked
@@ -300,7 +320,7 @@ identities describe development inspection inputs; they supply no checked source
 correspondence, kernel or runtime-artifact acceptance. The isolated producer uses
 the existing checked-parser runtime qualification and integrity checks.
 
-`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 5`,
+`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 6`,
 the exported `snapshot` digest and one `operation`: `symbols`, `symbol-at` or
 `type-at` with a byte `offset`, or `references` with a snapshot-scoped `symbol` handle.
 `tokens` returns the full concrete partition subject to the query limit;
@@ -326,17 +346,23 @@ occurrences. An identifier's end, punctuation and comments select no symbol.
 Offsets inside UTF-8 characters or CRLF are refused. The Python `Snapshot.query`
 interface also requires the current source and rechecks URI, configuration, target
 and producer closure; a changed binding or cross-snapshot handle is refused.
-Version 5 makes the complete typed expression overlay mandatory alongside the
-source syntax tree, concrete pieces and structured identifier types.
-Version-1/2/3/4 queries and obsolete worker facts without the mandatory views are
+`scopes` returns the lexical environment tree; `scope-at` with a byte `offset`
+selects the innermost containing environment, including its source delimiters.
+Leading/trailing trivia outside the module span and EOF select no environment.
+`scope-symbols` with a `scope` handle returns that environment's declarations,
+without inherited declarations or an availability filter. Unknown or foreign scope
+handles refuse. These operations share the same query limits and stale-input checks.
+Version 6 makes the complete lexical scope inventory and membership mandatory
+alongside typed expressions, source syntax, concrete pieces and identifier types.
+Version-1/2/3/4/5 queries and obsolete worker facts without the mandatory views are
 refused; no label-parsing compatibility path supplies missing semantic facts.
 Clients must select the published schema version.
 
 Bulk inspection retains the existing 65,536-byte source, 1,024-declaration and
 4,096-occurrence bounds, with additional 16,384-piece concrete, 8,192-node syntax
-and 8,192-expression bounds and a
+and 8,192-expression bounds, a 2,048-scope bound and a
 1,048,576-byte compact export bound. Exceeding either publication bound clears
-all semantic, concrete, syntax and expression facts; a truncated partition or tree cannot claim completeness.
+all semantic, concrete, syntax, expression and scope facts; a truncated partition or tree cannot claim completeness.
 Queries report
 the total result count; truncation returns `partial`, `complete: false` and
 `result-limit`. Only a complete successful pure check or query reports `checked`
