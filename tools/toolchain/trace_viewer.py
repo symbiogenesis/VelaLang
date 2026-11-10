@@ -36,14 +36,15 @@ COUNTERS_SQL = (
 )
 EXPECTED_SLICES = [
     ["name", "ts", "dur", "depth", "tid", "pid"],
-    ["compile", "0", "7000", "0", "1", "1"],
+    ["compile", "0", "9000", "0", "1", "1"],
     ["parse", "2000", "1000", "1", "1", "1"],
-    ["elaborate-and-emit", "4000", "1000", "1", "1", "1"],
+    ["elaborate-and-emit", "4000", "3000", "1", "1", "1"],
+    ["declaration", "5000", "1000", "2", "1", "1"],
 ]
 EXPECTED_COUNTERS = [
     ["name", "ts", "value"],
     ["source_bytes bytes", "1000", "47"],
-    ["gallina_bytes bytes", "6000", "48"],
+    ["gallina_bytes bytes", "8000", "48"],
 ]
 NEGATIVE_CONTROLS = ("stale-source", "stale-producer", "missing-phase", "crossing-span",
                      "negative-timestamp", "dropped-events", "cancelled")
@@ -87,7 +88,7 @@ def _fixture() -> Object:
         recorder.counter("source_bytes", len(SOURCE))
         with recorder.span("parse"):
             pass
-        with recorder.span("elaborate-and-emit"):
+        with recorder.span("elaborate-and-emit"), recorder.declaration("Twice", "function", 1, 26):
             pass
         recorder.counter("gallina_bytes", 48)
     return recorder.export(SOURCE, FIXTURE_PRODUCER, outcome="success")

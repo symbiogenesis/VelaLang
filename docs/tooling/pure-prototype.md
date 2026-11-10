@@ -356,7 +356,19 @@ are `pid: 1`, `tid: 1`; they describe this recording, not operating-system IDs.
 as an input to its viewer. The optional qualification command checks a pinned
 independent importer as described below.
 
-The `vela` schema-1 manifest binds events and completeness metadata, exact source
+Each top-level constant or function also has a nested `declaration` span within
+`elaborate-and-emit`, in source order. Its standard event `args` retain the declared
+name, declaration kind and one-based normalized Unicode code-point line/column.
+This attributes the existing combined elaboration/emission work to declarations;
+constant specialization remains inside its calling declaration. The manifest
+counts attempted declaration spans, including dropped records. Validation checks
+retained name sites against exact source bytes, ordered nonoverlapping declaration
+work within its parent phase, and the retained/dropped inventory. These source
+sites identify name spellings; declaration kinds are recorded producer metadata.
+The inventory counts recorder calls and supplies no independent source-coverage
+or source-to-timing correspondence theorem.
+
+The `vela` schema-2 manifest binds events and completeness metadata, exact source
 bytes, local Python/compiler/parser input files and Python/platform versions.
 The producer identity also binds the Python and opam lock owners, the command
 bootstrap, host Python executable bytes and the checked parser executable bytes
@@ -423,8 +435,9 @@ The harness validates a deterministic Chrome trace and verifies seven negative
 controls before handoff: stale source/producer, missing phases, crossing spans,
 negative timestamps, dropped events and cancellation. Perfetto imports the valid
 fixture and executes two fixed SQL queries. Independently chosen expected rows
-require three spans with exact nanosecond timestamps/durations, parent/child
-depth and worker identities, plus both byte counters. The report retains the
+require four spans with exact nanosecond timestamps/durations, parent/child
+depth through a nested function declaration and worker identities, plus both byte
+counters. The report retains the
 fixture, queries, imported CSV and parsed rows, version/diagnostic transcripts,
 negative-control results, executable/revision and harness identities, and a
 binding over the complete report. Each reader invocation has a 30-second timeout

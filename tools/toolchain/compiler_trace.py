@@ -21,6 +21,7 @@ MAX_TRACE_BYTES = 2_097_152
 MAX_DEPTH = 64
 MAX_TIME = 2**53 - 1
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 type Object = dict[str, object]
 
 
@@ -112,6 +113,7 @@ class Recorder:
         self.dropped = 0
         self.clock_fault = False
         self.overhead = 0
+        self.declarations = 0
 
     def _now(self) -> int:
         reading = self.clock()
@@ -139,12 +141,29 @@ class Recorder:
     def span(self, name: str) -> Generator[None]:
         if name not in {"compile", "parse", "elaborate-and-emit"}:
             raise ValueError("unsupported pure compiler phase")
+        with self._span(name):
+            yield
+
+    @contextmanager
+    def declaration(self, name: str, kind: str, line: int, column: int) -> Generator[None]:
+        if (not isinstance(name, str) or not _IDENTIFIER.fullmatch(name)
+                or kind not in {"function", "constant"}
+                or any(type(value) is not int or not 1 <= value <= 65_536 for value in (line, column))):
+            raise ValueError("invalid compiler declaration site")
+        self.declarations += 1
+        with self._span("declaration", {"name": name, "kind": kind, "line": line, "column": column}):
+            yield
+
+    @contextmanager
+    def _span(self, name: str, details: Object | None = None) -> Generator[None]:
         if self.depth >= MAX_DEPTH:
             raise ValueError("trace nesting exceeds limit")
         overhead = time.perf_counter_ns()
         start = self._now()
         event: Object = {"name": name, "cat": "vela.compiler", "ph": "X", "pid": 1,
                          "tid": 1, "ts": start, "dur": 0}
+        if details is not None:
+            event["args"] = details
         retained = self._retain(event)
         self.depth += 1
         self.overhead += time.perf_counter_ns() - overhead
@@ -170,11 +189,12 @@ class Recorder:
         if outcome not in {"success", "refused", "cancelled"} or not _SHA256.fullmatch(producer):
             raise ValueError("invalid trace outcome or producer identity")
         manifest: Object = {
-            "schema": 1, "scope": "pure-compiler-timing", "clock": "perf_counter_ns",
+            "schema": 2, "scope": "pure-compiler-timing", "clock": "perf_counter_ns",
             "timestamp_unit": "microseconds", "origin": "recording-relative",
             "worker": "synchronous-host-including-parser-wait", "source_sha256": hashlib.sha256(source).hexdigest(),
             "producer_sha256": producer, "max_events": self.max_events,
             "event_count": len(self.events), "dropped_events": self.dropped,
+            "declaration_count": self.declarations,
             "incomplete_spans": self.depth, "clock_fault": self.clock_fault,
             "outcome": outcome, "recording_overhead_ns": self.overhead,
             "complete": outcome == "success" and not (self.dropped or self.depth or self.clock_fault),
@@ -209,12 +229,12 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
     manifest = cast("Object", data["vela"])
     fields = {"schema", "scope", "clock", "timestamp_unit", "origin", "worker", "source_sha256",
               "producer_sha256", "max_events", "event_count", "dropped_events", "incomplete_spans",
-              "clock_fault", "outcome", "recording_overhead_ns", "complete", "binding_sha256"}
+              "clock_fault", "outcome", "recording_overhead_ns", "complete", "binding_sha256", "declaration_count"}
     _require(set(manifest) == fields, "unsupported manifest fields")
     binding = manifest["binding_sha256"]
     unsigned = {key: value for key, value in manifest.items() if key != "binding_sha256"}
     _require(binding == _digest({**data, "vela": unsigned}), "trace binding mismatch")
-    _require(type(manifest["schema"]) is int and manifest["schema"] == 1
+    _require(type(manifest["schema"]) is int and manifest["schema"] == 2
              and manifest["scope"] == "pure-compiler-timing"
              and manifest["clock"] == "perf_counter_ns"
              and manifest["timestamp_unit"] == "microseconds"
@@ -222,7 +242,7 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
              and manifest["worker"] == "synchronous-host-including-parser-wait", "unsupported trace schema")
     _require(manifest["source_sha256"] == hashlib.sha256(source).hexdigest()
              and manifest["producer_sha256"] == producer, "stale trace input or producer")
-    for name in ("max_events", "event_count", "dropped_events", "incomplete_spans", "recording_overhead_ns"):
+    for name in ("max_events", "event_count", "dropped_events", "incomplete_spans", "recording_overhead_ns", "declaration_count"):
         _require(_natural(manifest[name]), f"invalid {name}")
     _require(1 <= cast("int", manifest["max_events"]) <= MAX_EVENTS, "invalid event bound")
     _require(type(manifest["complete"]) is bool and type(manifest["clock_fault"]) is bool, "invalid completeness flags")
@@ -240,11 +260,16 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
     spans: dict[str, tuple[int, int]] = {}
     counter_times: dict[str, int] = {}
     ordered_names: list[str] = []
+    declarations: list[tuple[int, int]] = []
+    previous_site = (0, 0)
     for item in events:
         _require(isinstance(item, dict), "event must be an object")
         event = cast("Object", item)
         phase = event.get("ph")
-        _require(phase in ("X", "C") and set(event) == {"name", "cat", "ph", "pid", "tid", "ts", "dur" if phase == "X" else "args"}, "unsupported event fields")
+        fields = {"name", "cat", "ph", "pid", "tid", "ts", "dur" if phase == "X" else "args"}
+        if event.get("name") == "declaration":
+            fields.add("args")
+        _require(phase in ("X", "C") and set(event) == fields, "unsupported event fields")
         _require(type(event["pid"]) is int and event["pid"] == 1
                  and type(event["tid"]) is int and event["tid"] == 1
                  and event["cat"] == "vela.compiler", "invalid worker")
@@ -253,10 +278,16 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
         _require(start >= previous, "events out of start order")
         previous = start
         if phase == "X":
-            _require(event["name"] in ("compile", "parse", "elaborate-and-emit") and _natural(event["dur"]), "invalid phase or duration")
+            _require(event["name"] in ("compile", "parse", "elaborate-and-emit", "declaration") and _natural(event["dur"]), "invalid phase or duration")
             end = start + cast("int", event["dur"])
             _require(end <= MAX_TIME, "overflowing span")
             name = cast("str", event["name"])
+            if name == "declaration":
+                site = _declaration_site(event["args"], source)
+                _require(site > previous_site, "declaration sites are duplicated or out of source order")
+                previous_site = site
+                declarations.append((start, end))
+                continue
             _require(name not in spans, "duplicate compiler phase")
             spans[name] = (start, end)
             phases.append(name)
@@ -270,6 +301,9 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
             counters[cast("str", name)] = cast("int", args["bytes"])
             counter_times[cast("str", name)] = start
         ordered_names.append(cast("str", event["name"]))
+    count = cast("int", manifest["declaration_count"])
+    _require(len(declarations) <= count <= len(declarations) + cast("int", manifest["dropped_events"]),
+             "declaration inventory mismatch")
     if complete:
         _require(phases == ["compile", "parse", "elaborate-and-emit"]
                  and set(counters) == {"source_bytes", "gallina_bytes"}, "incomplete compiler phase inventory")
@@ -279,8 +313,37 @@ def validate(document: object, source: bytes, producer: str, *, require_complete
                  <= spans["parse"][0] <= spans["parse"][1]
                  <= spans["elaborate-and-emit"][0] <= spans["elaborate-and-emit"][1]
                  <= counter_times["gallina_bytes"] <= spans["compile"][1], "crossing or incorrectly nested compiler spans")
+        previous_end = spans["elaborate-and-emit"][0]
+        for start, end in declarations:
+            _require(previous_end <= start <= end <= spans["elaborate-and-emit"][1],
+                     "crossing or incorrectly nested declaration spans")
+            previous_end = end
     _require(not require_complete or complete, "recording is incomplete")
     return manifest
+
+
+def _declaration_site(value: object, source: bytes) -> tuple[int, int]:
+    _require(isinstance(value, dict), "invalid declaration details")
+    details = cast("Object", value)
+    _require(set(details) == {"name", "kind", "line", "column"}, "unsupported declaration details")
+    name = details["name"]
+    _require(isinstance(name, str) and _IDENTIFIER.fullmatch(name) is not None
+             and details["kind"] in ("function", "constant"), "invalid declaration name or kind")
+    line, column = details["line"], details["column"]
+    _require(all(type(value) is int and 1 <= value <= 65_536 for value in (line, column)),
+             "invalid declaration coordinates")
+    line, column = cast("int", line), cast("int", column)
+    try:
+        lines = source.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    except UnicodeDecodeError as error:
+        raise ValueError("declaration source is not UTF-8") from error
+    _require(line <= len(lines), "declaration line outside source")
+    tail = lines[line - 1][column - 1:]
+    match = re.match(r"[A-Za-z_][A-Za-z0-9_]*", tail)
+    _require(match is not None and match.group() == name
+             and (column == 1 or not re.match(r"[A-Za-z0-9_]", lines[line - 1][column - 2])),
+             "declaration name does not match its source site")
+    return line, column
 
 
 def decode(raw: bytes) -> Object:

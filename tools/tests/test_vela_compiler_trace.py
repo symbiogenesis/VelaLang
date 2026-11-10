@@ -68,6 +68,61 @@ def _independent_timeline() -> None:
            "independent counter interpretation differs")
 
 
+def _declarations() -> None:
+    source = ("module Timed;\r\n// \u03bb\U0001f600\r\npublic const Nat Base = 2;\r\n"
+              "public Nat Twice(Nat x) => x + Base;\r\n").encode()
+    ticks = iter(range(0, 20_000, 1000))
+    recorder = trace.Recorder(clock=ticks.__next__)
+    with recorder.span("compile"):
+        recorder.counter("source_bytes", len(source))
+        with recorder.span("parse"):
+            pass
+        with recorder.span("elaborate-and-emit"):
+            with recorder.declaration("Base", "constant", 3, 18):
+                pass
+            with recorder.declaration("Twice", "function", 4, 12):
+                pass
+        recorder.counter("gallina_bytes", 48)
+    document = recorder.export(source, PRODUCER, outcome="success")
+    manifest = trace.validate(document, source, PRODUCER)
+    events = json.loads(json.dumps(document))["traceEvents"]
+    ensure(manifest["declaration_count"] == 2, "declaration inventory omitted")
+    ensure([(event["ts"], event["dur"], event["args"]) for event in events
+            if event["name"] == "declaration"] == [
+                (5, 1, {"name": "Base", "kind": "constant", "line": 3, "column": 18}),
+                (7, 1, {"name": "Twice", "kind": "function", "line": 4, "column": 12})],
+           "declaration source sites or independently expected durations differ")
+    for field, value in (("name", "Missing"), ("name", "ase"), ("kind", "proof"),
+                         ("line", True), ("line", 50), ("column", 19), ("column", 65537)):
+        changed = copy.deepcopy(document)
+        cast("list[trace.Object]", changed["traceEvents"])[4]["args"] = {
+            **cast("trace.Object", events[4]["args"]), field: value}
+        _bind(changed)
+        _refuses(changed, source=source)
+    for field, value in (("dur", 4), ("ts", 3)):
+        changed = copy.deepcopy(document)
+        cast("list[trace.Object]", changed["traceEvents"])[4][field] = value
+        _bind(changed)
+        _refuses(changed, source=source)
+    changed = copy.deepcopy(document)
+    cast("trace.Object", changed["vela"])["declaration_count"] = 1
+    _bind(changed)
+    _refuses(changed, source=source)
+    changed = copy.deepcopy(document)
+    cast("list[trace.Object]", changed["traceEvents"])[5]["args"] = events[4]["args"]
+    _bind(changed)
+    _refuses(changed, source=source)
+    for name, kind, line, column in (("bad name", "function", 1, 1), ("X", "proof", 1, 1),
+                                     ("X", "function", True, 1), ("X", "constant", 1, 0)):
+        try:
+            with recorder.declaration(name, kind, line, column):
+                pass
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid declaration site entered recording")
+
+
 def _bindings_and_completeness() -> None:
     document = _fixture()
     _refuses(document, source=SOURCE + b" ")
@@ -253,6 +308,9 @@ def _compiler_and_command() -> None:
     recorder = trace.Recorder()
     ensure(vela.translate(SOURCE, trace=recorder) == expected, "tracing changed emitted terms")
     trace.validate(recorder.export(SOURCE, PRODUCER, outcome="success"), SOURCE, PRODUCER)
+    ensure([event["args"] for event in recorder.events if event["name"] == "declaration"]
+           == [{"name": "Twice", "kind": "function", "line": 1, "column": 26}],
+           "compiler did not record its actual declaration site")
     with tempfile.TemporaryDirectory(prefix="vela-trace-") as directory:
         source, output = Path(directory) / "source.vela", Path(directory) / "trace.json"
         source.write_bytes(SOURCE)
@@ -282,8 +340,28 @@ def _compiler_and_command() -> None:
             ensure(run("trace-validate", str(output), "--source", str(source)) == 1, "refused trace appeared complete")
 
 
+def _compiler_declarations() -> None:
+    source = ("module Timed;\r\n// \u03bb\U0001f600\r\npublic const Nat Base = 2;\r\n"
+              "public Nat Twice(Nat x) => x + Base;\r\n").encode()
+    expected = vela.translate(source)
+    recorder = trace.Recorder()
+    ensure(vela.translate(source, trace=recorder) == expected, "declaration tracing changed output")
+    trace.validate(recorder.export(source, PRODUCER, outcome="success"), source, PRODUCER)
+    ensure([event["args"] for event in recorder.events if event["name"] == "declaration"] == [
+        {"name": "Base", "kind": "constant", "line": 3, "column": 18},
+        {"name": "Twice", "kind": "function", "line": 4, "column": 12}],
+        "compiler declaration spans do not match the independently selected source sites")
+    bounded = trace.Recorder(max_events=4)
+    ensure(vela.translate(source, trace=bounded) == expected, "dropping events changed compiler output")
+    manifest = trace.validate(bounded.export(source, PRODUCER, outcome="success"),
+                              source, PRODUCER, require_complete=False)
+    ensure(manifest["declaration_count"] == 2 and manifest["dropped_events"] == 3
+           and manifest["complete"] is False, "dropped declaration inventory was hidden")
+
+
 def cases() -> list[Case]:
     return [Case("independent-chrome-timeline", _independent_timeline),
+            Case("source-bound-declaration-timings", _declarations),
             Case("bound-events-status-and-freshness", _bindings_and_completeness),
             Case("malformed-and-crossing-timeline", _malformed_timeline),
             Case("bad-clocks-and-open-spans", _clock_and_open_spans),
@@ -291,4 +369,5 @@ def cases() -> list[Case]:
             Case("bounded-strict-json", _bounded_decoder),
             Case("producer-python-and-parser-freshness", _producer_file_freshness),
             Case("host-and-guest-runtime-executable-identities", _runtime_executable_identity),
+            Case("real-constant-function-and-dropped-declarations", _compiler_declarations),
             Case("same-compiler-output-and-read-only-command", _compiler_and_command)]

@@ -27,15 +27,16 @@ def _reader(path: Path, arguments: list[str]) -> viewer.Object:
     else:
         ensure(arguments[0] == "query" and len(arguments) == 3, "unexpected reader arguments")
         document = json.loads(Path(arguments[1]).read_text(encoding="utf-8"))
-        ensure(document["vela"]["complete"] is True and len(document["traceEvents"]) == 5,
+        ensure(document["vela"]["complete"] is True and len(document["traceEvents"]) == 6,
                "an incomplete or negative fixture reached the reader")
         if "FROM slice s" in arguments[2]:
             output = ('"name","ts","dur","depth","tid","pid"\n'
-                      '"compile",0,7000,0,1,1\n"parse",2000,1000,1,1,1\n'
-                      '"elaborate-and-emit",4000,1000,1,1,1\n')
+                      '"compile",0,9000,0,1,1\n"parse",2000,1000,1,1,1\n'
+                      '"elaborate-and-emit",4000,3000,1,1,1\n'
+                      '"declaration",5000,1000,2,1,1\n')
         else:
             ensure("FROM counter c" in arguments[2], "unexpected SQL query")
-            output = '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",6000,48\n'
+            output = '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",8000,48\n'
     return {"stdout": output, "stderr": "reader diagnostic\n", "returncode": 0}
 
 
@@ -71,9 +72,9 @@ def _wrong_results_and_late_changes() -> None:
                 def wrong(path: Path, arguments: list[str], chosen: str = field) -> viewer.Object:
                     result = _reader(path, arguments)
                     output = cast("str", result["stdout"])
-                    replacements = {"duration": ("7000", "7001"), "worker": ("0,1,1", "0,2,1"),
+                    replacements = {"duration": ("9000", "9001"), "worker": ("0,1,1", "0,2,1"),
                                     "nesting": ("1000,1,1,1", "1000,0,1,1"),
-                                    "counter": ("6000,48", "6000,49"), "version": ("v58.2", "v58.1")}
+                                    "counter": ("8000,48", "8000,49"), "version": ("v58.2", "v58.1")}
                     before, after = replacements[chosen]
                     result["stdout"] = output.replace(before, after)
                     return result

@@ -543,7 +543,7 @@ class _Elaborator:
 
 
 def _translate(source: bytes, module: syntax.Module, facts: Facts | None = None, *,
-               elaborator: _Elaborator | None = None) -> Translation:
+               elaborator: _Elaborator | None = None, trace: Recorder | None = None) -> Translation:
     elaborator = _Elaborator(facts) if elaborator is None else elaborator
     name = module.name.text
     # REUSE-IgnoreStart
@@ -558,8 +558,15 @@ def _translate(source: bytes, module: syntax.Module, facts: Facts | None = None,
         raise _error("limit", "pure translation exceeds its output byte budget", module.name.site)
     definitions: list[str] = []
     for declaration in module.declarations:
-        definition = (elaborator.constant(declaration) if isinstance(declaration, syntax.Constant)
-                      else elaborator.function(declaration))
+        is_constant = isinstance(declaration, syntax.Constant)
+        if trace is None:
+            definition = (elaborator.constant(declaration) if isinstance(declaration, syntax.Constant)
+                          else elaborator.function(declaration))
+        else:
+            with trace.declaration(declaration.name.text, "constant" if is_constant else "function",
+                                   declaration.name.site.line, declaration.name.site.column):
+                definition = (elaborator.constant(declaration) if isinstance(declaration, syntax.Constant)
+                              else elaborator.function(declaration))
         # Emission is ASCII: identifiers are ASCII and comments are not emitted.
         # Account for separators and the footer before retaining another definition.
         output_bytes += len(definition) + (2 if definitions else 0)
@@ -595,7 +602,7 @@ def translate(source: bytes, *, trace: Recorder | None = None) -> Translation:
             with trace.span("parse"):
                 module = parse_module(source)
             with trace.span("elaborate-and-emit"):
-                translated = _translate(source, module, elaborator=elaborator)
+                translated = _translate(source, module, elaborator=elaborator, trace=trace)
             trace.counter("gallina_bytes", len(translated.gallina.encode("utf-8")))
     _LAST_ELABORATED = (_budget_key(source), elaborator.copy())
     return translated
