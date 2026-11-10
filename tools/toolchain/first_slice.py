@@ -445,7 +445,7 @@ def _retained_stdout(step: dict[str, object]) -> bytes:
 
 
 def _simulator_transcript(said: str, returncode: int) -> tuple[str, int | None, list[str]]:
-    """Require one unambiguous terminal verdict and a complete, well-formed trace."""
+    """Require one unambiguous terminal verdict and validate each declared trace row."""
     terminals: list[str] = []
     instruction_order = -1
     for raw in said.splitlines():
@@ -457,6 +457,8 @@ def _simulator_transcript(said: str, returncode: int) -> tuple[str, int | None, 
         parts = line.split()
         if not parts or parts[0] not in {"I", "X", "S", "C", "R", "W", "T"}:
             continue
+        if terminals:
+            raise ValueError("first-slice simulator commit record follows its terminal verdict")
         if not line.isascii() or trace.COMMIT_RE.fullmatch(line) is None:
             raise ValueError("first-slice simulator commit record is malformed")
         if parts[0] == "I":
