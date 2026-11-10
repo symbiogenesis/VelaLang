@@ -400,6 +400,13 @@ class _Elaborator:
 
     def _expression(self, expression: syntax.Expression,
                     environment: dict[str, _Local]) -> _Expression:
+        checked = self._checked_expression(expression, environment)
+        if self.facts is not None:
+            self.facts.expression(expression.kind, expression.site, checked.value_type)
+        return checked
+
+    def _checked_expression(self, expression: syntax.Expression,
+                            environment: dict[str, _Local]) -> _Expression:
         kind, value, site = expression.kind, expression.value, expression.site
         if kind == "nat":
             return _Expression("Nat", f"({int(cast('str', value).replace('_', ''))} : {_TYPES['Nat']})")
@@ -657,9 +664,9 @@ def inspect_source(source: bytes, *, syntax_tree: bool = False) -> dict[str, obj
         module = parse_module(source)
     declaration_sites = {declaration.name.site: declaration.site
                          for declaration in module.declarations}
-    facts = Facts(source, declaration_sites)
+    facts = Facts(source, declaration_sites, expression_types=syntax_tree)
     _translate(source, module, facts)
-    result = facts.result()
+    result = facts.result(expression_types=syntax_tree)
     if response is not None:
         result["syntax"] = response
     return result

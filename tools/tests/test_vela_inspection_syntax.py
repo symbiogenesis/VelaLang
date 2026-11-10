@@ -20,7 +20,7 @@ SOURCE = ("/// tree \U0001f600\r\nmodule Tree;\r\n"
 
 
 def _request(snapshot: inspection.Snapshot, operation: str, **fields: object) -> dict[str, object]:
-    return {"schema": 4, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
+    return {"schema": 5, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
 
 
 def _nodes(value: dict[str, object]) -> list[dict[str, object]]:
@@ -129,7 +129,7 @@ def _query_consumer() -> None:
     for handle in (None, [], {}, True, "unknown"):
         ensure(snapshot.query(SOURCE, _request(snapshot, "syntax-children", node=handle))["status"] == "refused",
                "malformed syntax handle accepted")
-    for version in (1, 2, 3):
+    for version in (1, 2, 3, 4):
         ensure(snapshot.query(SOURCE, {**_request(snapshot, "syntax"), "schema": version})["reason"] == "schema-version",
                "obsolete schema query accepted the new tree contract")
 
