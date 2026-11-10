@@ -215,6 +215,7 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
                 symbols, occurrences = _facts(document, facts, identity)
                 pieces = concrete.validate(source, raw_concrete)
                 nodes = inspection_syntax.nodes(source, raw_syntax, identity)
+                inspection_syntax.validate_inventory(nodes, symbols, occurrences)
                 publication.update(status="checked", complete=True, symbols=symbols,
                                    occurrences=occurrences, concrete=pieces, syntax=nodes)
         except InspectionError as error:

@@ -138,7 +138,7 @@ def _worker_corruption_and_bounds() -> None:
     raw = {**inspect_source(SOURCE, syntax_tree=True), "concrete": concrete.parts(SOURCE)}
     syntax = cast("dict[str, object]", raw["syntax"])
     corruptions: list[object] = [None, {}, {**syntax, "source_sha256": "0" * 64}]
-    for edit in ("omitted", "operator", "escaping", "extra", "non-node"):
+    for edit in ("omitted", "operator", "escaping", "trailing-trivia", "extra", "non-node"):
         changed = copy.deepcopy(syntax)
         module = cast("dict[str, object]", changed["ast"])
         declarations = cast("list[dict[str, object]]", module["declarations"])
@@ -148,6 +148,8 @@ def _worker_corruption_and_bounds() -> None:
             declarations[0]["value"] = {"kind": "nat", "span": [0, 1], "value": "0"}
         elif edit == "escaping":
             module["span"] = [0, len(SOURCE) + 1]
+        elif edit == "trailing-trivia":
+            module["span"] = [cast("list[int]", module["span"])[0], len(SOURCE)]
         elif edit == "non-node":
             declarations[0]["value"] = None
         else:
@@ -168,7 +170,58 @@ def _worker_corruption_and_bounds() -> None:
            "failed complete semantic check advertised checked source syntax")
 
 
+def _semantic_inventory_corruption() -> None:
+    source = SOURCE + b"// Identity\r\n"
+    raw = {**inspect_source(source, syntax_tree=True), "concrete": concrete.parts(source)}
+    corruptions: list[dict[str, object]] = []
+    empty = copy.deepcopy(raw)
+    empty.update(symbols=[], occurrences=[])
+    corruptions.append(empty)
+    omitted = copy.deepcopy(raw)
+    symbols = cast("list[dict[str, object]]", omitted["symbols"])
+    constant = next(index for index, symbol in enumerate(symbols) if symbol["name"] == "One")
+    symbols.pop(constant)
+    retained = [occurrence for occurrence in cast("list[dict[str, object]]", omitted["occurrences"])
+                if occurrence["symbol"] != constant]
+    for occurrence in retained:
+        if cast("int", occurrence["symbol"]) > constant:
+            occurrence["symbol"] = cast("int", occurrence["symbol"]) - 1
+    omitted["occurrences"] = retained
+    corruptions.append(omitted)
+    for token in (b"Identity(x:", b"x: (x"):
+        missing = copy.deepcopy(raw)
+        offset = source.index(token)
+        prefix = source[:offset].decode().replace("\r\n", "\n")
+        line, column = prefix.count("\n") + 1, len(prefix.rsplit("\n", 1)[-1]) + 1
+        occurrences = cast("list[dict[str, object]]", missing["occurrences"])
+        missing["occurrences"] = [item for item in occurrences
+                                   if (item["line"], item["column"]) != (line, column)]
+        ensure(len(missing["occurrences"]) == len(occurrences) - 1,
+               "independent omission fixture did not remove its selected callee/label")
+        corruptions.append(missing)
+    extra = copy.deepcopy(raw)
+    symbols = cast("list[dict[str, object]]", extra["symbols"])
+    identity = next(index for index, symbol in enumerate(symbols) if symbol["name"] == "Identity")
+    cast("list[dict[str, object]]", extra["occurrences"]).append(
+        {"symbol": identity, "line": source.count(b"\n"), "column": 4, "declaration": False})
+    corruptions.append(extra)
+    for changed in corruptions:
+        with patch.object(inspection, "inspect_document", return_value=changed):
+            snapshot = inspection.inspect(source)
+        publication = snapshot.export()
+        validate(inspection.SCHEMA_PATH, publication)
+        ensure(publication["status"] == "unavailable" and publication["complete"] is False
+               and publication["syntax"] == [] and publication["symbols"] == []
+               and publication["occurrences"] == [] and publication["concrete"] == [],
+               "missing or invented semantic sites masqueraded as a complete checked view")
+        for operation in ("symbols", "syntax", "tokens"):
+            reply = snapshot.query(source, _request(snapshot, operation))
+            ensure(reply["status"] == "unavailable" and reply["complete"] is False and reply["items"] == [],
+                   "incomplete producer inventory became a checked empty query")
+
+
 def cases() -> list[Case]:
     return [Case("independent-pure-syntax-shape-source-spans-and-parent-links", _shape_consumer),
             Case("bounded-syntax-location-and-child-query-consumer", _query_consumer),
-            Case("syntax-worker-corruption-stale-schema-and-node-bound-refusal", _worker_corruption_and_bounds)]
+            Case("syntax-worker-corruption-stale-schema-and-node-bound-refusal", _worker_corruption_and_bounds),
+            Case("complete-source-declaration-and-reference-inventories", _semantic_inventory_corruption)]

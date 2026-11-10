@@ -30,6 +30,10 @@ def nodes(source: bytes, response: object, identity: str) -> list[dict[str, obje
     owns this presentation schema; compiler implementation objects are not serialized.
     """
     ast.decode(source, response)
+    module = cast("dict[str, object]", cast("dict[str, object]", response)["ast"])
+    declarations = cast("list[dict[str, object]]", module["declarations"])
+    if cast("list[int]", module["span"])[1] != cast("list[int]", declarations[-1]["span"])[1]:
+        raise ValueError("pure inspection module span includes trailing source trivia")
     result: list[dict[str, object]] = []
 
     def visit(raw: dict[str, object], parent: str | None, role: str, index: int | None) -> str:
@@ -57,5 +61,42 @@ def nodes(source: bytes, response: object, identity: str) -> list[dict[str, obje
                 children.append(visit(cast("dict[str, object]", child), handle, field, None))
         return handle
 
-    visit(cast("dict[str, object]", cast("dict[str, object]", response)["ast"]), None, "root", None)
+    visit(module, None, "root", None)
     return result
+
+
+def validate_inventory(syntax: list[dict[str, object]], symbols: list[object],
+                       occurrences: list[object]) -> None:
+    """Require every authored declaration/reference site without resolving it again."""
+    parents = {node["id"]: node for node in syntax}
+    kinds = {"function": "function", "constant": "constant", "parameter": "parameter",
+             "binding": "variable", "local-constant": "constant"}
+    expected_symbols: list[tuple[str, str, int, int]] = []
+    expected_occurrences: list[tuple[str, int, int, bool]] = []
+    for node in syntax:
+        if node["kind"] != "identifier":
+            continue
+        parent = parents[node["parent"]]
+        if parent["kind"] == "module":
+            continue
+        name = cast("str", node["value"])
+        first, last = cast("list[int]", node["span"])
+        declaration_kind = kinds.get(cast("str", parent["kind"])) if node["role"] == "name" else None
+        if declaration_kind is not None:
+            expected_symbols.append((declaration_kind, name, first, last))
+        elif (parent["kind"], node["role"]) not in {
+                ("name", "name"), ("call", "callee"), ("argument", "label")}:
+            raise ValueError("pure inspection identifier has an unsupported source role")
+        expected_occurrences.append((name, first, last, declaration_kind is not None))
+    declared = [cast("dict[str, object]", symbol) for symbol in symbols]
+    actual_symbols = [(cast("str", symbol["kind"]), cast("str", symbol["name"]),
+                       *cast("list[int]", symbol["span"])) for symbol in declared]
+    if sorted(actual_symbols) != sorted(expected_symbols):
+        raise ValueError("pure inspection declaration inventory differs from source syntax")
+    by_handle = {symbol["id"]: symbol for symbol in declared}
+    references = [cast("dict[str, object]", occurrence) for occurrence in occurrences]
+    actual_occurrences = [(cast("str", by_handle[occurrence["symbol"]]["name"]),
+                           *cast("list[int]", occurrence["span"]), cast("bool", occurrence["declaration"]))
+                          for occurrence in references]
+    if sorted(actual_occurrences) != sorted(expected_occurrences):
+        raise ValueError("pure inspection occurrence inventory differs from source syntax")
