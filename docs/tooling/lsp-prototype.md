@@ -80,7 +80,8 @@ Remember a newer received version even when its replacement text is refused;
 an older later update cannot restore synchronization.
 Close clears diagnostics. Save rechecks the overlay. Configuration and watched-file
 changes invalidate and recheck all open snapshots conservatively. There are no
-import, rename or interactive-proof providers. The separately
+import or interactive-proof providers. The [local rename preview](#local-rename-previews)
+uses the existing pure producer and versioned client edits. The separately
 commissioned pure navigation increment below consumes existing resolution facts;
 it supplies no wider-language qualification.
 
@@ -119,7 +120,7 @@ remain unqualified host diagnostics. Record immutable declaration identities,
 types and occurrences in the existing pure elaborator's resolution decisions;
 do not introduce another parser, resolver or type system. Retain both existing
 translation routes and their emitted terms. No facts survive a failed complete
-check. Partial syntax, imports, completion, rename, proof state and wider-language
+check. Partial syntax, imports, completion, package-wide rename, proof state and wider-language
 services retain their existing prerequisites.
 
 Support `textDocument/hover`, `textDocument/definition`,
@@ -361,6 +362,56 @@ focused host tests, Python checks, both Host CI aggregates and selected Guest CI
 dispatch. Independent review covers projection and formatting isolation. Two
 pinned editor clients and retained transcripts remain required for final
 interoperability qualification; this increment stays open without them.
+
+## Local rename previews
+
+The pure development increment supports `textDocument/prepareRename` and
+`textDocument/rename` for compiler-resolved local `let` variables. Functions,
+parameters and constants return null: their public or callable uses require
+package-wide facts that this producer does not supply. A token-end position,
+comment, punctuation or refused complete source also returns null. Same-spelled
+variables in sibling branches retain distinct identities.
+
+Advertise `renameProvider: {prepareProvider: true}` only when the client offers
+`workspace.workspaceEdit.documentChanges: true`. Preparation returns the exact
+selected identifier range and its current spelling. Rename returns a single
+`TextDocumentEdit` containing the open URI, its exact integer version and all
+resolved declaration/reference edits for the selected variable. The server
+preserves the overlay and disk; applying the preview belongs to the client,
+which must refuse an edit after that document version changes. A same-name
+request returns an empty versioned edit list. A client without versioned edit
+support receives RequestFailed (`-32803`) for either request.
+
+Validate the requested spelling with the pure compiler's identifier and keyword
+vocabulary. Invalid names return invalid parameters (`-32602`). Construct a
+candidate by replacing only the resolved identifier byte ranges, then run the
+existing isolated compiler inspection over that complete candidate. Compare every
+declaration's kind and structured type and every occurrence's resolved identity,
+declaration flag and translated range with the original facts. This catches a
+capture even when the edited source still typechecks. A failed candidate or any
+changed binding refuses the entire preview. ASCII identifiers let position shifts
+preserve supplementary comments, original UTF-8 bytes and LF/CRLF/bare-CR layout.
+No second resolver or type inference is added.
+
+Use the existing current-snapshot inspection cache for preparation and the source
+side of rename. Recheck the candidate separately without caching it as a live
+overlay. Before publishing, require the original overlay, synchronization state,
+inspector callable and configuration/dependency generation to remain current.
+Saves, source changes, refused edits and configuration/dependency invalidation
+retain the normal navigation cache rules. Source, inspection and complete-reply
+bounds apply; each compiler worker retains its five-second limit.
+
+Independent controls cover exact previews, declaration/reference selection,
+same-name edits, sibling identities, separate call/value namespaces, invalid
+names, duplicates, type-correct capture, CRLF and supplementary comments,
+unsupported clients, desynchronization and source/producer changes during
+candidate checking. The pinned Neovim qualifier explicitly offers versioned
+document edits and checks successful preparation and preview traffic. The pinned
+Vim plugin omits that capability and supplies no override API, so both its full
+and incremental sessions check the explicit refusal. Retained observations join
+the exact responses to wire requests, open source and document version; changed
+versions, incomplete edits and mismatched observations fail replay. Successful
+rename interoperability in a second version-capable client remains open.
 
 ## Acceptance and remaining qualification
 
