@@ -1549,10 +1549,15 @@ and required process subjects/verdicts against retained transcripts. Rehashed
 missing coverage, invented source-proof status and altered process records refuse.
 Capacity coverage requires both compilation subjects, their joint kernel-check
 transcript and retained source/library outputs; declared capacities and byte
-lengths agree with those outputs. All 17 semantic negatives must occur exactly
-once with successful parsing, the intended semantic refusal and positive integer locations.
-The eleven receipt cases include omitted capacity processes/artifacts, altered
-metrics, duplicate or missing controls and syntax-only refusals. These checks
+lengths agree with those outputs, and original Vela inputs exactly match the
+frozen small/large fixtures. All 17 semantic negatives retain their exact frozen
+Vela source and must occur exactly once with successful parsing, the intended
+semantic refusal and integer locations within that source. The proof-corruption
+subject is exactly the retained Gallina followed by the frozen false equality;
+a normal Rocq exit must report its intended type mismatch at that definition.
+Signals, unrelated failures and missing or duplicate errors refuse. Independent
+cases include substituted capacity/control subjects, omitted processes/artifacts,
+altered metrics, invalid locations and syntax-only refusals. These checks
 preserve coverage reporting without rerunning controls or remeasuring work.
 Native proof observations bind stdout/stderr byte lengths and hashes separately;
 the strict assumption audit reads the bound stdout while retaining all stderr.
@@ -1575,7 +1580,7 @@ its exact image. Failed interpreter processes cannot publish a source verdict.
 Two additional [receipt cases](../../tools/tests/test_vela_first_slice_receipts.py)
 cover the observation producer and 31 independent process/subject/summary mutations,
 including rehashed contradictory transcripts and changed effective inputs or images.
-All 13 receipt cases pass. Local CompCert remains unavailable; optional fixtures
+All 14 receipt cases pass. Local CompCert remains unavailable; optional fixtures
 supply no live compiler verdict. Receipt matching does not replay or authenticate
 these proofs. Final binding publication rechecks
 source/revision, execution/parser identities, retained outputs and the receipt
@@ -1623,7 +1628,7 @@ whole-cell completion credit or additional hours are recorded for this increment
 
 Partial pure-producer delivery on 2026-11-09 under the
 [pure snapshot contract](../tooling/tooling-protocols.md#pure-development-snapshot-increment).
-`vela inspect` exports immutable source-preserving snapshots with schema-4
+`vela inspect` exports immutable source-preserving snapshots with schema-5
 provenance, UTF-8 byte spans, structured scalar/callable identifier types and
 snapshot-scoped resolved symbols/references. Function types include parameter
 types, required-static flags, result types and constant-callable status.
@@ -1656,13 +1661,21 @@ Four [syntax consumers](../../tools/tests/test_vela_inspection_syntax.py)
 independently check a complete authored tree with constant qualifiers, typed
 locals, branch nesting, named arguments and parentheses. Malformed, omitted and
 escaping worker nodes, stale schema versions and foreign handles refuse. All
-19 inspection cases and both-platform typechecking pass. Independent review
+22 inspection cases and both-platform typechecking pass. Independent review
 identified and corrected coordinated omitted semantic inventories and an
 in-bounds expanded module span. Source-tree identifier coverage cross-checks
 every declaration, callee, value and argument-label occurrence without
 duplicating resolution; trailing trivia cannot enter a forged root span.
+Every pure literal, name, call, operator and grouped expression also carries its
+compiler-recorded scalar result type, joined to the exact syntax node and source
+span. Bounded `expressions`, `expression-at` and `expression-type` queries expose
+these decisions while callable identifier types remain distinct from call result
+types. Three [typed-expression consumers](../../tools/tests/test_vela_inspection_types.py)
+independently check expected source meanings, named/static calls, callee shadowing,
+operator/group sites, Unicode/CRLF, bounded/stale/foreign queries and malformed,
+omitted or inconsistent worker decisions. Failed overlays withdraw the snapshot.
 Combined local gate and behavioral validation cover integration.
-Q25ch remains open for typed-expression trees, structural scopes, imports, generated/proof and
+Q25ch remains open for structural scopes, imports, wider typed trees, generated/proof and
 lowering views and their qualified producers. No whole-cell completion credit
 or additional hours are recorded for this development increment.
 
@@ -1696,16 +1709,31 @@ declaration, type and reference binding is compared before publication.
 Type-correct capture, stale overlays and producer changes refuse. Functions,
 parameters and constants remain outside this single-document increment.
 Four [rename cases](../../tools/tests/test_vela_lsp_rename.py) check independent
-expected edits, capture, coordinates, negotiation and freshness. Seven
+expected edits, capture, coordinates, negotiation and freshness. Eight
 [client cases](../../tools/tests/test_vela_lsp_clients.py) check retained
 observations and wire joins, including version and edit corruption.
 The live schema-2 client report qualifies successful versioned previews in pinned
 Neovim and explicit `RequestFailed` refusal in pinned Vim's full and incremental
 sessions, whose plugin omits versioned `documentChanges` support.
+`textDocument/completion` offers explicit callable-name edits at existing resolved
+call identifiers in fully checked pure source. Candidates preserve structured
+types, static requirements and parameter names and use a conservative earlier
+declaration set; partial scope coverage remains `isIncomplete: true`.
+`textDocument/signatureHelp` projects resolved callable signatures and compiler
+token boundaries, selects the innermost call and counts only that call's argument
+commas. Named/static arguments, nested calls, documentation and empty parameter
+lists retain the current compiler facts. Invalid, timed-out, changed or stale
+snapshots publish no stale suggestions.
+Eight [discovery cases](../../tools/tests/test_vela_lsp_discovery.py) check
+independently expected results, Unicode/trivia and unsaved stdio edits, nested and
+zero-argument calls, static/parameter-name compatibility and output bounds.
+Both pinned clients, including both Vim synchronization modes, qualify completion
+and signatures; retained observations join their exact source/cursor requests and
+responses to the wire transcripts. Corrupted or detached observations refuse.
 Combined local gate and behavioral validation cover integration.
 
 Q25ci remains open for a second successful version-capable rename client, wider
-qualified producers and the remaining selected editor operations. This increment supplies no wider
+qualified producers, general completion and the remaining selected editor operations. This increment supplies no wider
 language or proof admission and records no whole-cell completion credit or hours.
 
 <a id="q25cp-expose-bounded-compiler-performance-traces"></a>
@@ -1715,17 +1743,22 @@ language or proof admission and records no whole-cell completion credit or hours
 Partial pure-producer delivery on 2026-11-09 under the
 [bounded trace contract](../tooling/pure-prototype.md#bounded-compiler-traces).
 `vela trace` records the existing pure producer's parse and combined
-elaboration/emission phases plus byte counters as Chrome Trace Event JSON.
+elaboration/emission phases, nested source-located constant/function declaration
+work and byte counters as Chrome Trace Event JSON. The schema-2 manifest counts
+attempted declaration records, including drops; validation checks name spellings,
+source order, nonoverlapping work within the parent phase and retained/dropped
+counts. Declaration metadata supplies no independent source-coverage theorem.
 The manifest binds source, local producer and events/completeness metadata;
 `vela trace-validate` refuses stale inputs and incomplete or malformed recordings.
 Event/byte/nesting bounds, clock faults, dropped events, open spans and
 refused/cancelled work preserve truthful completeness. Publication rechecks source
 and producer identities and preserves existing output on preparation failure.
 
-Nine [trace consumer cases](../../tools/tests/test_vela_compiler_trace.py)
+Eleven [trace consumer cases](../../tools/tests/test_vela_compiler_trace.py)
 independently recover a deterministic timeline and cover quantized zero-duration
 boundaries, changed compiler/parser files, malformed data, truncation/refusal,
-clock regression and late-publication freshness. Independent code review found
+clock regression, declaration locations/nesting, real constant/function and
+truncated declaration recording, and late-publication freshness. Independent code review found
 and corrected producer-path, timestamp-boundary and publication-freshness gaps.
 Producer identity includes Python/opam lock owners, the command bootstrap and
 selected host/guest Python and validated checked-parser executable bytes.
@@ -1750,7 +1783,7 @@ SQL, raw and parsed reader observations, version/diagnostic transcripts and harn
 identity. Five [importer cases](../../tools/tests/test_vela_trace_viewer.py) cover
 wrong observations, disabled controls, unknown readers, timeout/output bounds,
 alias/cancellation and late changes. Actual Windows AMD64 under ARM64 emulation
-and Linux ARM64 reader qualifications pass, along with all 19 trace cases and
+and Linux ARM64 reader qualifications pass, along with all 21 trace cases and
 both-platform typechecking. The [license record](../../THIRD-PARTY.md) records
 the selected reader's own terms; the optional command downloads nothing.
 Combined local gate and behavioral validation cover integration.
