@@ -1916,3 +1916,38 @@ and their reviewed licensing. The qualified inputs are standalone pure files;
 imported resolution, proof/resource diagnostics, related locations and code flows
 remain producer duties where unavailable. This completes the declared host
 projection and supplies no checked synchronous frontend or artifact admission.
+
+<a id="q25cj-distribute-tree-sitter-and-textmate-syntax-assets"></a>
+
+#### Q25cj · Distribute Tree-sitter and TextMate syntax assets
+
+Landed on 2026-11-09 with the original 56 h retained estimate (32–80), actual
+n/a because effort was shared across this parallel batch. The
+[syntax-assets contract](../tooling/highlighting.md) distributes a Tree-sitter
+grammar/query and a TextMate language extension generated from the canonical
+Menhir grammar and lexer. The original bounded C scanner handles nested block
+comments, raw quote delimiters, interpolation braces and lifetime apostrophes.
+Generated upstream parser/runtime files and independently provisioned consumers
+remain outside tracked source; the [licensing record](../../THIRD-PARTY.md#independent-syntax-consumers)
+fixes the selected revisions and reviewed notices.
+
+Pinned Tree-sitter 0.25.10 and vscode-textmate 9.2.0/vscode-oniguruma 2.0.1 on
+Node.js 22.22.1 qualify all six examples and the complete 395-case canonical
+corpus. Exact executable recovery dispositions record one positive editor
+recovery and 35 syntax-negative editor trees; canonical encoding/resource cases
+retain their own refusal envelope. Independent scopes cover Unicode, nested
+comments, raw/escaped strings, dependent generics, interpolation nesting and
+lifetimes. The stock HTML consumer preserves exact decoded source text, and
+TextMate tokenizes 378 projected sources. Eight complete fresh/incremental tree
+comparisons cover valid edits, malformed neighbors and repairs.
+
+Seven behavioral controls cover owner-driven regeneration, source/consumer
+alias refusal, changed runtime/source publication, package pins, Unicode HTML
+and complete tree comparison, and narrowly scoped grammar DSL support. The
+static gate additionally rejects generated asset drift and marks original C
+sources under the repository licensing policy. Focused controls, both-platform
+typechecking and the full static gate pass; independent review confirms the
+interpolation, corpus and publication boundaries. Combined local gate and
+behavioral validation cover integration. Reports bind exact input, asset,
+consumer and canonical-parser identities with explicit bounds and
+`semantic_acceptance: false`; no recovered editor tree admits Vela source.

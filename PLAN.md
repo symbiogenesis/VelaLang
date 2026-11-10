@@ -15,14 +15,14 @@ investigation is complete, while full first-slice artifact acceptance remains op
 | Measure | Value |
 | --- | --- |
 | Total estimate midpoint h | 21,457.9 |
-| Total estimate range h | 11,197.9–31,717.9 |
-| Completed scope h | 453.9 |
-| Complete by estimate % | 2.1 |
-| Remaining h | 21,004 |
-| Open class I h | 2,920 |
+| Total estimate range h | 11,221.9–31,693.9 |
+| Completed scope h | 509.9 |
+| Complete by estimate % | 2.4 |
+| Remaining h | 20,948 |
+| Open class I h | 2,864 |
 | Open class X h | 18,084 |
-| Retained completion estimate h | 450.5 |
-| Unmeasured completed items | 32 |
+| Retained completion estimate h | 506.5 |
+| Unmeasured completed items | 33 |
 <!-- estimate-summary:end -->
 
 The [checklist](#checklist-items-q25-series) owns completion status and the
@@ -59,6 +59,7 @@ local receipt integration:
 | Pure compiler inspection | `vela inspect` exports schema-6 source-preserving token/trivia partitions, pure syntax trees, lexical scopes, compiler-owned expression and identifier types and bounded concrete/syntax/scope/resolved queries under the [pure inspection contract](docs/tooling/tooling-protocols.md#pure-development-snapshot-increment) | Wider syntax, imports, generated, proof and lowering views retain Q25ch/ci's producer prerequisites |
 | Pure semantic editor | Compiler-backed callable and visible-value completion, argument-sensitive signature help and token deltas qualify in both pinned clients; literal completion adds checked whole-token edits and static argument restrictions; checked local-variable rename previews qualify in Neovim and refuse unsupported versioned edits in pinned Vim under the [LSP contract](docs/tooling/lsp-prototype.md) | Q25ci retains a second successful rename client, empty or unfinished completion sites, wider producers and editor operations |
 | Batch diagnostic export | Qualified SARIF 2.1.0 projects the current pure diagnostic producer across bounded standalone inputs, preserves incomplete outcomes, binds source/producer/configuration identities and offers explicit canonical-format fix previews; a pinned independent reader qualifies source locations and edits under the [export contract](docs/tooling/tooling-protocols.md#qualified-pure-batch-sarif) | Wider diagnostic meanings, imported resolution and source/artifact admission remain with their existing producers |
+| Editor syntax assets | Menhir-derived Tree-sitter and TextMate distributions qualify in pinned independent consumers against all 395 canonical cases, explicit recovery dispositions, Unicode scopes and eight incremental edits under the [syntax-assets contract](docs/tooling/highlighting.md) | Syntax coloring and recovered editor trees confer no semantic, proof or artifact acceptance |
 | Kernel replay | Imported checker sources and Python dependency owners enter input identity; malformed assumption reports refuse | Kernel checking of emitted terms supplies no source or artifact correspondence |
 | Local first-slice source proofs | All 69 exports kernel-replay with an empty solver-trust ledger within unchanged elaboration budgets under [first-slice qualification](docs/language/first-release.md#first-slice-qualification) | Q25ba retains source correspondence and exact-artifact producer joins |
 | Local first-slice receipts | Schema-2 binding checks verify exact capacity and negative-control source subjects, the intended proof-corruption refusal, retained proof/control coverage, unambiguous Sail verdicts and well-formed traces, capability images and optional CompCert process chains, effective inputs and image regeneration as well as producer/tool/runtime/parser identities | Q25ar remains open for external checked producer receipts and complete declared coverage |
@@ -155,6 +156,11 @@ into these hours.
 ## Checklist items (Q25 series)
 
 Each checklist item pairs with a single [completion-log](docs/assurance/completion-log.md) entry carrying the exact `Q25* · Title` heading when landed, and records its prospective estimate, range, class (`I` implementation or `X` investigation), and actual hours (`n/a` when shared across a batch). The [first-release delivery sequence](#vela-first-release-delivery) governs new Vela work: existing parser, mathematical, and editor increments may finish their frozen qualification, while broader surface and adapter work waits for the concrete synchronous component.
+
+The standalone host syntax-asset and pure-diagnostic-export cells qualify their
+declared existing development producers independently of production release.
+They supply no wider frontend, missing-law or source/artifact admission receipt;
+other conditional adapter and surface work retains its entry predicates.
 
 - [x] **Q25 · Design the full graded dependent language and its control and mutation rules**
   - The graded, control, mutation and assurance-policy designs are reviewed together, with implementation debts and admission decisions recorded by Q25d ([note](docs/assurance/completion-log.md#q25-design-the-full-graded-dependent-language-and-its-control-and-mutation-rules))
@@ -498,8 +504,9 @@ Each checklist item pairs with a single [completion-log](docs/assurance/completi
 
 <a id="q25cj"></a>
 
-- [ ] **Q25cj · Distribute Tree-sitter and TextMate syntax assets** · 56 h, range 32–80 · I
+- [x] **Q25cj · Distribute Tree-sitter and TextMate syntax assets** · 56 h retained estimate, range 32–80, actual n/a · agent-parallel
   - **Owner:** `vela-highlight`. **Start:** Canonical Menhir grammar/corpus and named editor consumers. **Check:** Meet the [highlighting contract](docs/tooling/tooling-protocols.md#syntax-grammars-and-highlighting) with both asset formats, fresh/incremental agreement and malformed/Unicode cases; assets grant no semantic acceptance.
+  - Generated Menhir-derived assets, pinned independent consumers, the complete canonical corpus with frozen recovery dispositions and eight fresh/incremental edit comparisons pass the [syntax-assets qualification](docs/tooling/highlighting.md#executable-qualification). [Landing evidence](docs/assurance/completion-log.md#q25cj-distribute-tree-sitter-and-textmate-syntax-assets) records the syntax-only boundary.
 
 <a id="q25ck"></a>
 
@@ -836,8 +843,10 @@ with bounded syntax and existing-consumer preparation permitted independently;
 the validator's narrow runtime subset qualifies with its first artifact;
 broader represented-library, ownership and production qualification follows that
 accepted slice. Its [ergonomic refinement](docs/language/surface-grammar.md#ergonomic-authoring-and-bounded-collection-iteration)
-adds no concrete-law prerequisite or semantic acceptance claim. Other syntax and
-adapter breadth remain consumer-gated until the first slice works. Prioritize immutable batch inputs, diagnostics, navigation,
+adds no concrete-law prerequisite or semantic acceptance claim. Qualified
+standalone host syntax assets and pure diagnostic exports consume existing
+development producers; other syntax and adapter breadth remain consumer-gated
+until the first slice works. Prioritize immutable batch inputs, diagnostics, navigation,
 explicit formatting and inspectable proof obligations. The first release may
 consume retained Rocq definitions and proofs; complete Vela proof authorship is
 an independent option. Preserve the existing mandatory compiler, hardware and
