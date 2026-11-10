@@ -15,6 +15,7 @@ from toolchain import (
     VelaError,
     authoring_preview,
     compiler_trace,
+    inspection_reader,
     sarif,
     sarif_reader,
     trace_benchmark,
@@ -32,7 +33,7 @@ from toolchain.generated_tests import (
     DEFAULT_TIMEOUT_SECONDS,
     qualify_isolated_campaign,
 )
-from toolchain.inspection import MAX_EXPORT_BYTES, inspect
+from toolchain.inspection import MAX_EXPORT_BYTES, current_binding, inspect
 from toolchain.protocol_json import decode_message
 
 
@@ -48,6 +49,11 @@ def _identity(value: os.stat_result) -> tuple[int, int, int, int]:
     # Windows path stat and descriptor fstat expose different legacy ctime
     # meanings after a write. File identity, size, mtime and exact bytes agree.
     return value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns
+
+
+def _inspection_unchanged(source: _Source, binding: dict[str, object]) -> None:
+    if current_binding(source.data, uri=source.path.resolve().as_uri()) != binding:
+        raise ValueError("inspection producer changed during export handoff")
 
 
 def _read_source(path: Path, *, max_bytes: int = MAX_SOURCE_BYTES) -> _Source:
@@ -392,7 +398,9 @@ def main(argv: list[str] | None = None) -> int:
     inspection = commands.add_parser("inspect", help="export versioned pure compiler facts (Q25ch subset)")
     inspection.add_argument("source", type=Path)
     inspection.add_argument("--query", type=Path,
-                            help="read a version-2 bounded query JSON object instead of exporting all facts")
+                            help="read a version-6 bounded query JSON object instead of exporting all facts")
+    inspection.add_argument("--snapshot", type=Path,
+                            help="read and independently verify an existing export without recompiling")
     batch = commands.add_parser("sarif", help="export bounded pure batch diagnostics as SARIF 2.1.0")
     batch.add_argument("sources", nargs="+", type=Path)
     batch.add_argument("--schema", type=Path, required=True, help="exact external OASIS 2.1.0 schema")
@@ -451,12 +459,25 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=True, sort_keys=True))
             return 0
         if args.command == "inspect":
-            snapshot = inspect(source.data, uri=path.resolve().as_uri())
-            result = snapshot.export()
+            binding = current_binding(source.data, uri=path.resolve().as_uri())
+            retained = None
+            snapshot = None
+            if args.snapshot is None:
+                snapshot = inspect(source.data, uri=path.resolve().as_uri())
+                result = snapshot.export()
+            else:
+                with args.snapshot.open("rb") as stream:
+                    publication = stream.read(MAX_EXPORT_BYTES + 1)
+                retained = inspection_reader.read(publication, source.data, binding=binding)
+                result = retained.export()
             if args.query is not None:
                 with args.query.open("rb") as stream:
                     request = stream.read(MAX_EXPORT_BYTES + 1)
-                result = snapshot.query(source.data, decode_message(request))
+                if retained is not None:
+                    result = retained.query(source.data, decode_message(request), binding=binding)
+                elif snapshot is not None:
+                    result = snapshot.query(source.data, decode_message(request))
+            _inspection_unchanged(source, binding)
             _unchanged(source)
             encoded = json.dumps(result, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
             print(encoded)

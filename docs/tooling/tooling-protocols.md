@@ -373,6 +373,33 @@ changes yield `refused`. Source text remains available in failed bulk inspection
 empty semantic arrays carry no successful absence claim. The CLI returns success
 only for `checked` and preserves the source file.
 
+The independent [offline reader](../../tools/toolchain/inspection_reader.py) consumes
+serialized bulk exports through
+`python tools/run.py vela inspect SOURCE --snapshot EXPORT.json`, optionally with
+the same `--query REQUEST.json`. This path invokes no parser or resolution worker.
+Before handoff, the CLI recomputes the current source URI, source digest,
+configuration, target and producer closure; it refuses an export whose exact
+binding or snapshot digest differs. It checks the producer binding again before
+publication and preserves the source bytes. Exports are UTF-8 JSON; duplicate
+members, incompatible schemas, malformed JSON and over-budget publications refuse.
+
+The reader shares only the published JSON Schema and generic JSON/schema utilities
+with the exporter. It independently checks exact concrete reconstruction, ordered
+snapshot-scoped handles, tree parent/child reciprocity and preorder, contained
+source spans and leaf spellings, complete scope/expression inventories,
+declaration membership, authored origins and occurrence links before exposing
+stored facts. It implements all fifteen existing bounded query operations over
+those stored facts, including reference, type, syntax and scope queries. Current
+binding checks, cross-snapshot handle refusal, byte/CRLF coordinates, explicit
+truncation and incomplete producer statuses remain mandatory during offline queries.
+The [consumer qualification](../../tools/tests/test_vela_inspection_reader.py)
+uses independently expected shadowing, sibling-block, required-static signature,
+named-argument and call-result facts, malformed graph and binding controls, and a
+source-preserving CLI round trip with the compiler worker disabled. This is a
+structural consumer of existing compiler decisions, with the same development
+and source-correspondence limits as the producer; it provides no independent
+type inference, import resolution or proof acceptance.
+
 ## Syntax grammars and highlighting
 
 The distributed [editor syntax assets](highlighting.md) implement this boundary

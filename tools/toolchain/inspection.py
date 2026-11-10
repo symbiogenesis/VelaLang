@@ -54,6 +54,12 @@ def _binding(document: SourceSnapshot, configuration: str, target: str) -> dict[
             "coordinate_unit": "utf8-byte", "symbol_lifetime": "snapshot"}
 
 
+def current_binding(source: bytes, *, uri: str = "memory:vela", configuration: str = CONFIGURATION,
+                    target: str = TARGET) -> dict[str, object]:
+    """Identify current inputs without invoking the parser or semantic worker."""
+    return _binding(SourceSnapshot(uri, 1, source.decode("utf-8"), 1), configuration, target)
+
+
 def _span(document: SourceSnapshot, first: tuple[int, int], last: tuple[int, int]) -> list[int]:
     return [document.position_byte_offset(*first), document.position_byte_offset(*last)]
 
