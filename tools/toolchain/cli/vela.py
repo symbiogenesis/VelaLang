@@ -8,11 +8,14 @@ import stat
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from toolchain import (
     MAX_SOURCE_BYTES,
     VelaError,
     compiler_trace,
+    sarif,
+    sarif_reader,
     trace_benchmark,
     trace_viewer,
     translate,
@@ -218,6 +221,65 @@ def _trace_viewer(args: argparse.Namespace) -> int:
         return 0
 
 
+def _sarif_sources(paths: list[Path]) -> tuple[_Source, ...]:
+    if not 1 <= len(paths) <= sarif.MAX_FILES:
+        raise ValueError("SARIF requires 1 to 16 source files")
+    return tuple(_read_source(path) for path in paths)
+
+
+def _sarif(args: argparse.Namespace) -> int:
+    try:
+        sources = _sarif_sources(args.sources)
+        inputs = tuple(sarif.Input(source.path.resolve().as_uri(), source.data) for source in sources)
+        producer = compiler_trace.producer_identity()
+        if args.command == "sarif-validate":
+            with args.report.open("rb") as stream:
+                document = sarif.decode(stream.read(sarif.MAX_REPORT_BYTES + 1))
+        else:
+            document = sarif.export(inputs, producer, format_fixes=args.format_fixes)
+        manifest = sarif.validate(document, inputs, producer, schema_path=args.schema)
+        for source in sources:
+            _unchanged(source)
+        _producer_unchanged(producer, "during SARIF analysis")
+        sarif.check_schema_current(args.schema)
+        if args.command == "sarif":
+            _destination(args.schema, args.output)
+            for source in sources:
+                _destination(source.path, args.output)
+            with atomic_path(args.output) as pending:
+                pending.write_bytes(sarif.encode(document))
+                for source in sources:
+                    _unchanged(source)
+                _producer_unchanged(producer, "before SARIF publication")
+                sarif.check_schema_current(args.schema)
+        print(f"vela: SARIF analysis complete: {manifest['complete']}; pure development scope; unqualified")
+        bindings = cast("list[sarif.Object]", manifest["inputs"])
+        return 0 if manifest["complete"] and all(item["status"] == "checked" for item in bindings) else 1
+    except (OSError, ValueError) as error:
+        print(f"sarif:1:1: export: {error}", file=sys.stderr)
+        return 1
+
+
+def _sarif_reader(args: argparse.Namespace) -> int:
+    try:
+        _destination(args.schema, args.output)
+        for name in sarif_reader.WHEEL_PINS:
+            _destination(args.reader_directory / name, args.output)
+        report = sarif_reader.qualify(args.reader_directory, args.schema)
+        with atomic_path(args.output) as pending:
+            pending.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
+                               encoding="utf-8", newline="")
+            sarif_reader.check_current(args.reader_directory, report)
+            sarif.check_schema_current(args.schema)
+            _producer_unchanged(cast("str", report["producer_sha256"]), "before SARIF qualification publication")
+    except (OSError, ValueError) as error:
+        print(f"sarif-qualify-reader:1:1: qualification: {error}", file=sys.stderr)
+        return 1
+    else:
+        print(f"vela: {args.output}: pinned SARIF importer qualification passed")
+        return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(suggest_on_error=True, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -275,7 +337,24 @@ def main(argv: list[str] | None = None) -> int:
     inspection.add_argument("source", type=Path)
     inspection.add_argument("--query", type=Path,
                             help="read a version-2 bounded query JSON object instead of exporting all facts")
+    batch = commands.add_parser("sarif", help="export bounded pure batch diagnostics as SARIF 2.1.0")
+    batch.add_argument("sources", nargs="+", type=Path)
+    batch.add_argument("--schema", type=Path, required=True, help="exact external OASIS 2.1.0 schema")
+    batch.add_argument("--output", type=Path, required=True)
+    batch.add_argument("--format-fixes", action="store_true", help="include explicit canonical-format previews")
+    batch_validation = commands.add_parser("sarif-validate", help="refuse stale or corrupt SARIF handoffs")
+    batch_validation.add_argument("report", type=Path)
+    batch_validation.add_argument("--sources", nargs="+", type=Path, required=True)
+    batch_validation.add_argument("--schema", type=Path, required=True)
+    batch_reader = commands.add_parser("sarif-qualify-reader", help="qualify a pinned offline SARIF importer")
+    batch_reader.add_argument("--reader-directory", type=Path, required=True)
+    batch_reader.add_argument("--schema", type=Path, required=True)
+    batch_reader.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.command in {"sarif", "sarif-validate"}:
+        return _sarif(args)
+    if args.command == "sarif-qualify-reader":
+        return _sarif_reader(args)
     if args.command in {"trace", "trace-validate"}:
         return _trace(args)
     if args.command in {"trace-benchmark", "trace-benchmark-validate"}:

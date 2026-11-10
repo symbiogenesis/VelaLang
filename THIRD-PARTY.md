@@ -2,6 +2,49 @@
 
 This file records third-party dependencies, development tools, and reference readings for the VelaLang repository, following [COPYRIGHT.md](COPYRIGHT.md).
 
+<a id="independent-sarif-importer"></a>
+
+## Independent SARIF importer
+
+The optional [pure batch SARIF qualification](docs/tooling/tooling-protocols.md#qualified-pure-batch-sarif)
+uses the external `sarif-tools` 3.0.5 importer with the exact wheels below.
+The selected release's [LICENSE](https://github.com/microsoft/sarif-tools/blob/v3.0.5/LICENSE)
+and the wheel's own license were read on 2026-11-09: MIT, copyright Microsoft
+Corporation. Qualification imports only the reader API, with `jsonpath-ng` 1.7.0
+([release](https://pypi.org/project/jsonpath-ng/1.7.0/)), `ply` 3.11
+([release](https://pypi.org/project/ply/3.11/)) and PyYAML 6.0.3
+([release](https://pypi.org/project/PyYAML/6.0.3/)). The exact wheel license files
+were read at this milestone: `jsonpath_ng-1.7.0.dist-info/LICENSE` is Apache-2.0;
+PLY's `ply/lex.py` and `ply/yacc.py` carry the three-clause BSD license, copyright
+2001–2018 David M. Beazley (Dabeaz LLC); and
+`pyyaml-6.0.3.dist-info/licenses/LICENSE` is MIT, copyright 2017–2021 Ingy döt Net
+and 2006–2016 Kirill Simonov. The isolated process loads pure Python directly
+from the verified wheel ZIPs; PyYAML's native extension and sarif-tools' chart,
+HTML and document-export dependencies are not imported. The named PyYAML wheel
+is an input archive for pure imports, with no claim to execute its native payload
+on other platforms.
+
+| External wheel | SHA-256 |
+| --- | --- |
+| `sarif_tools-3.0.5-py3-none-any.whl` | `682d22559095ca4a210a401e21f0585fdb8015e826c0d160ab3cbadee326952f` |
+| `jsonpath_ng-1.7.0-py3-none-any.whl` | `f3d7f9e848cba1b6da28c55b1c26ff915dc9e0b1ba7e752a53d6da8d5cbd00b6` |
+| `ply-3.11-py2.py3-none-any.whl` | `096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce` |
+| `pyyaml-6.0.3-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl` | `501a031947e3a9025ed4405a168e6ef5ae3126c59f90ce0cd6f2bfc477be31b7` |
+
+The schema input is the official
+[OASIS SARIF 2.1.0 schema](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json),
+SHA-256 `ad6db49878699b091f3eeb765b6e29e92a34bad4da88664d000c923b549c3a25`.
+The [standard's notices](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html)
+and [repository license](https://github.com/oasis-tcs/sarif-spec/blob/main/LICENSE.md)
+were read on 2026-11-09: copyright 2020 OASIS Open, with its stated document,
+computer-language-definition and IPR policies. The schema remains an external
+development input checked by the existing locked `jsonschema` library; its
+contents are not relicensed or vendored into this tree. No upstream schema,
+reader, dependency source, wheel or native binary is copied into the tracked
+tree, compiler runtime, or a Vela/VerifiedOS image. Retained reports contain
+Vela-authored fixtures, observed records and tool identities. These records
+authorize local development use and do not assert a redistribution closure.
+
 ## CI environment setup
 
 The [static workflow](.github/workflows/static.yml) invokes `actions/setup-python`
