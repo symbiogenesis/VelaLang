@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vela pure development inspection version 5",
+  "title": "Vela pure development inspection version 6",
   "$defs": {
     "concrete": {
       "type": "object", "additionalProperties": false, "required": ["kind", "text", "span"],
@@ -15,6 +15,18 @@
       "items": false, "minItems": 2
     },
     "handle": {"type": "string", "pattern": "^[0-9a-f]{64}:symbol:[0-9]+$"},
+    "scope_handle": {"type": "string", "pattern": "^[0-9a-f]{64}:scope:[0-9]+$"},
+    "lexical_scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "node", "span", "parent", "children", "symbols"],
+      "properties": {
+        "id": {"$ref": "#/$defs/scope_handle"}, "kind": {"enum": ["module", "function", "block"]},
+        "node": {"$ref": "#/$defs/node_handle"}, "span": {"$ref": "#/$defs/span"},
+        "parent": {"oneOf": [{"$ref": "#/$defs/scope_handle"}, {"type": "null"}]},
+        "children": {"type": "array", "maxItems": 2048, "items": {"$ref": "#/$defs/scope_handle"}},
+        "symbols": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/handle"}}
+      }
+    },
     "node_handle": {"type": "string", "pattern": "^[0-9a-f]{64}:node:[0-9]+$"},
     "syntax": {
       "type": "object", "additionalProperties": false,
@@ -76,13 +88,14 @@
     },
     "symbol": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "name", "kind", "detail", "type", "span", "origin", "documentation"],
+      "required": ["id", "name", "kind", "detail", "type", "span", "origin", "documentation", "scope", "available_from"],
       "properties": {
         "id": {"$ref": "#/$defs/handle"}, "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"},
         "kind": {"enum": ["function", "parameter", "variable", "constant"]},
         "detail": {"type": "string", "minLength": 1}, "span": {"$ref": "#/$defs/span"},
         "type": {"$ref": "#/$defs/type"},
         "documentation": {"type": ["string", "null"]},
+        "scope": {"$ref": "#/$defs/scope_handle"}, "available_from": {"type": "integer", "minimum": 0},
         "origin": {
           "type": "object", "additionalProperties": false, "required": ["kind", "span"],
           "properties": {"kind": {"const": "authored"}, "span": {"$ref": "#/$defs/span"}}
@@ -95,9 +108,10 @@
       }]
     },
     "occurrence": {
-      "type": "object", "additionalProperties": false, "required": ["symbol", "span", "declaration"],
+      "type": "object", "additionalProperties": false, "required": ["symbol", "span", "declaration", "scope"],
       "properties": {
-        "symbol": {"$ref": "#/$defs/handle"}, "span": {"$ref": "#/$defs/span"}, "declaration": {"type": "boolean"}
+        "symbol": {"$ref": "#/$defs/handle"}, "span": {"$ref": "#/$defs/span"}, "declaration": {"type": "boolean"},
+        "scope": {"$ref": "#/$defs/scope_handle"}
       }
     },
     "expression": {
@@ -120,7 +134,7 @@
   "type": "object",
   "required": ["schema", "scope", "snapshot", "binding", "status", "complete", "reason"],
   "properties": {
-    "schema": {"const": 5}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
+    "schema": {"const": 6}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
     "status": {"enum": ["checked", "unavailable", "timed-out", "partial", "unsupported", "refused"]},
     "complete": {"type": "boolean"}, "reason": {"type": ["string", "null"]}
   },
@@ -133,7 +147,7 @@
     {
       "oneOf": [
         {
-          "required": ["source", "symbols", "occurrences", "concrete", "syntax", "expressions", "supported_views", "unsupported_views"],
+          "required": ["source", "symbols", "occurrences", "concrete", "syntax", "expressions", "scopes", "supported_views", "unsupported_views"],
           "properties": {
             "scope": {"const": "vela-pure-inspection"}, "source": {"type": "string"},
             "symbols": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/symbol"}},
@@ -141,19 +155,20 @@
             "concrete": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/concrete"}},
             "syntax": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/syntax"}},
             "expressions": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/expression"}},
-            "supported_views": {"const": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree", "pure-typed-expressions"]},
+            "scopes": {"type": "array", "maxItems": 2048, "items": {"$ref": "#/$defs/lexical_scope"}},
+            "supported_views": {"const": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree", "pure-typed-expressions", "pure-lexical-scopes"]},
             "unsupported_views": {"const": ["imports", "generated-origins", "proof", "lowering"]}
           },
           "allOf": [{
             "if": {"properties": {"status": {"not": {"const": "checked"}}}},
-            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}, "concrete": {"maxItems": 0}, "syntax": {"maxItems": 0}, "expressions": {"maxItems": 0}}}
+            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}, "concrete": {"maxItems": 0}, "syntax": {"maxItems": 0}, "expressions": {"maxItems": 0}, "scopes": {"maxItems": 0}}}
           }]
         },
         {
           "required": ["items", "total"],
           "properties": {
             "scope": {"const": "vela-pure-inspection-query"}, "total": {"type": "integer", "minimum": 0},
-            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}, {"$ref": "#/$defs/concrete"}, {"$ref": "#/$defs/syntax"}, {"$ref": "#/$defs/expression"}]}}
+            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}, {"$ref": "#/$defs/concrete"}, {"$ref": "#/$defs/syntax"}, {"$ref": "#/$defs/expression"}, {"$ref": "#/$defs/lexical_scope"}]}}
           }
         }
       ]

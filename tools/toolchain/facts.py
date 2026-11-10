@@ -10,6 +10,7 @@ from toolchain.documentation import DocumentationSource
 MAX_SYMBOLS = 1024
 MAX_OCCURRENCES = 4096
 MAX_EXPRESSIONS = 8192
+MAX_SCOPES = 2048
 type SymbolKind = Literal["function", "parameter", "variable", "constant"]
 
 
@@ -55,8 +56,28 @@ class Facts:
         self.occurrences: list[_Occurrence] = []
         self.expression_types: dict[tuple[Site, str], ValueType] = {}
         self.collect_expression_types = expression_types
+        self.scopes: list[tuple[str, Site, int | None]] = []
+        self.current_scope: int | None = None
+        self.symbol_scopes: list[int] = []
+        self.occurrence_scopes: list[int] = []
         self.documentation = None if source is None else DocumentationSource(source)
         self.declaration_sites = {} if declaration_sites is None else dict(declaration_sites)
+
+    def enter_scope(self, kind: str, site: Site) -> None:
+        """Record the resolver's lexical environment boundaries for full snapshots."""
+        if not self.collect_expression_types:
+            return
+        if len(self.scopes) >= MAX_SCOPES:
+            raise VelaError("inspection-limit", site.line, site.column,
+                            "pure inspection exceeds scope limit")
+        self.scopes.append((kind, site, self.current_scope))
+        self.current_scope = len(self.scopes) - 1
+
+    def leave_scope(self) -> None:
+        if self.collect_expression_types:
+            if self.current_scope is None:
+                raise ValueError("pure inspection scope stack is empty")
+            self.current_scope = self.scopes[self.current_scope][2]
 
     def declare(self, name: Name, kind: SymbolKind, detail: str, value_type: PureType, *,
                 inferred: bool | None = None) -> int:
@@ -67,6 +88,10 @@ class Facts:
         if inferred is not None and (inferred is not False or kind != "variable"):
             raise ValueError("only an explicitly annotated variable carries an inference flag")
         self.symbols.append(_Symbol(name, kind, detail, value_type, inferred))
+        if self.collect_expression_types:
+            if self.current_scope is None:
+                raise ValueError("pure inspection declaration has no scope")
+            self.symbol_scopes.append(self.current_scope)
         self.reference(identity, name.site, declaration=True)
         return identity
 
@@ -75,6 +100,10 @@ class Facts:
             raise VelaError("inspection-limit", site.line, site.column,
                             "pure inspection exceeds occurrence limit")
         self.occurrences.append(_Occurrence(identity, site, declaration))
+        if self.collect_expression_types:
+            if self.current_scope is None:
+                raise ValueError("pure inspection occurrence has no scope")
+            self.occurrence_scopes.append(self.current_scope)
 
     def expression(self, kind: str, site: Site, value_type: ValueType) -> None:
         """Retain the checker's expression decision without inferring another type."""
@@ -115,6 +144,12 @@ class Facts:
                                      key=lambda item: (item.site.line, item.site.column))]
         result: dict[str, object] = {"status": "ok", "symbols": symbols, "occurrences": occurrences}
         if expression_types:
+            result["scopes"] = {
+                "scopes": [{"kind": kind, "line": site.line, "column": site.column, "parent": parent}
+                           for kind, site, parent in self.scopes],
+                "symbols": [self.symbol_scopes[old] for old, _ in ordered],
+                "occurrences": [self.occurrence_scopes[index] for index, _ in sorted(
+                    enumerate(self.occurrences), key=lambda item: (item[1].site.line, item[1].site.column))]}
             result["expressions"] = [
                 {"kind": kind, "line": site.line, "column": site.column,
                  "type": {"kind": "scalar", "name": value_type}}

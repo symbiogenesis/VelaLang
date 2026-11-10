@@ -192,6 +192,8 @@ class _Elaborator:
                                  PureType(function.result, tuple(
                                      (value_type, parameter.text in function.const_parameters)
                                      for parameter, value_type in function.parameters), function.is_const))
+        if self.facts is not None:
+            self.facts.enter_scope("function", name.site)
         environment: dict[str, _Local] = {}
         parameter_facts: list[tuple[syntax.Name, ValueType, int | None]] = []
         for parameter, value_type in function.parameters:
@@ -204,6 +206,8 @@ class _Elaborator:
             environment[parameter.text] = _Local(value_type, symbol, required_static=required_static)
             parameter_facts.append((parameter, value_type, symbol))
         body = self._block(function.body, environment, 1)
+        if self.facts is not None:
+            self.facts.leave_scope()
         if body.value_type != function.result:
             raise _error("type", f"function '{name.text}' returns {body.value_type}, "
                          f"expected {function.result}", function.body.site)
@@ -346,6 +350,15 @@ class _Elaborator:
         return self._evaluate_block(terminal.yes if condition.value else terminal.no, extended, depth + 1)
 
     def _block(self, block: syntax.Block, environment: dict[str, _Local], nesting: int) -> _Expression:
+        if self.facts is not None:
+            self.facts.enter_scope("block", block.site)
+        try:
+            return self._scoped_block(block, environment, nesting)
+        finally:
+            if self.facts is not None:
+                self.facts.leave_scope()
+
+    def _scoped_block(self, block: syntax.Block, environment: dict[str, _Local], nesting: int) -> _Expression:
         if nesting + len(block.bindings) > MAX_BLOCK_DEPTH:
             raise _error("limit", f"block or binding nesting exceeds {MAX_BLOCK_DEPTH}", block.site)
         extended = dict(environment)
@@ -672,6 +685,7 @@ def inspect_source(source: bytes, *, syntax_tree: bool = False) -> dict[str, obj
     declaration_sites = {declaration.name.site: declaration.site
                          for declaration in module.declarations}
     facts = Facts(source, declaration_sites, expression_types=syntax_tree)
+    facts.enter_scope("module", module.name.site)
     _translate(source, module, facts)
     result = facts.result(expression_types=syntax_tree)
     if response is not None:

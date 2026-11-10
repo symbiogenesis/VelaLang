@@ -25,7 +25,7 @@ SOURCE = ("module Inspect;\r\n// supplementary: 😀\r\n"
 
 
 def _request(snapshot: inspection.Snapshot, operation: str, **fields: object) -> dict[str, object]:
-    return {"schema": 5, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
+    return {"schema": 6, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
 
 
 def _symbols(value: dict[str, object]) -> list[dict[str, object]]:
@@ -286,7 +286,7 @@ def _unavailable_status_and_schema() -> None:
 
 def _export_bound() -> None:
     full = inspection.inspect(SOURCE).export()
-    empty = {**full, "symbols": [], "occurrences": [], "concrete": [], "syntax": [], "expressions": [],
+    empty = {**full, "symbols": [], "occurrences": [], "concrete": [], "syntax": [], "expressions": [], "scopes": [],
              "status": "unavailable", "complete": False,
              "reason": "export-limit"}
     bound = len(json.dumps(empty, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()) + 1
@@ -310,7 +310,7 @@ def _cli_source_preservation() -> None:
         value = json.loads(output.getvalue())
         validate(inspection.SCHEMA_PATH, value)
         query = Path(directory) / "query.json"
-        query.write_text(json.dumps({"schema": 5, "snapshot": value["snapshot"], "operation": "symbols"}),
+        query.write_text(json.dumps({"schema": 6, "snapshot": value["snapshot"], "operation": "symbols"}),
                          encoding="utf-8")
         with redirect_stdout(output := StringIO()), redirect_stderr(errors := StringIO()):
             code = cli.main(["inspect", str(path), "--query", str(query)])

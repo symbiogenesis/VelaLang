@@ -18,7 +18,7 @@ SOURCE = ("// \U0001f600\r\nmodule Typed;\r\npublic const bool Ready = true;\r\n
 
 
 def _request(snapshot: inspection.Snapshot, operation: str, **fields: object) -> dict[str, object]:
-    return {"schema": 5, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
+    return {"schema": 6, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
 
 
 def _expressions(value: dict[str, object]) -> list[dict[str, object]]:
