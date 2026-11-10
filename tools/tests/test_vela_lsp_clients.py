@@ -251,7 +251,8 @@ def _synthetic_session(
             )
         )
 
-    send_req("initialize", {"capabilities": {"general": {"positionEncodings": ["utf-16"]}}})
+    send_req("initialize", {"capabilities": {"general": {"positionEncodings": ["utf-16"]},
+        "workspace": {"workspaceEdit": {"documentChanges": True}}}})
     send_notif("initialized")
     send_notif(
         "textDocument/didOpen",
@@ -297,6 +298,10 @@ def _synthetic_session(
             },
         )
     send_req("textDocument/semanticTokens/full", {"textDocument": {"uri": _URI}})
+    send_req("textDocument/prepareRename", {"textDocument": {"uri": _URI},
+        "position": {"line": 7, "character": 7}})
+    send_req("textDocument/rename", {"textDocument": {"uri": _URI},
+        "position": {"line": 7, "character": 7}, "newName": "rescaled"})
     send_req(
         "textDocument/formatting",
         {"textDocument": {"uri": _URI}, "options": {"tabSize": 4, "insertSpaces": True}},
@@ -734,7 +739,37 @@ def _live_two_client_qualification() -> None:
             observation["uri"]), require_token_deltas=True)
         lsp_clients.verify_wire_transcript(json.loads(transcript_raw),
             require_ranged_change=name != "vim_full_sync", require_token_deltas=True,
-            delta_observation=observation["delta"])
+            delta_observation=observation["delta"], require_local_rename=True,
+            rename_observation=observation["stage1"])
+
+
+def _rename_wire_evidence_controls() -> None:
+    _, observation, transcript = _synthetic_session(incremental=True)
+    prepared = cast("dict[str, object]", observation["stage1"])
+
+    def verify(value: dict[str, object]) -> dict[str, object]:
+        return lsp_clients.verify_wire_transcript(value, require_ranged_change=True,
+            require_local_rename=True, rename_observation=prepared)
+
+    ensure(verify(transcript)["local_rename_responses"] == 2,
+           "wire evidence omitted one local rename response")
+    for field, replacement in (("version", 2), ("version", True), ("edits", [])):
+        corrupted = copy.deepcopy(transcript)
+        for frame in cast("list[dict[str, object]]", corrupted["frames"]):
+            message = cast("dict[str, object]", frame["message"])
+            result = message.get("result")
+            if isinstance(result, dict) and "documentChanges" in result:
+                change = cast("list[dict[str, object]]", result["documentChanges"])[0]
+                if field == "version":
+                    cast("dict[str, object]", change["textDocument"])[field] = replacement
+                else:
+                    change[field] = replacement
+        _refuses(lambda c=corrupted: verify(c), "stale or incomplete local rename wire response")
+    changed_observation = copy.deepcopy(prepared)
+    changed_observation["rename_prepared"] = None
+    _refuses(lambda: lsp_clients.verify_wire_transcript(transcript, require_ranged_change=True,
+        require_local_rename=True, rename_observation=changed_observation),
+        "rename observation not joined to wire evidence")
 
 
 def cases() -> list[Case]:
@@ -745,5 +780,6 @@ def cases() -> list[Case]:
         Case("wire-transcript-replay-and-controls", _wire_transcript_replay_and_controls),
         Case("delta-consumer-controls", _delta_consumer_controls),
         Case("delta-wire-evidence-controls", _delta_wire_evidence_controls),
+        Case("rename-wire-evidence-controls", _rename_wire_evidence_controls),
         Case("live-two-client-qualification", _live_two_client_qualification, slow=True),
     ]

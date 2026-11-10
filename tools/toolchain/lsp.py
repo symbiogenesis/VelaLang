@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import BinaryIO, Never, cast
 
 from toolchain.lsp_format import Formatter, format_document, formatting_edits
+from toolchain.lsp_rename import prepare, rename, valid_name
 from toolchain.lsp_services import (
     METHODS,
     SEMANTIC_TOKEN_MODIFIERS,
@@ -39,6 +40,7 @@ WORKER_SECONDS = 5
 type Checker = Callable[[bytes], dict[str, object] | None]
 _SEMANTIC_DELTA = "textDocument/semanticTokens/full/delta"
 _SEMANTIC_FULL = "textDocument/semanticTokens/full"
+_RENAME_METHODS = {"textDocument/prepareRename", "textDocument/rename"}
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,10 @@ class _TokenHistory:
 
 def _invalid(message: str) -> Never:
     raise ValueError(message)
+
+
+def _modified() -> Never:
+    raise InspectionError("Source or producer changed before reply publication")
 
 
 def diagnose(source: bytes) -> dict[str, object] | None:
@@ -142,6 +148,7 @@ class Server:
         self._token_history: dict[str, _TokenHistory] = {}
         self._token_serial = 0
         self._token_deltas = False
+        self._versioned_edits = False
         self.generation = 0
         self.initialized = False
         self.ready = False
@@ -257,6 +264,7 @@ class Server:
         if uri in self.desynchronized:
             return _error(request_id, -32801, "Document is out of synchronization")
         snapshot = self.documents[uri]
+        inspector, generation = self.inspector, self._inspection_generation
         position: tuple[int, int] | None = None
         requested_range: QueryRange | None = None
         include_declaration = False
@@ -291,15 +299,29 @@ class Server:
             options = _object(params.get("options"))
             if _integer(options.get("tabSize")) <= 0 or type(options.get("insertSpaces")) is not bool:
                 _invalid("formatting requires positive tabSize and Boolean insertSpaces")
+        new_name = ""
+        if method in _RENAME_METHODS and not self._versioned_edits:
+            return _error(request_id, -32803, "Rename requires versioned documentChanges support")
+        if method == "textDocument/rename":
+            new_name = _string(params.get("newName"))
+            if not valid_name(new_name):
+                _invalid("newName must be a supported pure identifier")
         try:
             token_history = None
             if method == "textDocument/formatting":
                 result = formatting_edits(snapshot, self.formatter(snapshot.source))
             elif method in {_SEMANTIC_FULL, _SEMANTIC_DELTA}:
                 result, token_history = self._tokens(snapshot, previous_result, method == _SEMANTIC_DELTA)
+            elif method == "textDocument/prepareRename":
+                result = prepare(snapshot, self._inspection(snapshot), position)
+            elif method == "textDocument/rename":
+                result = rename(snapshot, self._inspection(snapshot), position, new_name, inspector)
             else:
                 result = project_inspection(snapshot, self._inspection(snapshot), method,
                                             position, include_declaration, requested_range)
+            if (self.documents.get(uri) is not snapshot or uri in self.desynchronized
+                    or self.inspector is not inspector or self._inspection_generation != generation):
+                _modified()
             reply: dict[str, object] = {"jsonrpc": "2.0", "id": request_id, "result": result}
             encode_message(reply)
         except (InspectionError, FrameError, OSError, subprocess.SubprocessError):
@@ -341,6 +363,11 @@ class Server:
                 if not isinstance(encodings, list) or not all(isinstance(e, str) for e in encodings):
                     _invalid("invalid positionEncodings")
                 text_capabilities = _object(capabilities.get("textDocument", {}))
+                workspace = _object(capabilities.get("workspace", {}))
+                workspace_edits = _object(workspace.get("workspaceEdit", {}))
+                versioned_edits = workspace_edits.get("documentChanges", False)
+                if type(versioned_edits) is not bool:
+                    _invalid("documentChanges capability must be a boolean")
                 semantic = _object(text_capabilities.get("semanticTokens", {}))
                 token_requests = _object(semantic.get("requests", {}))
                 full_tokens = token_requests.get("full", False)
@@ -364,12 +391,16 @@ class Server:
                         "textDocumentSync": {
                         "openClose": True, "change": 2, "save": {"includeText": False}}},
                     "serverInfo": {"name": "Vela pure prototype (unqualified)", "version": "0"}}}
+                if versioned_edits:
+                    _object(_object(reply.get("result")).get("capabilities"))["renameProvider"] = {
+                        "prepareProvider": True}
                 try:
                     encode_message(reply)
                 except (FrameError, UnicodeError):
                     return [_error(request_id, -32803, "Initialization reply exceeds bounds")]
                 self.initialized = True
                 self._token_deltas = token_deltas
+                self._versioned_edits = versioned_edits
                 return [reply]
             if method == "shutdown" and request:
                 self.invalidate_inspections()
@@ -379,7 +410,7 @@ class Server:
                 self.received_versions.clear()
                 return [{"jsonrpc": "2.0", "id": request_id, "result": None}]
             if request:
-                if method in METHODS or method in {"textDocument/formatting", _SEMANTIC_DELTA}:
+                if method in METHODS or method in {"textDocument/formatting", _SEMANTIC_DELTA} | _RENAME_METHODS:
                     return [self._navigation(request_id, method, params)]
                 return [_error(request_id, -32601, "Method not found")]
             if method == "initialized":

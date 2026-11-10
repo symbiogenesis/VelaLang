@@ -279,6 +279,9 @@ local client_id = vim.lsp.start({
   name = "vela-lsp",
   cmd = { python_exe, run_py, "vela-lsp", "--transcript", transcript_path },
   root_dir = vim.fn.fnamemodify(target_path, ":h"),
+  capabilities = vim.tbl_deep_extend("force", vim.lsp.protocol.make_client_capabilities(), {
+    workspace = { workspaceEdit = { documentChanges = true } },
+  }),
 }, { bufnr = bufnr })
 
 if not client_id then
@@ -359,6 +362,10 @@ local stage1 = {
   inlay_hints_full = sync_request("textDocument/inlayHint", range_params(0, 0, 17, 0)),
   inlay_hints_subrange = sync_request("textDocument/inlayHint", range_params(7, 0, 8, 0)),
   semantic_tokens_initial = sync_request("textDocument/semanticTokens/full", { textDocument = { uri = uri } }),
+  rename_prepared = sync_request("textDocument/prepareRename", pos_params(7, 7)),
+  rename_preview = sync_request("textDocument/rename", {
+    textDocument = { uri = uri }, position = { line = 7, character = 7 }, newName = "rescaled",
+  }),
 }
 
 local fmt_edits = sync_request("textDocument/formatting", {
@@ -519,6 +526,7 @@ local out = {
   version = string.format("%d.%d.%d", vim.version().major, vim.version().minor, vim.version().patch),
   uri = uri,
   offset_encoding = client.offset_encoding,
+  versioned_rename = true,
   server_info = client.server_info,
   server_capabilities = client.server_capabilities,
   stage1 = stage1,
@@ -588,6 +596,12 @@ def RpcResult(lserver: dict<any>, method: string, params: dict<any>): any
     Fail(method .. ' returned error: ' .. json_encode(reply.error))
   endif
   return reply->get('result', v:null)
+enddef
+
+def RpcRefusal(lserver: dict<any>, method: string, params: dict<any>): dict<any>
+  # The pinned plugin discards error envelopes in its synchronous RPC wrapper.
+  var reply = lserver.job->ch_evalexpr({method: method, params: params}, {timeout: 10000})
+  return reply->get('error', {})
 enddef
 
 def RunQualification()
@@ -695,6 +709,10 @@ def RunQualification()
     inlay_hints_full: RpcResult(lserver, 'textDocument/inlayHint', RangeParams(0, 0, 17, 0)),
     inlay_hints_subrange: RpcResult(lserver, 'textDocument/inlayHint', RangeParams(7, 0, 8, 0)),
     semantic_tokens_initial: RpcResult(lserver, 'textDocument/semanticTokens/full', {textDocument: {uri: uri}}),
+    rename_prepared: RpcRefusal(lserver, 'textDocument/prepareRename', PosParams(7, 7)),
+    rename_preview: RpcRefusal(lserver, 'textDocument/rename', {
+      textDocument: {uri: uri}, position: {line: 7, character: 7}, newName: 'rescaled',
+    }),
   }
 
   # Stage 2: Query formatting edits, then run :LspFormat to apply them in the Vim buffer
@@ -805,6 +823,7 @@ def RunQualification()
     incremental_sync: inc_sync,
     uri: uri,
     offset_encoding: offset_enc,
+    versioned_rename: false,
     server_info: srv_info,
     server_capabilities: raw_caps,
     stage1: stage1,
@@ -1170,6 +1189,7 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
             "documentSymbolProvider": True,
             "inlayHintProvider": True,
             "documentFormattingProvider": True,
+            "renameProvider": {"prepareProvider": True},
             "semanticTokensProvider": {
                 "legend": {
                     "tokenTypes": list(SEMANTIC_TOKEN_TYPES),
@@ -1206,6 +1226,13 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
             "semantic_tokens_initial": project(
                 snap1, facts1, "textDocument/semanticTokens/full", None, False
             ),
+            "rename_prepared": {"range": {"start": {"line": 7, "character": 6},
+                                           "end": {"line": 7, "character": 12}}, "placeholder": "scaled"},
+            "rename_preview": {"documentChanges": [{"textDocument": {"uri": uri, "version": 1},
+                "edits": [{"range": {"start": {"line": 7, "character": 6},
+                                     "end": {"line": 7, "character": 12}}, "newText": "rescaled"},
+                          {"range": {"start": {"line": 8, "character": 21},
+                                     "end": {"line": 8, "character": 27}}, "newText": "rescaled"}]}]},
         },
         "stage2": {
             "formatting_edits_initial": formatting_edits(snap1, fmt1),
@@ -1265,6 +1292,16 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
 
 
 def _token_observation(key: str, value: object) -> object:
+    if key == "rename_preview":
+        result = _object(value)
+        changes = _array(result.get("documentChanges"))
+        _require(len(changes) == 1, "rename preview must edit exactly one document")
+        document = _object(_object(changes[0]).get("textDocument"))
+        version = document.get("version")
+        _require(type(version) is int and -(2 ** 31) <= version < 2 ** 31,
+                 "rename preview omits its document version")
+        return {"documentChanges": [{**_object(changes[0]),
+            "textDocument": {**document, "version": 1}}]}
     if "semantic_tokens" not in key or not isinstance(value, dict) or "resultId" not in value:
         return value
     identity = value["resultId"]
@@ -1355,11 +1392,16 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     """Verify a client's recorded scenario observations against the independent oracle."""
     label = str(observation.get("client", "unknown"))
     _require(observation.get("offset_encoding") == "utf-16", f"{label}: offset_encoding is not utf-16")
+    versioned_rename = observation.get("versioned_rename", True)
+    _require(type(versioned_rename) is bool, "client rename capability observation is malformed")
+    expected_caps = dict(_object(oracle["capabilities"]))
+    if not versioned_rename:
+        expected_caps.pop("renameProvider")
     _require(
-        observation.get("server_capabilities") == oracle["capabilities"],
+        observation.get("server_capabilities") == expected_caps,
         f"{label}: negotiated server_capabilities differ from oracle",
     )
-    for provider in ("completionProvider", "renameProvider"):
+    for provider in ("completionProvider",):
         _require(
             provider not in _object(observation.get("server_capabilities")),
             f"{label}: unimplemented {provider} advertised",
@@ -1369,6 +1411,11 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     oracle1 = _object(oracle["stage1"])
     _require(stage1.get("diagnostics") == [], f"{label}: stage1 initial diagnostics not empty")
     for key, expected in oracle1.items():
+        if key in {"rename_prepared", "rename_preview"} and not versioned_rename:
+            _require(stage1.get(key) == {"code": -32803,
+                "message": "Rename requires versioned documentChanges support"},
+                f"{label}: unversioned client returned an unexpected rename reply: {stage1.get(key)!r}")
+            continue
         _require(_token_observation(key, stage1.get(key)) == expected, f"{label}: stage1.{key} mismatch")
     if "goto_definition_cursor_1based" in stage1:
         _require(
@@ -1431,6 +1478,8 @@ def verify_wire_transcript(
     require_ranged_change: bool,
     require_token_deltas: bool = False,
     delta_observation: object = None,
+    require_local_rename: bool = False,
+    rename_observation: object = None,
 ) -> dict[str, object]:
     """Verify a server-recorded bidirectional JSON-RPC wire transcript."""
     _require(
@@ -1457,6 +1506,11 @@ def verify_wire_transcript(
     crlf_delta_edit = False
     delta_negotiated = False
     sources: dict[str, str] = {}
+    versions: dict[str, int] = {}
+    rename_requests: dict[object, dict[str, object]] = {}
+    rename_sources: dict[object, tuple[str, int]] = {}
+    rename_responses: dict[str, object] = {}
+    versioned_rename = False
     observed = {} if delta_observation is None else _object(delta_observation)
     if observed:
         _require(set(observed) == {"base", "changed", "unchanged", "unknown", "invalidated"},
@@ -1482,15 +1536,24 @@ def verify_wire_transcript(
                     token_requests[req_id] = _object(message.get("params"))
                     uri = str(_object(token_requests[req_id].get("textDocument")).get("uri"))
                     token_request_sources[req_id] = sources.get(uri)
+                if require_local_rename and method in {"textDocument/prepareRename", "textDocument/rename"}:
+                    params = _object(message.get("params"))
+                    uri = str(_object(params.get("textDocument")).get("uri"))
+                    _require(uri in sources and uri in versions, "rename request has no current open source")
+                    rename_requests[req_id] = params
+                    rename_sources[req_id] = (sources[uri], versions[uri])
             if method == "initialize":
                 caps = _object(_object(message.get("params")).get("capabilities"))
                 document = _object(caps.get("textDocument", {}))
                 semantic = _object(document.get("semanticTokens", {}))
                 full = _object(semantic.get("requests", {})).get("full")
                 delta_negotiated = isinstance(full, dict) and full.get("delta") is True
+                workspace = _object(caps.get("workspace", {}))
+                versioned_rename = _object(workspace.get("workspaceEdit", {})).get("documentChanges") is True
             if method == "textDocument/didOpen":
                 document = _object(_object(message.get("params")).get("textDocument"))
                 sources[str(document.get("uri"))] = str(document.get("text"))
+                versions[str(document.get("uri"))] = cast("int", document.get("version"))
             if method in {"workspace/didChangeConfiguration", "workspace/didChangeWatchedFiles"}:
                 latest_token_ids.clear()
             if method in {"textDocument/didSave", "textDocument/didClose"}:
@@ -1500,9 +1563,10 @@ def verify_wire_transcript(
                 params = _object(message.get("params"))
                 changes = _array(params.get("contentChanges"))
                 uri = str(_object(params.get("textDocument")).get("uri"))
+                versions[uri] = cast("int", _object(params.get("textDocument")).get("version"))
                 for raw_change in changes:
                     change = _object(raw_change)
-                    if require_token_deltas:
+                    if require_token_deltas or require_local_rename:
                         _require(uri in sources, "wire edit has no open source")
                         sources[uri] = _wire_source_edit(sources[uri], change)
                         crlf_delta_edit |= sources[uri] == DELTA_SOURCE
@@ -1535,8 +1599,45 @@ def verify_wire_transcript(
                 _require("id" in message, f"server response frame[{expected_index}] missing id")
                 req_id = message["id"]
                 _require(req_id in request_by_id, f"uncorrelated server response id {req_id!r}")
+                if req_id in rename_requests and not versioned_rename:
+                    _require(message.get("error") == {"code": -32803,
+                        "message": "Rename requires versioned documentChanges support"},
+                        "unversioned client did not receive the required rename refusal")
+                    key = "rename_prepared" if request_by_id[req_id].endswith("prepareRename") else "rename_preview"
+                    rename_responses[key] = message["error"]
+                    correlated_responses += 1
+                    continue
                 _require("error" not in message, f"unexpected error reply on wire: {message!r}")
                 correlated_responses += 1
+                if req_id in rename_requests:
+                    params = rename_requests[req_id]
+                    uri = str(_object(params.get("textDocument")).get("uri"))
+                    source, version = rename_sources[req_id]
+                    _require(source == INITIAL_SOURCE and params.get("position") == {"line": 7, "character": 7},
+                             "rename probe used an unexpected source or selected symbol")
+                    response = _object(message.get("result"))
+                    if request_by_id[req_id] == "textDocument/prepareRename":
+                        _require(response == {"range": {"start": {"line": 7, "character": 6},
+                            "end": {"line": 7, "character": 12}}, "placeholder": "scaled"},
+                                 "wire prepareRename differs from the expected local identifier")
+                        rename_responses["rename_prepared"] = response
+                    else:
+                        _require(params.get("newName") == "rescaled", "wire rename used an unexpected new name")
+                        changes = _array(response.get("documentChanges"))
+                        _require(len(changes) == 1, "wire rename edited an unexpected document set")
+                        change = _object(changes[0])
+                        document = _object(change.get("textDocument"))
+                        _require(type(document.get("version")) is int
+                                 and document == {"uri": uri, "version": version},
+                                 "wire rename edit used a stale source version")
+                        renamed = source
+                        for raw_edit in reversed(_array(change.get("edits"))):
+                            edit = _object(raw_edit)
+                            renamed = _wire_source_edit(renamed, {"range": edit.get("range"),
+                                                                 "text": edit.get("newText")})
+                        _require(renamed == INITIAL_SOURCE.replace("scaled", "rescaled"),
+                                 "wire rename preview changed unrelated bytes or missed a reference")
+                        rename_responses["rename_preview"] = response
                 if req_id in token_requests and require_token_deltas:
                     params = token_requests[req_id]
                     response = _object(message.get("result"))
@@ -1639,6 +1740,13 @@ def verify_wire_transcript(
         _require(delta_responses >= 2 and full_fallbacks >= 2 and empty_deltas >= 1,
                  "wire session omitted changed/unchanged deltas or full fallbacks")
         _require(observed_on_wire == set(observed), "observed token responses are absent from wire evidence")
+    if require_local_rename:
+        _require(set(rename_responses) == {"rename_prepared", "rename_preview"},
+                 "wire session omitted local rename preparation or preview")
+        if rename_observation is not None:
+            observation = _object(rename_observation)
+            _require(all(observation.get(key) == value for key, value in rename_responses.items()),
+                     "observed rename responses differ from wire evidence")
     return {
         "frame_count": len(frames),
         "client_frame_count": len(client_methods),
@@ -1651,6 +1759,8 @@ def verify_wire_transcript(
         "semantic_full_fallbacks": full_fallbacks,
         "semantic_empty_deltas": empty_deltas,
         "unsaved_unicode_crlf_delta_edit": crlf_delta_edit,
+        "local_rename_responses": len(rename_responses),
+        "versioned_local_rename": versioned_rename,
     }
 
 
@@ -1671,7 +1781,8 @@ def _verify_editor_session_artifacts(
     oracle = expected_scenario_oracle(str(observation.get("uri", "")))
     verify_client_observation(observation, oracle, require_token_deltas=True)
     summary = verify_wire_transcript(transcript, require_ranged_change=require_ranged_change,
-                                     require_token_deltas=True, delta_observation=observation["delta"])
+                                     require_token_deltas=True, delta_observation=observation["delta"],
+                                     require_local_rename=True, rename_observation=observation["stage1"])
     return (_sha256(observation_raw), _sha256(transcript_raw), summary,
             observation_raw.decode("utf-8"), transcript_raw.decode("utf-8"))
 
