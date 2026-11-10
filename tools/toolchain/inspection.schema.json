@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vela pure development inspection version 4",
+  "title": "Vela pure development inspection version 5",
   "$defs": {
     "concrete": {
       "type": "object", "additionalProperties": false, "required": ["kind", "text", "span"],
@@ -100,6 +100,16 @@
         "symbol": {"$ref": "#/$defs/handle"}, "span": {"$ref": "#/$defs/span"}, "declaration": {"type": "boolean"}
       }
     },
+    "expression": {
+      "type": "object", "additionalProperties": false, "required": ["node", "span", "type"],
+      "properties": {
+        "node": {"$ref": "#/$defs/node_handle"}, "span": {"$ref": "#/$defs/span"},
+        "type": {
+          "type": "object", "additionalProperties": false, "required": ["kind", "name"],
+          "properties": {"kind": {"const": "scalar"}, "name": {"enum": ["Nat", "bool"]}}
+        }
+      }
+    },
     "type_at": {
       "type": "object", "additionalProperties": false, "required": ["symbol", "span", "type"],
       "properties": {
@@ -110,7 +120,7 @@
   "type": "object",
   "required": ["schema", "scope", "snapshot", "binding", "status", "complete", "reason"],
   "properties": {
-    "schema": {"const": 4}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
+    "schema": {"const": 5}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
     "status": {"enum": ["checked", "unavailable", "timed-out", "partial", "unsupported", "refused"]},
     "complete": {"type": "boolean"}, "reason": {"type": ["string", "null"]}
   },
@@ -123,26 +133,27 @@
     {
       "oneOf": [
         {
-          "required": ["source", "symbols", "occurrences", "concrete", "syntax", "supported_views", "unsupported_views"],
+          "required": ["source", "symbols", "occurrences", "concrete", "syntax", "expressions", "supported_views", "unsupported_views"],
           "properties": {
             "scope": {"const": "vela-pure-inspection"}, "source": {"type": "string"},
             "symbols": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/symbol"}},
             "occurrences": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/occurrence"}},
             "concrete": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/concrete"}},
             "syntax": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/syntax"}},
-            "supported_views": {"const": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree"]},
-            "unsupported_views": {"const": ["typed-expression-tree", "imports", "generated-origins", "proof", "lowering"]}
+            "expressions": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/expression"}},
+            "supported_views": {"const": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree", "pure-typed-expressions"]},
+            "unsupported_views": {"const": ["imports", "generated-origins", "proof", "lowering"]}
           },
           "allOf": [{
             "if": {"properties": {"status": {"not": {"const": "checked"}}}},
-            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}, "concrete": {"maxItems": 0}, "syntax": {"maxItems": 0}}}
+            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}, "concrete": {"maxItems": 0}, "syntax": {"maxItems": 0}, "expressions": {"maxItems": 0}}}
           }]
         },
         {
           "required": ["items", "total"],
           "properties": {
             "scope": {"const": "vela-pure-inspection-query"}, "total": {"type": "integer", "minimum": 0},
-            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}, {"$ref": "#/$defs/concrete"}, {"$ref": "#/$defs/syntax"}]}}
+            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}, {"$ref": "#/$defs/concrete"}, {"$ref": "#/$defs/syntax"}, {"$ref": "#/$defs/expression"}]}}
           }
         }
       ]

@@ -9,6 +9,7 @@ from toolchain.documentation import DocumentationSource
 
 MAX_SYMBOLS = 1024
 MAX_OCCURRENCES = 4096
+MAX_EXPRESSIONS = 8192
 type SymbolKind = Literal["function", "parameter", "variable", "constant"]
 
 
@@ -48,9 +49,12 @@ class Facts:
     """Collect decisions, without performing name resolution or semantic checks."""
 
     def __init__(self, source: bytes | None = None,
-                 declaration_sites: dict[Site, Site] | None = None) -> None:
+                 declaration_sites: dict[Site, Site] | None = None, *,
+                 expression_types: bool = False) -> None:
         self.symbols: list[_Symbol] = []
         self.occurrences: list[_Occurrence] = []
+        self.expression_types: dict[tuple[Site, str], ValueType] = {}
+        self.collect_expression_types = expression_types
         self.documentation = None if source is None else DocumentationSource(source)
         self.declaration_sites = {} if declaration_sites is None else dict(declaration_sites)
 
@@ -72,7 +76,19 @@ class Facts:
                             "pure inspection exceeds occurrence limit")
         self.occurrences.append(_Occurrence(identity, site, declaration))
 
-    def result(self) -> dict[str, object]:
+    def expression(self, kind: str, site: Site, value_type: ValueType) -> None:
+        """Retain the checker's expression decision without inferring another type."""
+        if not self.collect_expression_types:
+            return
+        key = site, kind
+        if key not in self.expression_types and len(self.expression_types) >= MAX_EXPRESSIONS:
+            raise VelaError("inspection-limit", site.line, site.column,
+                            "pure inspection exceeds expression limit")
+        previous = self.expression_types.setdefault(key, value_type)
+        if previous != value_type:
+            raise ValueError("pure inspection expression has inconsistent checked types")
+
+    def result(self, *, expression_types: bool = False) -> dict[str, object]:
         ordered = sorted(enumerate(self.symbols),
                          key=lambda item: (item[1].name.site.line, item[1].name.site.column))
         identities = {old: new for new, (old, _) in enumerate(ordered)}
@@ -97,4 +113,11 @@ class Facts:
              "column": occurrence.site.column, "declaration": occurrence.declaration}
             for occurrence in sorted(self.occurrences,
                                      key=lambda item: (item.site.line, item.site.column))]
-        return {"status": "ok", "symbols": symbols, "occurrences": occurrences}
+        result: dict[str, object] = {"status": "ok", "symbols": symbols, "occurrences": occurrences}
+        if expression_types:
+            result["expressions"] = [
+                {"kind": kind, "line": site.line, "column": site.column,
+                 "type": {"kind": "scalar", "name": value_type}}
+                for (site, kind), value_type in sorted(self.expression_types.items(),
+                    key=lambda item: (item[0][0].line, item[0][0].column, item[0][1]))]
+        return result
