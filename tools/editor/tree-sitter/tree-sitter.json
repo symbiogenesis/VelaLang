@@ -1,0 +1,19 @@
+{
+  "grammars": [
+    {
+      "name": "vela",
+      "camelcase": "Vela",
+      "scope": "source.vela",
+      "path": ".",
+      "file-types": ["vela"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "Apache-2.0",
+    "description": "Vela syntax highlighting from the canonical Menhir grammar",
+    "authors": [{"name": "Edward Miller"}],
+    "links": {"repository": "https://github.com/symbiogenesis/VelaLang"}
+  }
+}

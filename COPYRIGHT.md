@@ -26,7 +26,8 @@ Every original file whose format admits comments opens with an SPDX header in th
 Opening mark syntax by file kind:
 
 - `# ...`: Python (`.py`), TOML (`.toml`), YAML (`.yml`, `.yaml`), and root config files (`.editorconfig`, `.gitattributes`, `.gitignore`)
-- `/* ... */`: Menhir grammars (`.mly`), CSS stylesheets (`.css`), and Vela sources (`.vela`, which also admit `// ...`)
+- `/* ... */`: Menhir grammars (`.mly`), C scanners (`.c`), CSS stylesheets (`.css`), and Vela sources (`.vela`, which also admit `// ...`)
+- `; ...`: Tree-sitter highlighting queries (`.scm`)
 - `(* ... *)`: OCaml sources (`.ml`, `.mli`), ocamllex definitions (`.mll`), and Rocq sources (`.v`)
 - `// ...`: JavaScript modules (`.mjs`, `.js`)
 - `<!-- ... -->`: HTML documents (`.html`)

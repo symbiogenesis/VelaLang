@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "positive_recovery": {
+    "structural-local-and-lambda-annotations": "Grouped and tuple type annotations use canonical lexer lookahead that the editor GLR parser approximates; highlighting may recover this fixture."
+  },
+  "negative_parse_groups": [
+    {
+      "reason": "Tree-sitter's contextual keyword lexer can recover reserved words as names in positions where the compiler's lexer refuses them.",
+      "cases": ["by-remains-reserved", "domain-role-remains-reserved", "domain-role-remains-reserved-value", "lifts-remains-reserved", "open-is-reserved", "handle-keyword-parameter-refused"]
+    },
+    {
+      "reason": "Compiler declaration actions enforce modifier ordering, multiplicity and applicability, constant initialization and proof-signature restrictions; highlighting retains their token structure.",
+      "cases": ["repeated-const-function", "const-non-callable-declaration", "constant-missing-initializer", "property-async-modifier", "property-const-modifier", "legacy-proof-signature-refused"]
+    },
+    {
+      "reason": "Compiler pattern actions enforce constructor capitalization, qualification, nullary spelling and complete binding shape; highlighting retains the enclosing expression or pattern structure.",
+      "cases": ["nullary-constructor-pattern-parentheses", "qualified-nullary-constructor-pattern-parentheses", "lowercase-constructor-pattern", "qualified-lowercase-pattern", "expression-binding-incomplete-pattern", "local-constructor-incomplete-argument", "local-nullary-constructor-pattern-parentheses", "local-qualified-nullary-constructor-pattern-parentheses", "local-lowercase-constructor-pattern", "incomplete-product-binding"]
+    },
+    {
+      "reason": "The compiler's lexical admission rules refuse null and null-conditional spellings; the editor can recover them as identifiers, propagation and member punctuation.",
+      "cases": ["null-literal", "null-binder", "null-conditional"]
+    },
+    {
+      "reason": "Canonical annotation lookahead rejects type-shaped bare locals; the editor's GLR alternatives can retain an expression-shaped recovery.",
+      "cases": ["bare-scalar-local", "bare-generic-local", "bare-structural-local"]
+    },
+    {
+      "reason": "The editor raw-string scanner recognizes exact quote delimiters; opening/closing-line layout and content indentation remain compiler lexical checks.",
+      "cases": ["raw-string-opening-line-text", "raw-string-closing-not-own-line", "raw-string-underindented-content"]
+    },
+    {
+      "reason": "Interpolation highlighting preserves strings and balanced holes while nonempty expressions and format specifiers remain compiler lexical checks.",
+      "cases": ["interpolated-empty-hole", "interpolated-whitespace-hole", "interpolated-empty-specifier", "interpolated-whitespace-specifier"]
+    }
+  ],
+  "outside_editor_envelope": "Invalid UTF-8 and compiler resource-limit fixtures retain their compiler refusals; they are not accepted as editor syntax or projected beyond the declared 65,536-byte source limit."
+}

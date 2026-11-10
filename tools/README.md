@@ -19,6 +19,7 @@
 | `python tools/run.py test` | host / guest | Run the `test_*.py` behavioral test suite |
 | `python tools/run.py vela` | host | Pure Vela prototype checker, formatter, linter, Gallina emitter, and generated-test runner |
 | `python tools/run.py vela-lsp` | host | Pure Vela Language Server Protocol server over stdio, wire-transcript recorder, and two-client interoperability qualifier |
+| `python tools/run.py vela-highlight` | host / guest | Check/regenerate syntax-only editor assets; qualify pinned Tree-sitter and TextMate consumers in the guest |
 | `python tools/run.py vela-playground` | guest (`[wsl]`) | Unified Vela browser playground with dependent mathematics |
 | `python tools/run.py vela-parser` | guest (`[wsl]`) | Menhir parser build/qualification, syntax campaigns, dependent elaboration, first-slice harness, and Rocq kernel replay |
 
@@ -67,4 +68,4 @@ Hosted execution remains user-managed under the
 
 ## Checked references in source comments
 
-Inline Markdown links in source comments and Python docstrings (`[label](target)` and `[label](target#fragment)`) are checked by `python tools/run.py check` across tracked `.py`, `.vela`, `.ml`, `.mli`, `.mll`, `.mly`, `.v`, `.mjs`, `.js`, `.css`, `.yml`, and `.yaml` files. Relative paths resolve from the containing source file's directory against the Git index, and `#fragment` anchors resolve against the target Markdown document's headings and `<a id="...">` bookmarks.
+Inline Markdown links in source comments and Python docstrings (`[label](target)` and `[label](target#fragment)`) are checked by `python tools/run.py check` across tracked `.py`, `.vela`, `.ml`, `.mli`, `.mll`, `.mly`, `.v`, `.c`, `.scm`, `.mjs`, `.js`, `.css`, `.yml`, and `.yaml` files. Relative paths resolve from the containing source file's directory against the Git index, and `#fragment` anchors resolve against the target Markdown document's headings and `<a id="...">` bookmarks.

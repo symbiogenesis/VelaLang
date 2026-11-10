@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "positive": [
+    {
+      "name": "nested-comments-unicode",
+      "source": "module Highlight;\n/* outer /* nested */ // remains block */\n/// documentation 🧭\npublic definition Nat Value<T>(Nat x) => x + 0x2_Au32;\n",
+      "scopes": [
+        {"text": "module", "scope": "keyword.control.vela"},
+        {"text": "nested", "scope": "comment.block.vela"},
+        {"text": "remains", "scope": "comment.block.vela"},
+        {"text": "🧭", "scope": "comment.line.double-slash.vela"},
+        {"text": "public", "scope": "keyword.control.vela"},
+        {"text": "Nat", "scope": "storage.type.vela"},
+        {"text": "0x2_Au32", "scope": "constant.numeric.vela"}
+      ]
+    },
+    {
+      "name": "strings-and-delimiters",
+      "source": "module Strings;\npublic definition Text Raw() => \"\"\"raw \"quotes\" 🧭\"\"\";\npublic definition Text Many() => \"\"\"\"\"raw \"\"\" more\"\"\"\"\";\npublic definition Text Escaped() => \"quoted \\\" value\";\npublic definition char Character() => 'x';\npublic definition Format Greeting(Nat value) => $\"value {value + 1} {{ok}}\";\n",
+      "scopes": [
+        {"text": "🧭", "scope": "string.quoted.other.raw.vela"},
+        {"text": "more", "scope": "string.quoted.other.raw.vela"},
+        {"text": "quoted", "scope": "string.quoted.double.vela"},
+        {"text": "'x'", "scope": "string.quoted.single.vela"},
+        {"text": "value +", "scope": "meta.interpolation.vela"},
+        {"text": "ok", "scope": "string.quoted.double.interpolated.vela"}
+      ]
+    },
+    {
+      "name": "interpolation-lifetime-apostrophe",
+      "source": "module Lifetime;\npublic definition Format Message() => $\"value {Check::<'a>()}\";\n",
+      "scopes": [
+        {"text": "'a", "scope": "entity.name.type.lifetime.vela", "tree_scope": "string"},
+        {"text": "Check", "scope": "meta.interpolation.vela"}
+      ]
+    },
+    {
+      "name": "nested-interpolation-boundary",
+      "source": "module Nested;\npublic definition Format Message(Box item) => $\"nested {(item with { Count = 1 }).Count + 2} after\";\n",
+      "scopes": [
+        {"text": ".Count + 2", "scope": "meta.interpolation.vela"},
+        {"text": "after", "scope": "string.quoted.double.interpolated.vela"}
+      ]
+    },
+    {
+      "name": "dependent-nested-types",
+      "source": "module Generic;\npublic record Box<T, ghost Nat n>(Vec<T, n> Values);\npublic definition Vec<Nat, 1> Single() => Vec<Nat, 1>(1,);\n",
+      "scopes": [
+        {"text": "record", "scope": "keyword.control.vela"},
+        {"text": "ghost", "scope": "keyword.control.vela"},
+        {"text": "1", "scope": "constant.numeric.vela"}
+      ]
+    }
+  ],
+  "negative": [
+    {"name": "unfinished-function", "source": "module Broken; public Nat Value(Nat x) { return x;", "scopes": []},
+    {"name": "unfinished-comment", "source": "module Broken; /* outer /* nested */ public Nat Value() => 1;", "scopes": [{"text": "public", "scope": "comment.block.vela"}]},
+    {"name": "unfinished-raw", "source": "module Broken; public Text Value() => \"\"\"unterminated 🧭", "scopes": [{"text": "🧭", "scope": "string.quoted.other.raw.vela"}]},
+    {"name": "broken-generics", "source": "module Broken; public record Box<T(Option<T> Value);", "scopes": []}
+  ],
+  "editor_recovery": [
+    {"name": "malformed-numeric-separator", "source": "module Recovery; public Nat Value() => 1__2;", "scopes": [{"text": "1__2", "scope": "constant.numeric.vela"}]},
+    {"name": "invalid-string-escape", "source": "module Recovery; public Text Value() => \"bad \\q\";", "scopes": [{"text": "bad", "scope": "string.quoted.double.vela"}]},
+    {"name": "interpolated-unbalanced-parentheses", "source": "module Recovery; public Format Value() => $\"value {(1]}\";", "scopes": [{"text": "1", "scope": "meta.interpolation.vela"}]},
+    {"name": "interpolated-newline", "source": "module Recovery; public Format Value() => $\"first\nsecond\";", "scopes": [{"text": "second", "scope": "string.quoted.double.interpolated.vela"}]}
+  ],
+  "edits": [
+    {"name": "unicode-before-edit", "source": "module Edit; // 🧭\npublic Nat Value(Nat x) => x + 1;", "needle": "x + 1", "replacement": "x + 2", "error": false},
+    {"name": "comment-becomes-open", "source": "module Edit; /* outer /* nested */ done */ public Nat Value() => 1;", "needle": "done */", "replacement": "done", "error": true},
+    {"name": "comment-repair", "source": "module Edit; /* open", "needle": "open", "replacement": "closed */ public Nat Value() => 1;", "error": false},
+    {"name": "generic-angle-edit", "source": "module Edit; public record Box<T>(Option<T> Value);", "needle": "Box<T>", "replacement": "Box<T", "error": true},
+    {"name": "raw-delimiter-edit", "source": "module Edit; public Text Value() => \"\"\"raw\"\"\";", "needle": "raw\"\"\"", "replacement": "raw\"\"", "error": true},
+    {"name": "interpolation-expression-edit", "source": "module Edit; public Format Value(Nat x) => $\"value {x + 1}\";", "needle": "x + 1", "replacement": "x + 2", "error": false},
+    {"name": "new-block", "source": "module Edit; public Nat Value() => 1;", "needle": "=> 1;", "replacement": "{ return 1; }", "error": false},
+    {"name": "unterminated-string-repair", "source": "module Edit; public Text Value() => \"hello", "needle": "hello", "replacement": "hello\";", "error": false}
+  ]
+}
