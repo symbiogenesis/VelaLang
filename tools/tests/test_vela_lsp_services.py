@@ -90,7 +90,9 @@ def _server(text: str = _SCOPE, uri: str = _URI) -> Server:
     capabilities = _object(result.get("capabilities"))
     for provider in ("hoverProvider", "definitionProvider", "referencesProvider", "documentSymbolProvider"):
         ensure(bool(capabilities.get(provider)), f"implemented provider {provider} not advertised")
-    for provider in ("completionProvider", "renameProvider"):
+    for provider in ("completionProvider", "signatureHelpProvider"):
+        ensure(bool(capabilities.get(provider)), f"implemented provider {provider} not advertised")
+    for provider in ("renameProvider",):
         ensure(not capabilities.get(provider), f"unimplemented provider {provider} advertised")
     server.handle(_notice("initialized"))
     _open(server, text, uri)

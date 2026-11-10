@@ -347,6 +347,8 @@ end
 
 local stage1 = {
   diagnostics = diag_events[#diag_events],
+  completion_square_call = sync_request("textDocument/completion", pos_params(6, 22)),
+  signature_square_call = sync_request("textDocument/signatureHelp", pos_params(6, 27)),
   hover_limit = sync_request("textDocument/hover", pos_params(2, 17)),
   hover_square_call = sync_request("textDocument/hover", pos_params(6, 20)),
   hover_multiplier = sync_request("textDocument/hover", pos_params(6, 27)),
@@ -693,6 +695,8 @@ def RunQualification()
 
   var stage1 = {
     diagnostics: ConvertDiags(diag.GetDiagsForBuf(bnr)),
+    completion_square_call: RpcResult(lserver, 'textDocument/completion', PosParams(6, 22)),
+    signature_square_call: RpcResult(lserver, 'textDocument/signatureHelp', PosParams(6, 27)),
     goto_definition_cursor_1based: goto_def_cursor,
     hover_limit: RpcResult(lserver, 'textDocument/hover', PosParams(2, 17)),
     hover_square_call: RpcResult(lserver, 'textDocument/hover', PosParams(6, 20)),
@@ -1143,6 +1147,20 @@ def _stage_vim_and_plugin(cache_dir: Path, stage_dir: Path) -> tuple[Path, Path,
     }
 
 
+def _discovery_expectations() -> dict[str, object]:
+    detail = "public const Nat Square(const Nat value)"
+    documentation = {"kind": "plaintext", "value": "Computes a square for caf\u00e9 \U0001f600."}
+    return {
+        "completion_square_call": {"isIncomplete": True, "items": [{
+            "label": "Square", "kind": 3, "detail": detail, "documentation": documentation,
+            "textEdit": {"range": {"start": {"line": 6, "character": 20},
+                                   "end": {"line": 6, "character": 26}}, "newText": "Square"}}]},
+        "signature_square_call": {"signatures": [{"label": detail,
+            "parameters": [{"label": "const Nat value"}], "documentation": documentation}],
+            "activeSignature": 0, "activeParameter": 0},
+    }
+
+
 def expected_scenario_oracle(uri: str) -> dict[str, object]:
     """Compute the independent pure Vela oracle expectations for the 6-stage scenario."""
     snap1 = SourceSnapshot(uri, 1, INITIAL_SOURCE, 1)
@@ -1188,6 +1206,8 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
             "referencesProvider": True,
             "documentSymbolProvider": True,
             "inlayHintProvider": True,
+            "completionProvider": {"resolveProvider": False},
+            "signatureHelpProvider": {"triggerCharacters": ["(", ","], "retriggerCharacters": [","]},
             "documentFormattingProvider": True,
             "renameProvider": {"prepareProvider": True},
             "semanticTokensProvider": {
@@ -1205,6 +1225,7 @@ def expected_scenario_oracle(uri: str) -> dict[str, object]:
             },
         },
         "stage1": {
+            **_discovery_expectations(),
             "hover_limit": project(snap1, facts1, "textDocument/hover", (2, 17), False),
             "hover_square_call": project(snap1, facts1, "textDocument/hover", (6, 20), False),
             "hover_multiplier": project(snap1, facts1, "textDocument/hover", (6, 27), False),
@@ -1401,12 +1422,6 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
         observation.get("server_capabilities") == expected_caps,
         f"{label}: negotiated server_capabilities differ from oracle",
     )
-    for provider in ("completionProvider",):
-        _require(
-            provider not in _object(observation.get("server_capabilities")),
-            f"{label}: unimplemented {provider} advertised",
-        )
-
     stage1 = _object(observation.get("stage1"), f"{label}.stage1")
     oracle1 = _object(oracle["stage1"])
     _require(stage1.get("diagnostics") == [], f"{label}: stage1 initial diagnostics not empty")
@@ -1480,6 +1495,7 @@ def verify_wire_transcript(
     delta_observation: object = None,
     require_local_rename: bool = False,
     rename_observation: object = None,
+    discovery_observation: object = None,
 ) -> dict[str, object]:
     """Verify a server-recorded bidirectional JSON-RPC wire transcript."""
     _require(
@@ -1510,6 +1526,8 @@ def verify_wire_transcript(
     rename_requests: dict[object, dict[str, object]] = {}
     rename_sources: dict[object, tuple[str, int]] = {}
     rename_responses: dict[str, object] = {}
+    discovery_requests: dict[object, tuple[str, object, str | None]] = {}
+    discovery_responses: dict[str, object] = {}
     versioned_rename = False
     observed = {} if delta_observation is None else _object(delta_observation)
     if observed:
@@ -1532,6 +1550,10 @@ def verify_wire_transcript(
                 req_id = message["id"]
                 _require(req_id not in request_by_id, f"duplicate client request id {req_id!r}")
                 request_by_id[req_id] = method
+                if discovery_observation is not None and method in {"textDocument/completion", "textDocument/signatureHelp"}:
+                    params = _object(message.get("params"))
+                    uri = str(_object(params.get("textDocument")).get("uri"))
+                    discovery_requests[req_id] = (method, params.get("position"), sources.get(uri))
                 if method.startswith("textDocument/semanticTokens/full"):
                     token_requests[req_id] = _object(message.get("params"))
                     uri = str(_object(token_requests[req_id].get("textDocument")).get("uri"))
@@ -1609,6 +1631,15 @@ def verify_wire_transcript(
                     continue
                 _require("error" not in message, f"unexpected error reply on wire: {message!r}")
                 correlated_responses += 1
+                if req_id in discovery_requests:
+                    method, position, source = discovery_requests[req_id]
+                    completion = method == "textDocument/completion"
+                    key = "completion_square_call" if completion else "signature_square_call"
+                    _require(source == INITIAL_SOURCE and position == {"line": 6, "character": 22 if completion else 27},
+                             "callable discovery probe used an unexpected source or position")
+                    _require(message.get("result") == _discovery_expectations()[key],
+                             "wire callable discovery differs from the independent expected result")
+                    discovery_responses[key] = message["result"]
                 if req_id in rename_requests:
                     params = rename_requests[req_id]
                     uri = str(_object(params.get("textDocument")).get("uri"))
@@ -1747,6 +1778,12 @@ def verify_wire_transcript(
             observation = _object(rename_observation)
             _require(all(observation.get(key) == value for key, value in rename_responses.items()),
                      "observed rename responses differ from wire evidence")
+    if discovery_observation is not None:
+        observation = _object(discovery_observation)
+        _require(set(discovery_responses) == set(_discovery_expectations()),
+                 "wire session omitted callable completion or signature help")
+        _require(all(observation.get(key) == value for key, value in discovery_responses.items()),
+                 "observed callable discovery differs from wire evidence")
     return {
         "frame_count": len(frames),
         "client_frame_count": len(client_methods),
@@ -1760,6 +1797,7 @@ def verify_wire_transcript(
         "semantic_empty_deltas": empty_deltas,
         "unsaved_unicode_crlf_delta_edit": crlf_delta_edit,
         "local_rename_responses": len(rename_responses),
+        "callable_discovery_responses": len(discovery_responses),
         "versioned_local_rename": versioned_rename,
     }
 
@@ -1782,7 +1820,8 @@ def _verify_editor_session_artifacts(
     verify_client_observation(observation, oracle, require_token_deltas=True)
     summary = verify_wire_transcript(transcript, require_ranged_change=require_ranged_change,
                                      require_token_deltas=True, delta_observation=observation["delta"],
-                                     require_local_rename=True, rename_observation=observation["stage1"])
+                                     require_local_rename=True, rename_observation=observation["stage1"],
+                                     discovery_observation=observation["stage1"])
     return (_sha256(observation_raw), _sha256(transcript_raw), summary,
             observation_raw.decode("utf-8"), transcript_raw.decode("utf-8"))
 

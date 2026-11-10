@@ -171,7 +171,9 @@ def _lifecycle() -> None:
     ensure(sync == 2 or _record(sync).get("change") == 2, "incremental sync not advertised")
     for provider in ("hoverProvider", "definitionProvider", "referencesProvider", "documentSymbolProvider"):
         ensure(capabilities.get(provider) is True, f"implemented {provider} not advertised")
-    for provider in ("completionProvider", "renameProvider"):
+    for provider in ("completionProvider", "signatureHelpProvider"):
+        ensure(bool(capabilities.get(provider)), f"implemented {provider} not advertised")
+    for provider in ("renameProvider",):
         ensure(not capabilities.get(provider), f"unimplemented {provider} advertised")
     repeated = server.handle(_request("initialize", {"capabilities": {}}, 8))
     ensure("error" in repeated[0], "repeated initialize accepted")
