@@ -530,13 +530,19 @@ not establish checked source correspondence or machine/artifact acceptance.
   omitted libraries, changed process subjects or verdicts and source-proof
   status inconsistent with the actual solver-trust ledger refuse, including
   attempts to promote a nonempty ledger by changing `accepted` or `kernel_checked`.
+  The corrupted source must equal the retained Gallina followed by the frozen
+  false Boolean-equality definition. A positive checker exit must report the
+  intended type mismatch at that appended definition; signal termination,
+  unrelated source failures and missing or duplicated error diagnostics refuse.
   Both capacity compilation transcripts and their joint kernel-check transcript
   are required, together with retained capacity sources and libraries. The
   declared small/large capacities, nonnegative work metrics and retained Gallina
-  byte lengths are checked. All 17 semantic-negative observations must name each
+  byte lengths are checked. Both original Vela capacity inputs must exactly match
+  the frozen small/large fixtures. All 17 semantic-negative observations must name each
   current control exactly once, report successful surface parsing and the
-  expected semantic refusal with a positive source location. Omitted, duplicate,
-  syntax-only or unrelated refusals cannot preserve a matching receipt. These
+  expected semantic refusal at a location within its retained Vela source.
+  Each retained control source must equal its frozen fixture. Omitted, duplicate,
+  substituted, syntax-only or unrelated refusals cannot preserve a matching receipt. These
   checks establish retained coverage; they do not rerun the controls or recompute
   elaboration work counters.
   Native proof observations bind separate UTF-8 stdout/stderr byte lengths and

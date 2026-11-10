@@ -444,6 +444,23 @@ def _retained_stdout(step: dict[str, object]) -> bytes:
     return stdout
 
 
+def _corrupted_proof(gallina: str) -> str:
+    return gallina + (
+        "\nDefinition vela_corrupted_check : @Corelib.Init.Logic.eq Corelib.Init.Datatypes.bool "
+        "Corelib.Init.Datatypes.true Corelib.Init.Datatypes.false := "
+        "@Corelib.Init.Logic.eq_refl Corelib.Init.Datatypes.bool Corelib.Init.Datatypes.true.\n"
+    )
+
+
+def _check_corruption_refusal(gallina: str, code: int, transcript: str) -> None:
+    """Require a normal checker refusal at the deliberately false appended definition."""
+    sites = re.findall(r'File "([^"\n]+)", line ([0-9]+), characters [0-9]+-[0-9]+:\s*Error:', transcript)
+    if (code <= 0 or len(sites) != 1 or Path(sites[0][0]).name != "FirstSliceCorrupted.v"
+            or sites[0][1] != str(gallina.count("\n") + 2) or transcript.count("Error:") != 1
+            or "has type" not in transcript or "while it is expected to have type" not in transcript):
+        raise ValueError("first-slice proof-corruption control did not reach its intended type refusal")
+
+
 def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[str, object]) -> str:
     """Bind every declared process observation and the required local proof steps."""
     steps = report.get("steps")
@@ -496,6 +513,9 @@ def _retained_steps(report: dict[str, object], directory: Path, artifacts: dict[
             if name in covered:
                 raise ValueError("first-slice receipt repeats a required proof observation")
             covered[name] = _retained_stdout(step)
+            if refused:
+                _check_corruption_refusal((directory / "FirstSlice.v").read_text(encoding="utf-8"),
+                                          code, Path(log).read_text(encoding="utf-8"))
     if covered.keys() != required.keys() or report.get("proof_corruption_refused") is not True:
         raise ValueError("first-slice receipt omits required local proof or corruption coverage")
     return covered["FirstSlice.assumptions.log"].decode("utf-8")
@@ -517,9 +537,12 @@ def _retained_controls(report: dict[str, object], directory: Path,
         if type(count) is not int or count < (0 if field == "reduction_steps" else 1):
             raise ValueError("first-slice receipt capacity metrics are malformed")
     for stem in ("CapSmall", "CapLarge"):
-        for extension in ("v", "vo"):
+        for extension in ("vela", "v", "vo"):
             if str(directory / f"{stem}.{extension}") not in artifacts:
                 raise ValueError("first-slice receipt omits a required capacity proof artifact")
+        literal = capacity["small_capacity" if stem == "CapSmall" else "large_capacity"]
+        if (directory / f"{stem}.vela").read_bytes() != _capacity_fixture(str(literal)):
+            raise ValueError("first-slice receipt capacity source differs from its declared subject")
         if len((directory / f"{stem}.v").read_bytes()) != capacity["gallina_bytes"]:
             raise ValueError("first-slice receipt capacity size differs from retained Gallina")
     controls = report.get("negative_controls")
@@ -541,6 +564,12 @@ def _retained_controls(report: dict[str, object], directory: Path,
                 or type(row.get("line")) is not int or row["line"] < 1
                 or type(row.get("column")) is not int or row["column"] < 1):
             raise ValueError("first-slice receipt semantic-refusal subject or verdict changed")
+        path = directory / "negative-controls" / f"{name}.vela"
+        if str(path) not in artifacts or path.read_bytes() != control.source.encode("utf-8"):
+            raise ValueError("first-slice receipt semantic-refusal source differs from its declared subject")
+        lines = control.source.splitlines()
+        if row["line"] > len(lines) or row["column"] > len(lines[row["line"] - 1]) + 1:
+            raise ValueError("first-slice receipt semantic refusal is outside its source")
         seen.add(name)
 
 
@@ -712,11 +741,13 @@ def _retained_proof(root: Path, report: dict[str, object], directory: Path,
     if any(artifacts.get(str(directory / name)) != outputs.get(str(directory / name))
            for name in ("FirstSlice.v", "first_slice.c")):
         raise ValueError("first-slice receipt generated identities differ from its output inventory")
-    for name in ("FirstSlice.vo", "FirstSliceAssumptions.v", "FirstSliceAssumptions.vo",
+    for name in ("FirstSlice.vo", "FirstSliceCorrupted.v", "FirstSliceAssumptions.v", "FirstSliceAssumptions.vo",
                  "FirstSlice.assumptions.log"):
         if str(directory / name) not in artifacts:
             raise ValueError("first-slice receipt omits a required retained proof artifact")
     gallina = (directory / "FirstSlice.v").read_text(encoding="utf-8")
+    if (directory / "FirstSliceCorrupted.v").read_bytes() != _corrupted_proof(gallina).encode("utf-8"):
+        raise ValueError("first-slice receipt corrupted proof differs from its declared subject")
     modules = re.findall(r"^Module (Vela_[A-Za-z0-9_]+)\.$", gallina, flags=re.MULTILINE)
     exports = re.findall(r"^Definition (vela_d[0-9]+_[A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|:)",
                          gallina, flags=re.MULTILINE)
@@ -1778,10 +1809,13 @@ def _resolve_ccomp(ccomp_path: Path | None) -> Path | None:
     return None
 
 
-def _run_negative_controls(compiled: vela_parser.Build) -> list[dict[str, object]]:
+def _run_negative_controls(compiled: vela_parser.Build, directory: Path) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
+    sources = directory / "negative-controls"
+    sources.mkdir()
     for ctrl in NEGATIVE_CONTROLS:
         raw = ctrl.source.encode("utf-8")
+        (sources / f"{ctrl.name}.vela").write_bytes(raw)
         # Must parse cleanly as schema-2 surface syntax; syntax refusal is never a semantic control.
         parsed = vela_parser.parse_source(compiled, raw, surface=True)
         try:
@@ -1812,6 +1846,8 @@ def _run_capacity_invariance_gate(
 ) -> dict[str, object]:
     small_src = _capacity_fixture("8usize")
     large_src = _capacity_fixture("1_000_000_000usize")
+    (directory / "CapSmall.vela").write_bytes(small_src)
+    (directory / "CapLarge.vela").write_bytes(large_src)
     small_parsed = vela_parser.parse_source(compiled, small_src, surface=True)
     large_parsed = vela_parser.parse_source(compiled, large_src, surface=True)
     small_elab, small_state = vela_elaborate._checked_elaboration(small_src, small_parsed)
@@ -1921,11 +1957,7 @@ def _qualify_attempt(
 
     # 2. Fail-closed proof-corruption control on FirstSlice.v
     corrupted_v = directory / "FirstSliceCorrupted.v"
-    corrupted_text = translated.gallina + (
-        "\nDefinition vela_corrupted_check : @Corelib.Init.Logic.eq Corelib.Init.Datatypes.bool "
-        "Corelib.Init.Datatypes.true Corelib.Init.Datatypes.false := "
-        "@Corelib.Init.Logic.eq_refl Corelib.Init.Datatypes.bool Corelib.Init.Datatypes.true.\n"
-    )
+    corrupted_text = _corrupted_proof(translated.gallina)
     corrupted_v.write_text(corrupted_text, encoding="utf-8", newline="")
     corrupt_proc = subprocess.run(
         _opam(["rocq", "c", "-q", "-R", str(directory), "VelaFirstSlice", corrupted_v.name]),
@@ -1936,20 +1968,20 @@ def _qualify_attempt(
         timeout=TIMEOUT,
         check=False,
     )
-    if corrupt_proc.returncode == 0:
-        raise ValueError("proof-corruption control was unexpectedly accepted by rocq c")
     corruption_log = directory / "FirstSliceCorrupted.compile.log"
     corruption_log.write_text(corrupt_proc.stdout + corrupt_proc.stderr, encoding="utf-8", newline="")
     steps.append({"command": corrupt_proc.args, "cwd": str(directory),
                   "returncode": corrupt_proc.returncode, "expected_refusal": True,
                   "log": str(corruption_log), "log_sha256": _sha256(corruption_log.read_bytes()),
                   **_stream_identity(corrupt_proc.stdout, corrupt_proc.stderr)})
+    _check_corruption_refusal(translated.gallina, corrupt_proc.returncode,
+                              corrupt_proc.stdout + corrupt_proc.stderr)
 
     # 3. Capacity-invariance gate (8usize vs 1_000_000_000usize)
     cap_gate = _run_capacity_invariance_gate(compiled, directory, steps)
 
     # 4. Semantic negative controls
-    neg_controls = _run_negative_controls(compiled)
+    neg_controls = _run_negative_controls(compiled, directory)
 
     # 5. Lower executable AST to Clight/C and execute on CompCert + Sail emulator
     c_source, check_count = lower_to_c(source, parsed)

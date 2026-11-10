@@ -147,6 +147,15 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
         f"Definition {name} : True := {axiom if trusted and index == 16 else 'I'}.\n"
         for index, name in enumerate(names)) + f"End {module}.\n"
     (outputs / "FirstSlice.v").write_text(gallina, encoding="utf-8")
+    corruption = (
+        "\nDefinition vela_corrupted_check : @Corelib.Init.Logic.eq Corelib.Init.Datatypes.bool "
+        "Corelib.Init.Datatypes.true Corelib.Init.Datatypes.false := "
+        "@Corelib.Init.Logic.eq_refl Corelib.Init.Datatypes.bool Corelib.Init.Datatypes.true.\n")
+    (outputs / "FirstSliceCorrupted.v").write_bytes((gallina + corruption).encode())
+    (outputs / "FirstSliceCorrupted.compile.log").write_bytes((
+        f'File "./FirstSliceCorrupted.v", line {gallina.count(chr(10)) + 2}, characters 144-230:\n'
+        'Error: The term "eq_refl true" has type "true = true"\n'
+        'while it is expected to have type "true = false".\n').encode())
     (outputs / "FirstSliceAssumptions.v").write_text(
         "From VelaFirstSlice Require Import FirstSlice.\n" + "".join(
             f"Print Assumptions FirstSlice.{module}.{name}.\n" for name in names), encoding="utf-8")
@@ -158,8 +167,14 @@ def _proof_fixture(root: Path, outputs: Path, *, trusted: bool = False,
         (outputs / name).write_bytes(f"retained {name}".encode())
     capacity_gallina = b"Definition capacity_fixture : True := I.\n"
     for stem in ("CapSmall", "CapLarge"):
+        literal = "8usize" if stem == "CapSmall" else "1_000_000_000usize"
+        (outputs / f"{stem}.vela").write_bytes(slice_harness._capacity_fixture(literal))
         (outputs / f"{stem}.v").write_bytes(capacity_gallina)
         (outputs / f"{stem}.vo").write_bytes(b"retained capacity proof")
+    controls = outputs / "negative-controls"
+    controls.mkdir(exist_ok=True)
+    for control in slice_harness.NEGATIVE_CONTROLS:
+        (controls / f"{control.name}.vela").write_bytes(control.source.encode())
     source = root / slice_harness.EXAMPLE
     source.parent.mkdir(parents=True, exist_ok=True)
     source.write_bytes(b"module Vela.FirstSlice;")
@@ -608,6 +623,52 @@ def _process_streams() -> None:
                 raise AssertionError(f"malformed replay-probe {field} was accepted")
 
 
+def _corruption_control_subjects() -> None:
+    with tempfile.TemporaryDirectory(prefix="vela-slice-corruption-subjects-") as temporary:
+        root = Path(temporary)
+        outputs = root / "slice-fixture"
+        outputs.mkdir()
+        for mutation in ("none", "missing-source", "unrelated-source", "uncorrupted-source", "signal",
+                         "accepted", "empty-diagnostic", "unrelated-file", "unrelated-line",
+                         "syntax-error", "duplicate-error", "extra-unrelated-error"):
+            report = _proof_fixture(root, outputs)
+            steps = cast("list[dict[str, object]]", report["steps"])
+            observation = steps[-1]
+            source, log = outputs / "FirstSliceCorrupted.v", outputs / "FirstSliceCorrupted.compile.log"
+            if mutation == "missing-source":
+                source.unlink()
+            elif mutation == "unrelated-source":
+                source.write_bytes(b"Definition unrelated := 0.\n")
+            elif mutation == "uncorrupted-source":
+                source.write_bytes((outputs / "FirstSlice.v").read_bytes())
+            elif mutation in {"signal", "accepted"}:
+                observation["returncode"] = -9 if mutation == "signal" else 0
+            elif mutation != "none":
+                diagnostic = log.read_bytes()
+                if mutation == "empty-diagnostic":
+                    diagnostic = b""
+                elif mutation == "unrelated-file":
+                    diagnostic = diagnostic.replace(b"FirstSliceCorrupted.v", b"MissingLibrary.v")
+                elif mutation == "unrelated-line":
+                    diagnostic = diagnostic.replace(b", line 30,", b", line 1,")
+                elif mutation == "syntax-error":
+                    diagnostic = diagnostic.split(b"Error:")[0] + b"Error: Syntax error.\n"
+                elif mutation == "extra-unrelated-error":
+                    diagnostic += b'File "./MissingLibrary.v", line 1, characters 0-1:\nError: Library missing.\n'
+                else:
+                    diagnostic += diagnostic
+                log.write_bytes(diagnostic)
+                observation.update(log_sha256=slice_harness._sha256(diagnostic),
+                                   stdout_bytes=len(diagnostic), stdout_sha256=slice_harness._sha256(diagnostic))
+            artifacts: dict[str, object] = dict(slice_harness._artifacts(outputs))
+            try:
+                slice_harness._retained_proof(root, report, outputs, artifacts)
+            except ValueError as error:
+                ensure(mutation != "none", f"intended type refusal was rejected: {error}")
+            else:
+                ensure(mutation == "none", f"{mutation} was mistaken for the intended proof corruption refusal")
+
+
 def _control_coverage() -> None:
     with tempfile.TemporaryDirectory(prefix="vela-slice-control-coverage-") as temporary:
         root = Path(temporary)
@@ -616,8 +677,10 @@ def _control_coverage() -> None:
         for mutation in ("none", "missing-capacity", "small-capacity", "large-capacity", "unchecked",
                          "boolean-metric", "negative-metric", "zero-obligations", "wrong-size",
                          "missing-capacity-object", "missing-capacity-source", "changed-capacity-source",
+                         "missing-capacity-input", "changed-capacity-input", "swapped-capacity-inputs",
                          "missing-controls", "count", "boolean-count", "duplicate", "unknown",
-                         "unparsed", "syntax-refusal", "wrong-reason", "bad-line", "bad-column"):
+                         "unparsed", "syntax-refusal", "wrong-reason", "bad-line", "bad-column",
+                         "missing-control-source", "changed-control-source", "out-of-range-line", "out-of-range-column"):
             report = _proof_fixture(root, outputs)
             capacity = cast("dict[str, object]", report["capacity_invariance"])
             rows = cast("list[dict[str, object]]", report["negative_controls"])
@@ -638,6 +701,13 @@ def _control_coverage() -> None:
                 (outputs / "CapSmall.v").unlink()
             elif mutation == "changed-capacity-source":
                 (outputs / "CapSmall.v").write_bytes(b"another capacity subject")
+            elif mutation == "missing-capacity-input":
+                (outputs / "CapSmall.vela").unlink()
+            elif mutation == "changed-capacity-input":
+                path = outputs / "CapLarge.vela"
+                path.write_bytes(path.read_bytes().replace(b"1_000_000_000usize", b"1_000_000_001usize"))
+            elif mutation == "swapped-capacity-inputs":
+                (outputs / "CapLarge.vela").write_bytes((outputs / "CapSmall.vela").read_bytes())
             elif mutation == "missing-controls":
                 rows.pop()
             elif mutation in {"count", "boolean-count"}:
@@ -656,6 +726,15 @@ def _control_coverage() -> None:
                 rows[0]["line"] = True
             elif mutation == "bad-column":
                 rows[0]["column"] = 0
+            elif mutation == "missing-control-source":
+                (outputs / "negative-controls/oob-read.vela").unlink()
+            elif mutation == "changed-control-source":
+                path = outputs / "negative-controls/oob-read.vela"
+                path.write_bytes(path.read_bytes().replace(b"Bad", b"Bogus"))
+            elif mutation == "out-of-range-line":
+                rows[0]["line"] = 100_000
+            elif mutation == "out-of-range-column":
+                rows[0]["column"] = 100_000
             artifacts: dict[str, object] = dict(slice_harness._artifacts(outputs))
             try:
                 slice_harness._retained_controls(report, outputs, artifacts)
@@ -991,6 +1070,7 @@ def cases() -> list[Case]:
             Case("retained first-slice identities and malformed refusals", _binding_checks),
             Case("retained proof coverage and assumption consistency", _retained_coverage),
             Case("stdout audit provenance preserves stderr diagnostics", _process_streams),
+            Case("proof corruption binds the intended source and type refusal", _corruption_control_subjects),
             Case("retained capacity and semantic refusal coverage", _control_coverage),
             Case("retained capability execution transcripts and images", _execution_coverage),
             Case("retained optional compiler availability and controls", _compiler_coverage),
