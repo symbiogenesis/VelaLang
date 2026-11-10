@@ -34,6 +34,7 @@ from toolchain.generated_tests import (
     qualify_isolated_campaign,
 )
 from toolchain.inspection import MAX_EXPORT_BYTES, current_binding, inspect
+from toolchain.inspection import producer_identity as inspection_producer_identity
 from toolchain.protocol_json import decode_message
 
 
@@ -54,6 +55,11 @@ def _identity(value: os.stat_result) -> tuple[int, int, int, int]:
 def _inspection_unchanged(source: _Source, binding: dict[str, object]) -> None:
     if current_binding(source.data, uri=source.path.resolve().as_uri()) != binding:
         raise ValueError("inspection producer changed during export handoff")
+
+
+def _preview_unchanged(preview: dict[str, object]) -> None:
+    if inspection_producer_identity() != cast("dict[str, object]", preview["binding"])["producer"]:
+        raise ValueError("compiler producer changed before lint preview publication")
 
 
 def _read_source(path: Path, *, max_bytes: int = MAX_SOURCE_BYTES) -> _Source:
@@ -456,6 +462,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "lint-preview":
             result = authoring_preview.preview(source.data, args.line, args.column)
             _unchanged(source)
+            _preview_unchanged(result)
             print(json.dumps(result, ensure_ascii=True, sort_keys=True))
             return 0
         if args.command == "inspect":

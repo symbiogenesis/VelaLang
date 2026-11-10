@@ -156,6 +156,15 @@ def _cli_publication() -> None:
             code = cli.main(["lint-preview", str(path), "--line", str(line), "--column", str(column)])
         ensure(code == 1 and not output.getvalue() and "source changed" in errors.getvalue(),
                "CLI published a preview after a concurrent source edit")
+        path.write_bytes(source)
+        identity = inspection.producer_identity()
+        output, errors = io.StringIO(), io.StringIO()
+        with (patch.object(authoring_preview, "preview", return_value=publication),
+              patch.object(cli, "inspection_producer_identity", return_value={**identity, "version": "0" * 64}),
+              contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors)):
+            code = cli.main(["lint-preview", str(path), "--line", str(line), "--column", str(column)])
+        ensure(code == 1 and not output.getvalue() and "producer changed" in errors.getvalue(),
+               "CLI published a preview after a late compiler change")
 
 
 def cases() -> list[Case]:
