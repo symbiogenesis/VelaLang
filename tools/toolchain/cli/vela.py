@@ -17,6 +17,8 @@ from toolchain import (
     sarif,
     sarif_reader,
     trace_benchmark,
+    trace_browser,
+    trace_html,
     trace_viewer,
     translate,
 )
@@ -47,21 +49,21 @@ def _identity(value: os.stat_result) -> tuple[int, int, int, int]:
     return value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns
 
 
-def _read_source(path: Path) -> _Source:
+def _read_source(path: Path, *, max_bytes: int = MAX_SOURCE_BYTES) -> _Source:
     before = path.lstat()
     if not stat.S_ISREG(before.st_mode):
         raise OSError("source must be a regular file, not a symbolic link or special file")
     with path.open("rb") as stream:
         if _identity(os.fstat(stream.fileno())) != _identity(before):
             raise OSError("source changed while it was opened")
-        data = stream.read(MAX_SOURCE_BYTES + 1)
+        data = stream.read(max_bytes + 1)
     if _identity(path.lstat()) != _identity(before):
         raise OSError("source changed while it was read")
     return _Source(path, data, _identity(before), stat.S_IMODE(before.st_mode))
 
 
 def _unchanged(source: _Source) -> None:
-    current = _read_source(source.path)
+    current = _read_source(source.path, max_bytes=max(MAX_SOURCE_BYTES, len(source.data)))
     if current.identity != source.identity or current.data != source.data:
         raise OSError("source changed during compilation; no pending source rewrite was applied")
 
@@ -221,6 +223,47 @@ def _trace_viewer(args: argparse.Namespace) -> int:
         return 0
 
 
+def _trace_render(args: argparse.Namespace) -> int:
+    try:
+        source = _read_source(args.source)
+        recording = _read_source(args.trace, max_bytes=compiler_trace.MAX_TRACE_BYTES)
+        producer = compiler_trace.producer_identity()
+        _destination(source.path, args.output)
+        _destination(recording.path, args.output)
+        artifact = trace_html.render(compiler_trace.decode(recording.data), source.data, producer)
+        _unchanged(source)
+        _unchanged(recording)
+        _producer_unchanged(producer, "during trace rendering")
+        _destination(source.path, args.output)
+        _destination(recording.path, args.output)
+        with atomic_path(args.output) as pending:
+            pending.write_text(artifact, encoding="utf-8", newline="")
+            _unchanged(source)
+            _unchanged(recording)
+            _producer_unchanged(producer, "before trace HTML publication")
+    except (OSError, ValueError) as error:
+        print(f"trace-render:1:1: rendering: {error}", file=sys.stderr)
+        return 1
+    print(f"vela: {args.output}: complete offline compiler timeline")
+    return 0
+
+
+def _trace_browser(args: argparse.Namespace) -> int:
+    try:
+        _destination(args.browser, args.output)
+        report = trace_browser.qualify(args.browser, args.browser_sha256)
+        _destination(args.browser, args.output)
+        with atomic_path(args.output) as pending:
+            pending.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
+                               encoding="utf-8", newline="")
+            trace_browser.check_current(args.browser, args.browser_sha256, report)
+    except (OSError, ValueError) as error:
+        print(f"trace-qualify-browser:1:1: qualification: {error}", file=sys.stderr)
+        return 1
+    print(f"vela: {args.output}: offline trace browser rendering qualification passed")
+    return 0
+
+
 def _sarif_sources(paths: list[Path]) -> tuple[_Source, ...]:
     if not 1 <= len(paths) <= sarif.MAX_FILES:
         raise ValueError("SARIF requires 1 to 16 source files")
@@ -309,6 +352,14 @@ def main(argv: list[str] | None = None) -> int:
     trace_validation = commands.add_parser("trace-validate", help="refuse incomplete or stale compiler traces")
     trace_validation.add_argument("trace", type=Path)
     trace_validation.add_argument("--source", type=Path, required=True)
+    trace_render = commands.add_parser("trace-render", help="render a current complete trace as offline HTML")
+    trace_render.add_argument("trace", type=Path)
+    trace_render.add_argument("--source", type=Path, required=True)
+    trace_render.add_argument("--output", type=Path, required=True)
+    browser = commands.add_parser("trace-qualify-browser", help="qualify offline trace rendering in a selected Chromium browser")
+    browser.add_argument("--browser", type=Path, required=True)
+    browser.add_argument("--browser-sha256", required=True, help="explicit SHA-256 pin of the provisioned browser executable")
+    browser.add_argument("--output", type=Path, required=True)
     benchmark = commands.add_parser("trace-benchmark", help="compare plain and traced pure compilation")
     benchmark.add_argument("source", type=Path)
     benchmark.add_argument("--output", type=Path, required=True)
@@ -357,6 +408,10 @@ def main(argv: list[str] | None = None) -> int:
         return _sarif_reader(args)
     if args.command in {"trace", "trace-validate"}:
         return _trace(args)
+    if args.command == "trace-render":
+        return _trace_render(args)
+    if args.command == "trace-qualify-browser":
+        return _trace_browser(args)
     if args.command in {"trace-benchmark", "trace-benchmark-validate"}:
         return _trace_benchmark(args)
     if args.command in {"trace-qualify-viewer", "trace-viewer-validate"}:

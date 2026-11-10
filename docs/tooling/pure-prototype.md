@@ -339,6 +339,7 @@ Create the destination directory, then run:
 ```console
 python tools/run.py vela trace examples/pure.vela --output out/pure-trace.json
 python tools/run.py vela trace-validate out/pure-trace.json --source examples/pure.vela
+python tools/run.py vela trace-render out/pure-trace.json --source examples/pure.vela --output out/pure-timeline.html
 python tools/run.py vela trace-benchmark examples/pure.vela --output out/pure-trace-comparison.json
 python tools/run.py vela trace-benchmark-validate out/pure-trace-comparison.json --source examples/pure.vela
 python tools/run.py vela trace-qualify-viewer --trace-processor /path/to/trace_processor_shell --output out/trace-viewer.json
@@ -476,6 +477,52 @@ acceptance. This checks retained data consistency and freshness; it supplies no
 transcript authentication or fresh reader observation.
 
 This qualifies the selected Perfetto importer for the deterministic pure trace
-profile. Browser UI rendering, wider phase/worker coverage, exact runtime closure
-and workload-specific overhead qualification remain open under Q25cp. Compiler
-timings supply no execution time, WCET or constant-time evidence for emitted programs.
+profile. The separate offline browser viewer below uses the same source-bound
+recording contract. Wider phase/worker coverage, exact runtime closure and
+workload-specific overhead qualification remain open under Q25cp. Compiler timings
+supply no execution time, WCET or constant-time evidence for emitted programs.
+
+### Offline browser timelines
+
+`trace-render` validates an exact-source, current-producer, complete schema-3
+recording before publishing a self-contained HTML timeline. Open the resulting
+file in a browser. Nested phase and declaration spans have keyboard-focusable
+source/time tooltips, with a searchable table retaining exact microsecond values
+and both byte counters. The graphic uses a fixed 1,000-pixel time axis inside a
+horizontal scroll container; depth determines the row. Zero and subpixel
+durations retain a minimum half-pixel hit target, while the table preserves the
+actual zero or short duration. The view identifies the source, producer,
+recording and viewer bytes. It includes no source text or external assets; a
+content-security policy allows only its exact inline style/script hashes and
+refuses network access. Default commands preserve source bytes.
+
+HTML export accepts at most the recording's 2 MiB input bound and emits at most
+4 MiB. Stale, refused, cancelled, dropped or malformed recordings refuse before
+rendering. Source and recording bytes and identities, plus producer inputs, are
+rechecked before atomic publication. Source/recording aliases refuse and failed
+or cancelled preparation preserves an existing timeline.
+
+Qualify actual browser rendering using an already provisioned Chromium browser
+and an explicitly selected executable SHA-256:
+
+```console
+python tools/run.py vela trace-qualify-browser --browser /path/to/browser --browser-sha256 <sha256> --output out/trace-browser.json
+```
+
+The command installs nothing and opens only a temporary local file in a fresh
+headless profile. Its 30-second invocation and accepted DOM/diagnostic output are
+bounded. The browser renders the deterministic fixture with a qualification-only
+probe that reads actual layout rectangles, computed colors, keyboard focusability,
+tooltips, counters and a dispatched filter edit. Independently fixed expectations
+require six spans at their exact time-derived positions, three nesting depths,
+source details and a single matching declaration row after filtering. The receipt
+binds observed geometry and behavior, exact browser bytes, viewer/harness inputs
+and fixture HTML; late changes withdraw publication. The
+[viewer controls](../../tools/tests/test_vela_trace_html.py) exercise incorrect
+layout, styles, filtering and source observations, binary changes, timeouts,
+oversized output, stale/incomplete recordings and atomic publication failures.
+
+This qualifies the Vela offline viewer in the exact selected Chromium executable.
+It supplies no Perfetto browser-UI qualification, browser installation/runtime
+closure, measurement authentication or emitted-program timing verdict. The pinned
+Perfetto importer retains its independent receipt and separate acceptance scope.
