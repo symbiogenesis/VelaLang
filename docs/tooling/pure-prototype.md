@@ -349,7 +349,11 @@ The read-only trace command records `compile`, nested `parse` and
 `elaborate-and-emit` phases from the existing pure producer. Resolution and Gallina
 emission share one elaborator and remain one measured phase. The synchronous host
 worker includes time waiting for the checked parser process; it does not report
-that process's internal phases. Source and Gallina byte counters use Chrome
+that process's internal phases. Inside `parse`, the `checked-parse` span measures
+the checked parser invocation and its existing build/runtime checks; the
+`syntax-decode` span measures Python validation and construction of the returned
+pure AST. Their ordered, nonoverlapping nesting within `parse` is mandatory.
+Source and Gallina byte counters use Chrome
 Trace Event `C` records, and completed phases use `X` records with recording-relative
 integer microseconds derived from `perf_counter_ns`. The fixed worker identities
 are `pid: 1`, `tid: 1`; they describe this recording, not operating-system IDs.
@@ -369,7 +373,7 @@ sites identify name spellings; declaration kinds are recorded producer metadata.
 The inventory counts recorder calls and supplies no independent source-coverage
 or source-to-timing correspondence theorem.
 
-The `vela` schema-2 manifest binds events and completeness metadata, exact source
+The `vela` schema-3 manifest binds events and completeness metadata, exact source
 bytes, local Python/compiler/parser input files and Python/platform versions.
 The producer identity also binds the Python and opam lock owners, the command
 bootstrap, host Python executable bytes and the checked parser executable bytes
@@ -389,6 +393,8 @@ These hashes detect changed data; they authenticate no producer and carry no
 complete installed-library/operating-system closure, theorem or artifact-admission verdict. The validation
 command refuses changed source or producer identities, malformed events, crossing
 spans, invalid clocks, missing phases or counters, and incomplete recordings.
+Schema-1/2 recordings lack the mandatory parser-stage contract and refuse;
+regenerate retained traces after this producer change.
 A successful complete recording measures a successful pure check only.
 
 Recording retains at most 4,096 events; `--max-events` selects a smaller positive
@@ -445,9 +451,9 @@ The harness validates a deterministic Chrome trace and verifies seven negative
 controls before handoff: stale source/producer, missing phases, crossing spans,
 negative timestamps, dropped events and cancellation. Perfetto imports the valid
 fixture and executes two fixed SQL queries. Independently chosen expected rows
-require four spans with exact nanosecond timestamps/durations, parent/child
-depth through a nested function declaration and worker identities, plus both byte
-counters. The report retains the
+require six spans with exact nanosecond timestamps/durations, parent/child
+depth through both parser stages and a nested function declaration, worker
+identities, plus both byte counters. The report retains the
 fixture, queries, imported CSV and parsed rows, version/diagnostic transcripts,
 negative-control results, executable/revision and harness identities, and a
 binding over the complete report. Each reader invocation has a 30-second timeout

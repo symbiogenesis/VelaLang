@@ -611,10 +611,15 @@ def _budget_key(source: bytes) -> tuple[bytes, int, int, int, int]:
     return (source, MAX_OUTPUT_BYTES, MAX_STATIC_WORK, MAX_STATIC_DEPTH, MAX_EXPRESSION_DEPTH)
 
 
-def parse_module(source: bytes) -> syntax.Module:
+def parse_module(source: bytes, *, trace: Recorder | None = None) -> syntax.Module:
     """Parse and decode pure Vela source through the Rocq-extracted checked parser."""
     checked = import_module("toolchain.parser_checked")
-    return syntax.decode(source, checked.parse_checked(source))
+    if trace is None:
+        return syntax.decode(source, checked.parse_checked(source))
+    with trace.span("checked-parse"):
+        parsed = checked.parse_checked(source)
+    with trace.span("syntax-decode"):
+        return syntax.decode(source, parsed)
 
 
 def translate(source: bytes, *, trace: Recorder | None = None) -> Translation:
@@ -627,7 +632,7 @@ def translate(source: bytes, *, trace: Recorder | None = None) -> Translation:
         with trace.span("compile"):
             trace.counter("source_bytes", len(source))
             with trace.span("parse"):
-                module = parse_module(source)
+                module = parse_module(source, trace=trace)
             with trace.span("elaborate-and-emit"):
                 translated = _translate(source, module, elaborator=elaborator, trace=trace)
             trace.counter("gallina_bytes", len(translated.gallina.encode("utf-8")))

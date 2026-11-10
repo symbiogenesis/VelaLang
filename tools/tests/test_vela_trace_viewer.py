@@ -28,16 +28,16 @@ def _reader(path: Path, arguments: list[str]) -> viewer.Object:
     else:
         ensure(arguments[0] == "query" and len(arguments) == 3, "unexpected reader arguments")
         document = json.loads(Path(arguments[1]).read_text(encoding="utf-8"))
-        ensure(document["vela"]["complete"] is True and len(document["traceEvents"]) == 6,
+        ensure(document["vela"]["complete"] is True and len(document["traceEvents"]) == 8,
                "an incomplete or negative fixture reached the reader")
         if "FROM slice s" in arguments[2]:
             output = ('"name","ts","dur","depth","tid","pid"\n'
-                      '"compile",0,9000,0,1,1\n"parse",2000,1000,1,1,1\n'
-                      '"elaborate-and-emit",4000,3000,1,1,1\n'
-                      '"declaration",5000,1000,2,1,1\n')
+                      '"compile",0,13000,0,1,1\n"parse",2000,5000,1,1,1\n'
+                      '"checked-parse",3000,1000,2,1,1\n"syntax-decode",5000,1000,2,1,1\n"elaborate-and-emit",8000,3000,1,1,1\n'
+                      '"declaration",9000,1000,2,1,1\n')
         else:
             ensure("FROM counter c" in arguments[2], "unexpected SQL query")
-            output = '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",8000,48\n'
+            output = '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",12000,48\n'
     return {"stdout": output, "stderr": "reader diagnostic\n", "returncode": 0}
 
 
@@ -53,7 +53,7 @@ def _independent_observations() -> None:
                "report lost accepted reader identity")
         queries = cast("dict[str, viewer.Object]", report["queries"])
         slices = cast("list[list[str]]", queries["slices"]["rows"])
-        ensure(slices[2] == ["parse", "2000", "1000", "1", "1", "1"],
+        ensure(slices[2] == ["parse", "2000", "5000", "1", "1", "1"],
                "independent nanosecond, nesting or worker observations changed")
         ensure(report["negative_controls"] == ["stale-source", "stale-producer", "missing-phase",
                                                "crossing-span", "negative-timestamp", "dropped-events", "cancelled"],
@@ -73,9 +73,9 @@ def _wrong_results_and_late_changes() -> None:
                 def wrong(path: Path, arguments: list[str], chosen: str = field) -> viewer.Object:
                     result = _reader(path, arguments)
                     output = cast("str", result["stdout"])
-                    replacements = {"duration": ("9000", "9001"), "worker": ("0,1,1", "0,2,1"),
-                                    "nesting": ("1000,1,1,1", "1000,0,1,1"),
-                                    "counter": ("8000,48", "8000,49"), "version": ("v58.2", "v58.1")}
+                    replacements = {"duration": ("13000", "13001"), "worker": ("0,1,1", "0,2,1"),
+                                    "nesting": ("5000,1,1,1", "5000,0,1,1"),
+                                    "counter": ("12000,48", "12000,49"), "version": ("v58.2", "v58.1")}
                     before, after = replacements[chosen]
                     result["stdout"] = output.replace(before, after)
                     return result
@@ -210,7 +210,7 @@ def _retained_observations() -> None:
                         cast("list[list[str]]", queries["slices"]["rows"])[1][2] = "9001"
                     elif field == "csv":
                         cast("viewer.Object", queries["counters"]["transcript"])["stdout"] = (
-                            '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",8000,49\n')
+                            '"name","ts","value"\n"source_bytes bytes",1000,47\n"gallina_bytes bytes",12000,49\n')
                     elif field == "version":
                         cast("viewer.Object", changed["version"])["stdout"] = "Perfetto v58.1"
                     elif field == "returncode":
@@ -219,7 +219,7 @@ def _retained_observations() -> None:
                         cast("viewer.Object", changed["version"])["stderr"] = "x" * (viewer.MAX_OUTPUT_BYTES + 1)
                     elif field == "fixture":
                         fixture = cast("viewer.Object", changed["trace"])
-                        event = cast("list[viewer.Object]", fixture["traceEvents"])[4]
+                        event = cast("list[viewer.Object]", fixture["traceEvents"])[6]
                         cast("viewer.Object", event["args"])["kind"] = "constant"
                         manifest = cast("viewer.Object", fixture["vela"])
                         manifest.pop("binding_sha256")
