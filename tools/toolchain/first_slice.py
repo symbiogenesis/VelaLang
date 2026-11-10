@@ -451,8 +451,11 @@ def _simulator_transcript(said: str, returncode: int) -> tuple[str, int | None, 
     for raw in said.splitlines():
         line = raw.rstrip()
         if line.lstrip().startswith(("SUCCESS", "FAILURE")):
-            if re.fullmatch(r"(?:SUCCESS|FAILURE: [0-9]+)", line) is None:
+            terminal = re.fullmatch(r"(?:SUCCESS|FAILURE: ([0-9]+)(?: \(0x([0-9a-fA-F]{8})\))?)", line)
+            if terminal is None:
                 raise ValueError("first-slice simulator terminal verdict is malformed")
+            if terminal[2] is not None and int(terminal[2], 16) != int(terminal[1]):
+                raise ValueError("first-slice simulator terminal decimal and hexadecimal codes disagree")
             terminals.append(line)
         parts = line.split()
         if not parts or parts[0] not in {"I", "X", "S", "C", "R", "W", "T"}:

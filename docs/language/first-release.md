@@ -558,7 +558,8 @@ not establish checked source correspondence or machine/artifact acceptance.
   Capability and optional compiler simulator transcripts must contain exactly one
   complete terminal verdict and at least one retired instruction. Duplicate,
   conflicting, embedded-only or malformed verdicts, trace rows following the
-  terminal verdict, trap-loop diagnostics,
+  terminal verdict, trap-loop diagnostics, disagreement between a failure's
+  decimal code and its optional eight-digit hexadecimal rendering,
   malformed commit records, repeated or regressing retirement counters and memory
   records whose byte widths disagree with their values refuse even when the
   retained hashes are refreshed. Both stdout and stderr may carry simulator
