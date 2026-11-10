@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from toolchain import VelaError, concrete
+from toolchain import VelaError, concrete, inspection_syntax
 from toolchain.lsp_services import (
     Inspection,
     InspectionError,
@@ -17,7 +17,7 @@ from toolchain.lsp_services import (
 )
 from toolchain.source import SourceSnapshot
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 CONFIGURATION = "pure-default-v1"
 TARGET = "gallina-pure-v1"
 MAX_QUERY_RESULTS = 256
@@ -116,13 +116,16 @@ class Snapshot:
             return refuse("stale-snapshot")
         operation = query.get("operation")
         if not isinstance(operation, str) or operation not in {
-                "symbol-at", "type-at", "references", "symbols", "tokens", "token-at"}:
+                "symbol-at", "type-at", "references", "symbols", "tokens", "token-at",
+                "syntax", "syntax-at", "syntax-children"}:
             return refuse("unsupported-operation", "unsupported")
         required = {"schema", "snapshot", "operation"}
-        if operation in {"symbol-at", "type-at", "token-at"}:
+        if operation in {"symbol-at", "type-at", "token-at", "syntax-at"}:
             required.add("offset")
         elif operation == "references":
             required.add("symbol")
+        elif operation == "syntax-children":
+            required.add("node")
         if set(query) - {"limit"} != required:
             return refuse("malformed-request")
         limit = query.get("limit", MAX_QUERY_RESULTS)
@@ -137,6 +140,14 @@ class Snapshot:
             items = symbols
         elif operation == "tokens":
             items = cast("list[dict[str, object]]", current["concrete"])
+        elif operation == "syntax":
+            items = cast("list[dict[str, object]]", current["syntax"])
+        elif operation == "syntax-children":
+            nodes = cast("list[dict[str, object]]", current["syntax"])
+            node = next((item for item in nodes if item["id"] == query["node"]), None)
+            if node is None:
+                return refuse("stale-or-unknown-node")
+            items = [item for item in nodes if item["parent"] == node["id"]]
         elif operation == "references":
             handle = query["symbol"]
             if not isinstance(handle, str) or not any(item["id"] == handle for item in symbols):
@@ -148,6 +159,16 @@ class Snapshot:
                 self.document.byte_position(cast("int", offset))
             except (ValueError, TypeError):
                 return refuse("invalid-offset")
+            if operation == "syntax-at":
+                candidates = cast("list[dict[str, object]]", current["syntax"])
+                containing = [item for item in reversed(candidates)
+                              if cast("list[int]", item["span"])[0] <= cast("int", offset)
+                              < cast("list[int]", item["span"])[1]]
+                selected = min(containing, key=lambda item: cast("list[int]", item["span"])[1]
+                               - cast("list[int]", item["span"])[0], default=None)
+                items = [] if selected is None else [selected]
+                response.update(status="checked", complete=True, reason=None, total=len(items), items=items)
+                return response
             candidates = cast("list[dict[str, object]]", current["concrete"]) if operation == "token-at" else occurrences
             selected = next((item for item in candidates
                              if cast("list[int]", item["span"])[0] <= cast("int", offset)
@@ -177,38 +198,40 @@ def inspect(source: bytes, *, uri: str = "memory:vela", configuration: str = CON
     publication: dict[str, object] = {
         "schema": SCHEMA_VERSION, "scope": "vela-pure-inspection",
         "snapshot": identity, "binding": binding, "status": "unavailable", "complete": False,
-        "reason": None, "source": document.text, "symbols": [], "occurrences": [], "concrete": [],
-        "supported_views": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers"],
-        "unsupported_views": ["syntax-tree", "imports", "generated-origins", "proof", "lowering"]}
+        "reason": None, "source": document.text, "symbols": [], "occurrences": [], "concrete": [], "syntax": [],
+        "supported_views": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree"],
+        "unsupported_views": ["typed-expression-tree", "imports", "generated-origins", "proof", "lowering"]}
     if configuration != CONFIGURATION or target != TARGET:
         publication.update(status="unsupported", reason="unsupported-configuration-or-target")
     else:
         try:
             raw = dict(inspect_document(source, concrete=True))
             raw_concrete = raw.pop("concrete", None)
+            raw_syntax = raw.pop("syntax", None)
             facts = validate_inspection(document, raw)
             if facts is None:
                 publication["reason"] = raw["reason"]
             else:
                 symbols, occurrences = _facts(document, facts, identity)
                 pieces = concrete.validate(source, raw_concrete)
+                nodes = inspection_syntax.nodes(source, raw_syntax, identity)
                 publication.update(status="checked", complete=True, symbols=symbols,
-                                   occurrences=occurrences, concrete=pieces)
+                                   occurrences=occurrences, concrete=pieces, syntax=nodes)
         except InspectionError as error:
             timed_out = "exceeded 5 seconds" in str(error)
             publication.update(status="timed-out" if timed_out else "unavailable",
                                reason="producer-timeout" if timed_out else "producer-failure")
         except VelaError as error:
             publication["reason"] = error.kind
-        except ValueError:
+        except (ValueError, TypeError, KeyError):
             publication["reason"] = "producer-failure"
     if _binding(document, configuration, target) != binding:
         publication.update(status="refused", complete=False, reason="producer-changed",
-                           symbols=[], occurrences=[], concrete=[])
+                           symbols=[], occurrences=[], concrete=[], syntax=[])
     encoded = _encoded(publication)
     if len(encoded) > MAX_EXPORT_BYTES:
         publication.update(status="unavailable", complete=False, reason="export-limit",
-                           symbols=[], occurrences=[], concrete=[])
+                           symbols=[], occurrences=[], concrete=[], syntax=[])
         encoded = _encoded(publication)
         if len(encoded) > MAX_EXPORT_BYTES:
             raise ValueError("inspection source and provenance exceed export limit")

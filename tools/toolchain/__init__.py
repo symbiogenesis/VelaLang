@@ -647,14 +647,22 @@ def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEva
     return StaticEvaluation(result.value_type, result.value)
 
 
-def inspect_source(source: bytes) -> dict[str, object]:
+def inspect_source(source: bytes, *, syntax_tree: bool = False) -> dict[str, object]:
     """Return diagnostic resolution facts only after a complete successful pure check."""
-    module = parse_module(source)
+    response = None
+    if syntax_tree:
+        response = import_module("toolchain.parser_checked").parse_checked(source)
+        module = syntax.decode(source, response)
+    else:
+        module = parse_module(source)
     declaration_sites = {declaration.name.site: declaration.site
                          for declaration in module.declarations}
     facts = Facts(source, declaration_sites)
     _translate(source, module, facts)
-    return facts.result()
+    result = facts.result()
+    if response is not None:
+        result["syntax"] = response
+    return result
 
 
 def translate_ast(source: bytes, response: object) -> Translation:

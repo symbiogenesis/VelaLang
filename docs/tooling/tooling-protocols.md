@@ -228,13 +228,13 @@ checked-generation requests retain their separate metaprogramming obligations.
 
 ### Pure development snapshot increment
 
-`python tools/run.py vela inspect SOURCE` exports version 3 of the bounded
+`python tools/run.py vela inspect SOURCE` exports version 4 of the bounded
 pure inspection view. Its [JSON Schema](../../tools/toolchain/inspection.schema.json)
 covers bulk snapshots and query replies; the
 [implementation](../../tools/toolchain/inspection.py) consumes the existing
 [pure resolution producer](lsp-prototype.md#pure-navigation-increment) through its
-isolated five-second worker. This is partial Q25ch delivery. The wider frontend,
-syntax-tree, generated, proof and lowering views retain their producer prerequisites.
+isolated five-second worker. This is partial Q25ch delivery. Typed expression trees,
+the wider frontend, generated, proof and lowering views retain their producer prerequisites.
 
 Each snapshot preserves the exact UTF-8 source text, including comments, line
 endings and supplementary characters. The `concrete` view partitions that text
@@ -245,7 +245,8 @@ pure authoring token producer; trivia fills the gaps without normalizing line
 endings or discarding comments. Concatenating piece text reproduces the exact
 source. The worker boundary verifies contiguous coverage, byte spelling, token
 kinds and comment/trivia shapes. Only a successful complete pure check publishes
-pieces; this bounded view supplies no syntax tree or error-recovery nodes.
+pieces. The separate `syntax` view supplies the successful pure source tree;
+error-recovery nodes remain unavailable.
 Declaration and occurrence spans are
 half-open UTF-8 byte offsets. The view supplies source-ordered declaration kinds,
 compiler type/signature labels, structured scalar and callable types, authored
@@ -256,9 +257,26 @@ the corresponding `bool` object. Callable types carry `kind: "function"`, a
 `Nat`/`bool` result, ordered parameters with `type` and Boolean `required_static`
 fields, and a Boolean `const` field identifying constant-callable functions.
 The worker boundary checks type shapes, declaration kinds, parameter order and
-display-label agreement before publishing facts. It does not supply a syntax
+display-label agreement before publishing facts. It does not supply a typed expression
 tree, structural scope tree, inferred argument terms or generated definitions. Same-spelled declarations
 retain distinct identities; a symbol handle contains its complete snapshot digest.
+
+The `syntax` array is a bounded preorder tree projected from that same check's
+checked-parser response, with an independently owned presentation schema. The
+worker boundary decodes the complete located parser response again, checking its
+source digest, supported fields, delimiters, ordering and source coverage before
+publishing nodes. Each node has a snapshot-scoped `id`, a declared `kind`, a
+half-open UTF-8 byte `span`, its `parent`, a parent-field `role`, a nullable
+list `index` and ordered `children` handles. Scalar `value` records exact identifier,
+operator, type and decimal spellings or a Boolean literal; `const` records the
+Boolean callable/parameter qualifier. Other node values and qualifiers are `null`.
+Kinds cover modules, functions, constants, parameters, types, blocks, bindings,
+local constants, returns, conditionals, expression bodies, literals, names,
+calls, arguments, binary/unary operators, groups and identifier/operator leaves.
+Source parentheses, named-argument labels and expression bodies remain explicit.
+The tree supplies source structure, with no expression type inference, additional
+name resolution or semantic acceptance route. Syntax handles designate nodes
+only in their exact snapshot; they have the same lifetime as symbol handles.
 
 Snapshot identity binds the source URI and digest, the fixed `pure-default-v1`
 configuration and `gallina-pure-v1` target, Python implementation/version, and a
@@ -268,12 +286,17 @@ identities describe development inspection inputs; they supply no checked source
 correspondence, kernel or runtime-artifact acceptance. The isolated producer uses
 the existing checked-parser runtime qualification and integrity checks.
 
-`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 3`,
+`vela inspect SOURCE --query REQUEST.json` accepts a strict object with `schema: 4`,
 the exported `snapshot` digest and one `operation`: `symbols`, `symbol-at` or
 `type-at` with a byte `offset`, or `references` with a snapshot-scoped `symbol` handle.
 `tokens` returns the full concrete partition subject to the query limit;
 `token-at` with a byte `offset` selects its containing token or trivia piece.
 Piece spans are half-open; source EOF selects no piece.
+`syntax` returns the preorder node list; `syntax-children` with a `node` handle
+returns its immediate children in source-field order. `syntax-at` with a byte
+`offset` returns the deepest smallest containing node. Trivia between child
+nodes can select their containing parent; leading/trailing trivia outside the
+module span and source EOF select no node. Missing or foreign node handles refuse.
 `type-at` returns the resolved identifier's structured type, symbol handle and
 occurrence span, including at function calls and declarations. Same-spelled
 function and parameter references retain their separately resolved types. This
@@ -284,15 +307,15 @@ occurrences. An identifier's end, punctuation and comments select no symbol.
 Offsets inside UTF-8 characters or CRLF are refused. The Python `Snapshot.query`
 interface also requires the current source and rechecks URI, configuration, target
 and producer closure; a changed binding or cross-snapshot handle is refused.
-Version 3 makes the concrete partition mandatory alongside structured types.
-Version-1/2 queries and obsolete worker facts without the mandatory views are
+Version 4 makes the source syntax tree mandatory alongside concrete pieces and structured types.
+Version-1/2/3 queries and obsolete worker facts without the mandatory views are
 refused; no label-parsing compatibility path supplies missing semantic facts.
 Clients must select the published schema version.
 
 Bulk inspection retains the existing 65,536-byte source, 1,024-declaration and
-4,096-occurrence bounds, with an additional 16,384-piece concrete bound and a
+4,096-occurrence bounds, with additional 16,384-piece concrete and 8,192-node syntax bounds and a
 1,048,576-byte compact export bound. Exceeding either publication bound clears
-all semantic and concrete facts; a truncated partition cannot claim reconstruction.
+all semantic, concrete and syntax facts; a truncated partition or tree cannot claim completeness.
 Queries report
 the total result count; truncation returns `partial`, `complete: false` and
 `result-limit`. Only a complete successful pure check or query reports `checked`

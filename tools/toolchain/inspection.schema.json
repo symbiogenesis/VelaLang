@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vela pure development inspection version 3",
+  "title": "Vela pure development inspection version 4",
   "$defs": {
     "concrete": {
       "type": "object", "additionalProperties": false, "required": ["kind", "text", "span"],
@@ -15,6 +15,22 @@
       "items": false, "minItems": 2
     },
     "handle": {"type": "string", "pattern": "^[0-9a-f]{64}:symbol:[0-9]+$"},
+    "node_handle": {"type": "string", "pattern": "^[0-9a-f]{64}:node:[0-9]+$"},
+    "syntax": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "span", "parent", "role", "index", "children", "value", "const"],
+      "properties": {
+        "id": {"$ref": "#/$defs/node_handle"},
+        "kind": {"enum": ["module", "function", "constant", "parameter", "type", "block", "binding", "local-constant", "return", "if", "expression-body", "nat", "bool", "name", "call", "argument", "binary", "unary", "group", "identifier", "operator"]},
+        "span": {"$ref": "#/$defs/span"},
+        "parent": {"oneOf": [{"$ref": "#/$defs/node_handle"}, {"type": "null"}]},
+        "role": {"enum": ["root", "name", "declarations", "result", "parameters", "body", "type", "bindings", "exit", "value", "condition", "then", "else", "callee", "arguments", "label", "left", "operator", "right"]},
+        "index": {"type": ["integer", "null"], "minimum": 0},
+        "children": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/node_handle"}},
+        "value": {"type": ["string", "boolean", "null"]},
+        "const": {"type": ["boolean", "null"]}
+      }
+    },
     "type": {
       "oneOf": [
         {
@@ -94,7 +110,7 @@
   "type": "object",
   "required": ["schema", "scope", "snapshot", "binding", "status", "complete", "reason"],
   "properties": {
-    "schema": {"const": 3}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
+    "schema": {"const": 4}, "snapshot": {"$ref": "#/$defs/digest"}, "binding": {"$ref": "#/$defs/binding"},
     "status": {"enum": ["checked", "unavailable", "timed-out", "partial", "unsupported", "refused"]},
     "complete": {"type": "boolean"}, "reason": {"type": ["string", "null"]}
   },
@@ -107,25 +123,26 @@
     {
       "oneOf": [
         {
-          "required": ["source", "symbols", "occurrences", "concrete", "supported_views", "unsupported_views"],
+          "required": ["source", "symbols", "occurrences", "concrete", "syntax", "supported_views", "unsupported_views"],
           "properties": {
             "scope": {"const": "vela-pure-inspection"}, "source": {"type": "string"},
             "symbols": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/symbol"}},
             "occurrences": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/occurrence"}},
             "concrete": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/concrete"}},
-            "supported_views": {"const": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers"]},
-            "unsupported_views": {"const": ["syntax-tree", "imports", "generated-origins", "proof", "lowering"]}
+            "syntax": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/syntax"}},
+            "supported_views": {"const": ["source-text", "pure-concrete-pieces", "pure-resolved-identifiers", "pure-syntax-tree"]},
+            "unsupported_views": {"const": ["typed-expression-tree", "imports", "generated-origins", "proof", "lowering"]}
           },
           "allOf": [{
             "if": {"properties": {"status": {"not": {"const": "checked"}}}},
-            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}, "concrete": {"maxItems": 0}}}
+            "then": {"properties": {"symbols": {"maxItems": 0}, "occurrences": {"maxItems": 0}, "concrete": {"maxItems": 0}, "syntax": {"maxItems": 0}}}
           }]
         },
         {
           "required": ["items", "total"],
           "properties": {
             "scope": {"const": "vela-pure-inspection-query"}, "total": {"type": "integer", "minimum": 0},
-            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}, {"$ref": "#/$defs/concrete"}]}}
+            "items": {"type": "array", "maxItems": 256, "items": {"oneOf": [{"$ref": "#/$defs/symbol"}, {"$ref": "#/$defs/occurrence"}, {"$ref": "#/$defs/type_at"}, {"$ref": "#/$defs/concrete"}, {"$ref": "#/$defs/syntax"}]}}
           }
         }
       ]

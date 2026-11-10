@@ -26,7 +26,7 @@ EXPECTED = [
 
 
 def _request(snapshot: inspection.Snapshot, operation: str, **fields: object) -> dict[str, object]:
-    return {"schema": 3, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
+    return {"schema": 4, "snapshot": snapshot.export()["snapshot"], "operation": operation, **fields}
 
 
 def _reconstruct_and_locate() -> None:
@@ -69,7 +69,7 @@ def _bounds_and_freshness() -> None:
     ensure(snapshot.query(SOURCE + b" ", query)["reason"] == "stale-input", "stale concrete pieces reused")
     old = snapshot.query(SOURCE, {**query, "schema": 2})
     ensure(old["reason"] == "schema-version", "schema-2 query silently selected schema-3 concrete semantics")
-    raw = {**inspect_source(SOURCE), "concrete": concrete.parts(SOURCE)}
+    raw = {**inspect_source(SOURCE, syntax_tree=True), "concrete": concrete.parts(SOURCE)}
     with patch.object(inspection, "inspect_document", return_value=raw), patch.object(concrete, "MAX_CONCRETE_PARTS", 2):
         bounded = inspection.inspect(SOURCE).export()
     ensure(bounded["status"] == "unavailable" and bounded["concrete"] == []
@@ -77,7 +77,7 @@ def _bounds_and_freshness() -> None:
 
 
 def _corrupt_worker_refusal() -> None:
-    raw = {**inspect_source(SOURCE), "concrete": concrete.parts(SOURCE)}
+    raw = {**inspect_source(SOURCE, syntax_tree=True), "concrete": concrete.parts(SOURCE)}
     pieces = raw["concrete"]
     corruptions: list[object] = [None, pieces[:-1], pieces[1:], [*pieces, pieces[-1]]]
     for index, fields in ((0, {"kind": "line-comment"}), (2, {"kind": "identifier"}),
