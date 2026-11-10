@@ -30,6 +30,39 @@ modification, and distribution with its copyright and permission notice. Browser
 assets and upstream notices are served directly from the package CDN rather than
 vendored into this repository or shipped in a VerifiedOS image.
 
+<a id="independent-trace-importer"></a>
+
+## Independent trace importer
+
+The optional [pure trace qualification](docs/tooling/pure-prototype.md#bounded-compiler-traces)
+uses an externally provisioned Perfetto `v58.2` `trace_processor_shell`, revision
+`add693d8b338ba9599dbcbc3e300b1ab8c000897`. Its revision's
+[LICENSE](https://github.com/google/perfetto/blob/v58.2/LICENSE)
+was read on 2026-11-09 (SHA-256
+`9a682a56cffc9524dfa9b0b1c0dca9cb81a19e96d5bd0793aaf02c08a95ee7ca`):
+Apache-2.0 for the principal work, copyright 2017 The Android Open Source
+Project, with the file-specific Chromium BSD notice, syntaqlite Apache-2.0
+notice, public-domain parser-grammar declaration and Niels Provos BSD notice
+stated in that same file. The reader runs only as an independent local
+development tool; no upstream source, executable, library or wrapper is copied
+into the tracked tree, compiler runtime or a Vela/VerifiedOS image. This record
+does not authorize a distribution closure.
+
+The harness accepts these exact official standalone prebuilts, checking bytes
+before and after qualification and checking their reported source revision:
+
+| Target | Official executable | SHA-256 |
+| --- | --- | --- |
+| Windows AMD64 | [trace_processor_shell.exe](https://commondatastorage.googleapis.com/perfetto-luci-artifacts/v58.2/windows-amd64/trace_processor_shell.exe) | `adfa6bad3d72be3ba9b83fa2b17b69fa13b3ab1cad0f42e52b86188bd5f0f997` |
+| Linux AMD64 | [trace_processor_shell](https://commondatastorage.googleapis.com/perfetto-luci-artifacts/v58.2/linux-amd64/trace_processor_shell) | `58042408e6cc861fb1a731c26bb082dc222285561eaa4e12a48a8b2b90dca7b9` |
+| Linux ARM64 | [trace_processor_shell](https://commondatastorage.googleapis.com/perfetto-luci-artifacts/v58.2/linux-arm64/trace_processor_shell) | `0e6e0c5452c505c8d46fe472fd196a0d17d963460727e2ce2013b02aa1309555` |
+
+The command requires the reader path explicitly and performs no downloads or
+dependency installation. The executable remains in an ignored external-tool
+directory alongside the upstream license; retained reports contain Vela-authored
+fixture data, SQL observations and tool identities. Qualification of one target
+does not claim execution on every target in the pin table or browser UI coverage.
+
 <a id="development-tools-contained-by-use"></a>
 
 ## Development parser generator

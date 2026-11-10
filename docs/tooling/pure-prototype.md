@@ -341,6 +341,7 @@ python tools/run.py vela trace examples/pure.vela --output out/pure-trace.json
 python tools/run.py vela trace-validate out/pure-trace.json --source examples/pure.vela
 python tools/run.py vela trace-benchmark examples/pure.vela --output out/pure-trace-comparison.json
 python tools/run.py vela trace-benchmark-validate out/pure-trace-comparison.json --source examples/pure.vela
+python tools/run.py vela trace-qualify-viewer --trace-processor /path/to/trace_processor_shell --output out/trace-viewer.json
 ```
 
 The read-only trace command records `compile`, nested `parse` and
@@ -352,7 +353,8 @@ Trace Event `C` records, and completed phases use `X` records with recording-rel
 integer microseconds derived from `perf_counter_ns`. The fixed worker identities
 are `pid: 1`, `tid: 1`; they describe this recording, not operating-system IDs.
 [Perfetto documents these event formats](https://perfetto.dev/docs/getting-started/other-formats)
-as an input to its viewer. No external viewer is qualified by this increment.
+as an input to its viewer. The optional qualification command checks a pinned
+independent importer as described below.
 
 The `vela` schema-1 manifest binds events and completeness metadata, exact source
 bytes, local Python/compiler/parser input files and Python/platform versions.
@@ -406,7 +408,34 @@ recover expected order, durations, nesting and counters with a separate JSON rea
 and exercise corruption, overflow, clock and refusal controls.
 [Paired-measurement fixtures](../../tools/tests/test_vela_trace_benchmark.py) check
 independently chosen timing totals, warmup exclusion, output equivalence, binding
-and publication refusals. Wider phase/worker coverage, pinned external-viewer
-qualification, exact runtime closure and workload-specific overhead qualification
-remain open under Q25cp. Compiler timings supply no execution time, WCET or
-constant-time evidence for emitted programs.
+and publication refusals.
+
+`trace-qualify-viewer` accepts an already provisioned Perfetto `v58.2`
+`trace_processor_shell`; it performs no downloads and changes no dependencies.
+The selected executable must match one of the reviewed Windows AMD64, Linux
+AMD64 or Linux ARM64 SHA-256 pins in the
+[qualification harness](../../tools/toolchain/trace_viewer.py), then report
+revision `add693d8b338ba9599dbcbc3e300b1ab8c000897`. The
+[license and use record](../../THIRD-PARTY.md#independent-trace-importer) owns
+provisioning links and terms. Other binaries refuse before execution.
+
+The harness validates a deterministic Chrome trace and verifies seven negative
+controls before handoff: stale source/producer, missing phases, crossing spans,
+negative timestamps, dropped events and cancellation. Perfetto imports the valid
+fixture and executes two fixed SQL queries. Independently chosen expected rows
+require three spans with exact nanosecond timestamps/durations, parent/child
+depth and worker identities, plus both byte counters. The report retains the
+fixture, queries, imported CSV and parsed rows, version/diagnostic transcripts,
+negative-control results, executable/revision and harness identities, and a
+binding over the complete report. Each reader invocation has a 30-second timeout
+and bounded accepted output. Hashes detect changes and authenticate no measurement.
+Reader/harness changes withdraw qualification; atomic publication preserves
+existing evidence after failures or cancellation and refuses output aliases.
+[Reader qualification tests](../../tools/tests/test_vela_trace_viewer.py) cover
+wrong independent observations, disabled negative checks, unknown binaries,
+timeouts, output bounds, aliases and late identity changes.
+
+This qualifies the selected Perfetto importer for the deterministic pure trace
+profile. Browser UI rendering, wider phase/worker coverage, exact runtime closure
+and workload-specific overhead qualification remain open under Q25cp. Compiler
+timings supply no execution time, WCET or constant-time evidence for emitted programs.
