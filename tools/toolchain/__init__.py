@@ -433,6 +433,13 @@ class _Elaborator:
             if local is None:
                 raise _error("name", f"unbound value '{name}'", site)
             self._reference(local.symbol, site)
+            if self.facts is not None and self.facts.collect_completion_options:
+                available = {**self.constants, **environment}
+                choices = tuple(candidate.symbol for candidate in available.values()
+                                if candidate.symbol is not None and candidate.value_type == local.value_type
+                                and (not (local.required_static or local.static is not None)
+                                     or candidate.required_static or candidate.static is not None))
+                self.facts.visible_values(site, choices)
             return _Expression(local.value_type, local.gallina if local.gallina is not None
                                else f"v_{name}" if name in environment else f"c_{name}")
         # Specialization may expand a short source argument into a large term.
@@ -674,7 +681,8 @@ def evaluate(source: bytes, expression: str, value_type: ValueType) -> StaticEva
     return StaticEvaluation(result.value_type, result.value)
 
 
-def inspect_source(source: bytes, *, syntax_tree: bool = False) -> dict[str, object]:
+def inspect_source(source: bytes, *, syntax_tree: bool = False,
+                   completion_options: bool = False) -> dict[str, object]:
     """Return diagnostic resolution facts only after a complete successful pure check."""
     response = None
     if syntax_tree:
@@ -684,7 +692,8 @@ def inspect_source(source: bytes, *, syntax_tree: bool = False) -> dict[str, obj
         module = parse_module(source)
     declaration_sites = {declaration.name.site: declaration.site
                          for declaration in module.declarations}
-    facts = Facts(source, declaration_sites, expression_types=syntax_tree)
+    facts = Facts(source, declaration_sites, expression_types=syntax_tree,
+                  completion_options=completion_options)
     facts.enter_scope("module", module.name.site)
     _translate(source, module, facts)
     result = facts.result(expression_types=syntax_tree)

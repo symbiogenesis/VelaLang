@@ -33,10 +33,11 @@ def main() -> int:
             return 1
         print(encoded, end="")
         return 0
-    if sys.argv[1:] in (["--inspect"], ["--inspect-snapshot"]):
+    if sys.argv[1:] in (["--inspect"], ["--inspect-snapshot"], ["--inspect-completion"]):
         digest = hashlib.sha256(source).hexdigest()
         try:
-            inspection = inspect_source(source, syntax_tree=sys.argv[1:] == ["--inspect-snapshot"])
+            inspection = inspect_source(source, syntax_tree=sys.argv[1:] == ["--inspect-snapshot"],
+                                        completion_options=sys.argv[1:] == ["--inspect-completion"])
             if sys.argv[1:] == ["--inspect-snapshot"]:
                 inspection["concrete"] = parts(source)
         except VelaError as error:

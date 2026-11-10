@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded callable discovery from checked pure facts and compiler token boundaries."""
+"""Bounded value and callable discovery from checked pure compiler facts."""
 
 from dataclasses import dataclass
 from typing import cast
@@ -29,28 +29,33 @@ def _parameters(inspection: Inspection, identity: int) -> list[str]:
 
 def _completion(snapshot: SourceSnapshot, inspection: Inspection, position: Position) -> object:
     selected = next((item for item in inspection.occurrences
-                     if not item.declaration and item.start <= position <= item.end
-                     and inspection.symbols[item.symbol].kind == "function"), None)
+                     if not item.declaration and item.start <= position <= item.end), None)
     if selected is None:
         return {"isIncomplete": False, "items": []}
     symbol = inspection.symbols[selected.symbol]
     first = snapshot.position_byte_offset(*selected.start)
     cursor = snapshot.position_byte_offset(*position)
     prefix = snapshot.source[first:cursor].decode("ascii")
-    parameters = _parameters(inspection, selected.symbol)
+    callable_use = symbol.kind == "function"
+    parameters = _parameters(inspection, selected.symbol) if callable_use else []
+    choices = next((identities for start, identities in inspection.completions
+                    if start == selected.start), ())
     items: list[dict[str, object]] = []
     for identity, candidate in enumerate(inspection.symbols):
-        if (candidate.kind != "function" or candidate.start > symbol.start
+        if callable_use and (candidate.kind != "function" or candidate.start > symbol.start
                 or candidate.value_type != symbol.value_type or not candidate.name.startswith(prefix)
                 or _parameters(inspection, identity) != parameters):
             continue
-        item: dict[str, object] = {"label": candidate.name, "kind": 3, "detail": candidate.detail,
+        if not callable_use and (identity not in choices or not candidate.name.startswith(prefix)):
+            continue
+        item: dict[str, object] = {"label": candidate.name, "kind": 3 if callable_use else (
+                                      21 if candidate.kind == "constant" else 6), "detail": candidate.detail,
                                   "textEdit": {"range": _range(selected.start, selected.end),
                                                "newText": candidate.name}}
         if candidate.documentation is not None:
             item["documentation"] = {"kind": "plaintext", "value": candidate.documentation}
         items.append(item)
-    # Scope-wide and incomplete-source completion need additional compiler facts.
+    # Empty and incomplete-source insertion sites need additional compiler facts.
     return {"isIncomplete": True, "items": items}
 
 
