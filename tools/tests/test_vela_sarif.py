@@ -138,6 +138,11 @@ def _incomplete() -> None:
     document = sarif.export((SOURCE,), PRODUCER, checker=_checked, formatter=unavailable, format_fixes=True)
     ensure(sarif.validate(document, (SOURCE,), PRODUCER)["complete"] is False,
            "requested but unavailable formatter appeared complete")
+    document = sarif.export((SOURCE,), PRODUCER, checker=_checked, format_fixes=True,
+                            formatter=lambda source: {"status": "unavailable", "reason": "unsupported",
+                                                       "source_sha256": hashlib.sha256(source).hexdigest()})
+    ensure(sarif.validate(document, (SOURCE,), PRODUCER)["complete"] is False,
+           "LSP's harmless empty-format response hid an unfinished batch formatter")
 
 
 def _corruptions() -> None:

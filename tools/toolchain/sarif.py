@@ -76,6 +76,14 @@ def _result(item: Input, index: int, rule: str, message: str, line: int, column:
             "message": {"text": message}, "locations": [_location(item, index, line, column)]}
 
 
+def _format_edits(item: Input, formatter: Formatter) -> list[Object]:
+    formatted = formatter(item.source)
+    edits = formatting_edits(item.snapshot(), formatted)
+    if formatted.get("status") != "ok":
+        raise InspectionError("requested canonical formatter did not finish")
+    return edits
+
+
 def export(inputs: tuple[Input, ...], producer: str, *, format_fixes: bool = False,
            checker: Checker = diagnose, formatter: Formatter = format_document) -> Object:
     """Project producer judgments without independently reimplementing analysis."""
@@ -102,7 +110,7 @@ def export(inputs: tuple[Input, ...], producer: str, *, format_fixes: bool = Fal
                                    diagnostic["message"], diagnostic["line"], diagnostic["column"]))
         elif format_fixes:
             try:
-                edits = formatting_edits(item.snapshot(), formatter(item.source))
+                edits = _format_edits(item, formatter)
             except InspectionError:
                 status = "format-unavailable"
                 results.append(_result(item, index, "VELA-FORMAT-UNAVAILABLE",
