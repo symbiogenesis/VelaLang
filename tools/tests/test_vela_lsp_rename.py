@@ -136,14 +136,16 @@ def _stale_and_failed_candidate() -> None:
         server.handle(_notice("textDocument/didChange", {"textDocument": {"uri": _URI, "version": 8},
             "contentChanges": [{"text": _TEXT}]}))
     ensure(_error_code(_query(server)) == -32801, "desynchronized overlay offered an edit")
-    for failure in (InspectionError("unavailable"), {"status": "unavailable", "reason": "type"}):
+    failures: tuple[Exception | dict[str, object], ...] = (
+        InspectionError("unavailable"), {"status": "unavailable", "reason": "type"})
+    for failure in failures:
         server = _server()
         _query(server, method="textDocument/prepareRename")
 
-        def inspect(_source: bytes) -> dict[str, object]:
-            if isinstance(failure, Exception):
-                raise failure
-            return copy.deepcopy(failure)
+        def inspect(_source: bytes, refused: Exception | dict[str, object] = failure) -> dict[str, object]:
+            if isinstance(refused, Exception):
+                raise refused
+            return copy.deepcopy(refused)
 
         server.inspector = inspect
         reply = _query(server)
@@ -153,14 +155,15 @@ def _stale_and_failed_candidate() -> None:
         server = _server()
         original = server.documents[_URI]
 
-        def inspect(source: bytes, kind: str = invalidation) -> dict[str, object]:
-            if source != original.source:
+        def inspect(source: bytes, kind: str = invalidation, target: Server = server,
+                    snapshot: SourceSnapshot = original) -> dict[str, object]:
+            if source != snapshot.source:
                 if kind == "generation":
-                    server.invalidate_inspections()
+                    target.invalidate_inspections()
                 elif kind == "producer":
-                    server.inspector = _inspect
+                    target.inspector = _inspect
                 else:
-                    server.handle(_notice("textDocument/didChange", {
+                    target.handle(_notice("textDocument/didChange", {
                         "textDocument": {"uri": _URI, "version": 8}, "contentChanges": [{"text": _TEXT}]}))
             return _inspect(source)
 
