@@ -63,7 +63,6 @@ def _completion(snapshot: SourceSnapshot, inspection: Inspection, position: Posi
         if candidate.documentation is not None:
             item["documentation"] = {"kind": "plaintext", "value": candidate.documentation}
         items.append(item)
-    # Empty and incomplete-source insertion sites need additional compiler facts.
     return {"isIncomplete": True, "items": items}
 
 

@@ -203,6 +203,7 @@ RECOVERED_SOURCE = UNSUPPORTED_ERROR_SOURCE.replace(
 )
 
 DELTA_SOURCE = "// \U0001f600 delta\r\nmodule Delta;\r\npublic Nat Id(Nat value) => value;\r\n"
+RECOVERY_COMPLETION_SOURCE = "// \U0001f600 recovery\r\nmodule Recovery;\r\npublic Nat Use(Nat amount) => amzzz;\r\n"
 DELTA_TOKEN_DATA = [2, 11, 2, 0, 1, 0, 7, 5, 1, 3, 0, 10, 5, 1, 2]
 
 NEOVIM_SCRIPT = r"""
@@ -513,6 +514,22 @@ if not ok_watch_diag then
   fail("timed out waiting for didChangeWatchedFiles diagnostics")
 end
 
+prev_diag_count = #diag_events
+vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+  "// 😀 recovery\r", "module Recovery;\r", "public Nat Use(Nat amount) => amzzz;\r",
+})
+if not vim.wait(10000, function()
+  return #diag_events > prev_diag_count and #diag_events[#diag_events] == 1
+end, 10) then fail("timed out waiting for unfinished-source diagnostics") end
+local recovery_completion = sync_request("textDocument/completion", pos_params(2, 32))
+prev_diag_count = #diag_events
+vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+  "// 😀 delta\r", "module Delta;\r", "public Nat Id(Nat value) => value;\r",
+})
+if not vim.wait(10000, function()
+  return #diag_events > prev_diag_count and #diag_events[#diag_events] == 0
+end, 10) then fail("timed out waiting for source restoration after completion") end
+
 client:notify("$/cancelRequest", { id = 99999 })
 
 vim.api.nvim_buf_delete(bufnr, { force = true })
@@ -539,6 +556,7 @@ local out = {
   stage5 = stage5,
   stage6 = stage6,
   delta = delta,
+  recovery_completion = recovery_completion,
 }
 
 client:stop()
@@ -813,6 +831,14 @@ def RunQualification()
   lserver.sendNotification('$/cancelRequest', {id: 99999})
   WaitUntil(() => diag.GetDiagsForBuf(bnr)->empty(), 'post-notification clean diagnostics')
 
+  setline(1, ["// 😀 recovery\r", "module Recovery;\r", "public Nat Use(Nat amount) => amzzz;\r"])
+  listener_flush()
+  WaitUntil(() => diag.GetDiagsForBuf(bnr)->len() == 1 && diag.GetDiagsForBuf(bnr)[0]->get('code', '') == 'name', 'unfinished-source diagnostics')
+  var recovery_completion = RpcResult(lserver, 'textDocument/completion', PosParams(2, 32))
+  setline(1, ["// 😀 delta\r", "module Delta;\r", "public Nat Id(Nat value) => value;\r"])
+  listener_flush()
+  WaitUntil(() => diag.GetDiagsForBuf(bnr)->empty(), 'source restoration after completion')
+
   var raw_caps = lserver.caps->deepcopy()
   var srv_info = raw_caps->get('~additionalInitResult_serverInfo', {})
   if raw_caps->has_key('~additionalInitResult_serverInfo')
@@ -848,6 +874,7 @@ def RunQualification()
       base: delta_base, changed: delta_changed, unchanged: delta_unchanged,
       unknown: delta_unknown, invalidated: delta_invalidated,
     },
+    recovery_completion: recovery_completion,
   }
   writefile([json_encode(out)], out_path)
 enddef
@@ -1170,6 +1197,12 @@ def _discovery_expectations() -> dict[str, object]:
     }
 
 
+def _recovery_completion_expectation() -> dict[str, object]:
+    return {"isIncomplete": True, "items": [{"label": "amount", "kind": 6, "detail": "amount: Nat",
+        "textEdit": {"range": {"start": {"line": 2, "character": 30},
+                               "end": {"line": 2, "character": 35}}, "newText": "amount"}}]}
+
+
 def expected_scenario_oracle(uri: str) -> dict[str, object]:
     """Compute the independent pure Vela oracle expectations for the 6-stage scenario."""
     snap1 = SourceSnapshot(uri, 1, INITIAL_SOURCE, 1)
@@ -1418,7 +1451,8 @@ def _wire_source_edit(text: str, change: dict[str, object]) -> str:
 
 
 def verify_client_observation(observation: dict[str, object], oracle: dict[str, object], *,
-                              require_token_deltas: bool = False) -> None:
+                              require_token_deltas: bool = False,
+                              require_recovery_completion: bool = False) -> None:
     """Verify a client's recorded scenario observations against the independent oracle."""
     label = str(observation.get("client", "unknown"))
     _require(observation.get("offset_encoding") == "utf-16", f"{label}: offset_encoding is not utf-16")
@@ -1494,6 +1528,9 @@ def verify_client_observation(observation: dict[str, object], oracle: dict[str, 
     if require_token_deltas:
         recovered = _object(oracle6["recovered_semantic_tokens"])
         _verify_delta_observation(observation.get("delta"), cast("list[int]", recovered["data"]))
+    if require_recovery_completion:
+        _require(observation.get("recovery_completion") == _recovery_completion_expectation(),
+                 f"{label}: incomplete-source completion differs from the independent expectation")
 
 
 def verify_wire_transcript(
@@ -1505,6 +1542,7 @@ def verify_wire_transcript(
     require_local_rename: bool = False,
     rename_observation: object = None,
     discovery_observation: object = None,
+    recovery_observation: object = None,
 ) -> dict[str, object]:
     """Verify a server-recorded bidirectional JSON-RPC wire transcript."""
     _require(
@@ -1537,6 +1575,9 @@ def verify_wire_transcript(
     rename_responses: dict[str, object] = {}
     discovery_requests: dict[object, tuple[str, object, str | None]] = {}
     discovery_responses: dict[str, object] = {}
+    recovery_requests: dict[object, tuple[object, str | None, bool]] = {}
+    recovery_responses: list[object] = []
+    recovery_diagnostics: set[str] = set()
     versioned_rename = False
     observed = {} if delta_observation is None else _object(delta_observation)
     if observed:
@@ -1562,7 +1603,11 @@ def verify_wire_transcript(
                 if discovery_observation is not None and method in {"textDocument/completion", "textDocument/signatureHelp"}:
                     params = _object(message.get("params"))
                     uri = str(_object(params.get("textDocument")).get("uri"))
-                    discovery_requests[req_id] = (method, params.get("position"), sources.get(uri))
+                    if recovery_observation is not None and sources.get(uri) == RECOVERY_COMPLETION_SOURCE:
+                        _require(method == "textDocument/completion", "recovery probe requested unsupported signature help")
+                        recovery_requests[req_id] = (params.get("position"), sources.get(uri), uri in recovery_diagnostics)
+                    else:
+                        discovery_requests[req_id] = (method, params.get("position"), sources.get(uri))
                 if method.startswith("textDocument/semanticTokens/full"):
                     token_requests[req_id] = _object(message.get("params"))
                     uri = str(_object(token_requests[req_id].get("textDocument")).get("uri"))
@@ -1594,10 +1639,11 @@ def verify_wire_transcript(
                 params = _object(message.get("params"))
                 changes = _array(params.get("contentChanges"))
                 uri = str(_object(params.get("textDocument")).get("uri"))
+                recovery_diagnostics.discard(uri)
                 versions[uri] = cast("int", _object(params.get("textDocument")).get("version"))
                 for raw_change in changes:
                     change = _object(raw_change)
-                    if require_token_deltas or require_local_rename:
+                    if require_token_deltas or require_local_rename or recovery_observation is not None:
                         _require(uri in sources, "wire edit has no open source")
                         sources[uri] = _wire_source_edit(sources[uri], change)
                         crlf_delta_edit |= sources[uri] == DELTA_SOURCE
@@ -1626,6 +1672,11 @@ def verify_wire_transcript(
                         )
                         codes.append(str(diag.get("code", "")))
                     published_codes.append(codes)
+                    uri = str(params.get("uri"))
+                    if sources.get(uri) == RECOVERY_COMPLETION_SOURCE and codes == ["name"]:
+                        recovery_diagnostics.add(uri)
+                    else:
+                        recovery_diagnostics.discard(uri)
             else:
                 _require("id" in message, f"server response frame[{expected_index}] missing id")
                 req_id = message["id"]
@@ -1640,6 +1691,14 @@ def verify_wire_transcript(
                     continue
                 _require("error" not in message, f"unexpected error reply on wire: {message!r}")
                 correlated_responses += 1
+                if req_id in recovery_requests:
+                    position, source, original_diagnostic = recovery_requests[req_id]
+                    _require(position == {"line": 2, "character": 32}
+                             and source == RECOVERY_COMPLETION_SOURCE and original_diagnostic,
+                             "wire recovery probe used a different source or cursor")
+                    _require(message.get("result") == _recovery_completion_expectation(),
+                             "wire recovery completion differs from the independent expectation")
+                    recovery_responses.append(message["result"])
                 if req_id in discovery_requests:
                     method, position, source = discovery_requests[req_id]
                     key = next((name for name, operation, line, column in (
@@ -1797,6 +1856,9 @@ def verify_wire_transcript(
                  "wire session omitted callable/value completion or signature help")
         _require(all(observation.get(key) == value for key, value in discovery_responses.items()),
                  "observed discovery differs from wire evidence")
+    if recovery_observation is not None:
+        _require(recovery_responses == [recovery_observation] and ["name"] in published_codes,
+                 "wire session omitted or changed incomplete-source completion or its original diagnostic")
     return {
         "frame_count": len(frames),
         "client_frame_count": len(client_methods),
@@ -1812,6 +1874,7 @@ def verify_wire_transcript(
         "local_rename_responses": len(rename_responses),
         "callable_discovery_responses": len(discovery_responses) - int("completion_start_value" in discovery_responses),
         "value_completion_responses": int("completion_start_value" in discovery_responses),
+        "recovery_completion_responses": len(recovery_responses),
         "versioned_local_rename": versioned_rename,
     }
 
@@ -1831,11 +1894,12 @@ def _verify_editor_session_artifacts(
     observation = _object(json.loads(observation_raw), f"{label} observation")
     transcript = _object(json.loads(transcript_raw), f"{label} transcript")
     oracle = expected_scenario_oracle(str(observation.get("uri", "")))
-    verify_client_observation(observation, oracle, require_token_deltas=True)
+    verify_client_observation(observation, oracle, require_token_deltas=True, require_recovery_completion=True)
     summary = verify_wire_transcript(transcript, require_ranged_change=require_ranged_change,
                                      require_token_deltas=True, delta_observation=observation["delta"],
                                      require_local_rename=True, rename_observation=observation["stage1"],
-                                     discovery_observation=observation["stage1"])
+                                     discovery_observation=observation["stage1"],
+                                     recovery_observation=observation["recovery_completion"])
     return (_sha256(observation_raw), _sha256(transcript_raw), summary,
             observation_raw.decode("utf-8"), transcript_raw.decode("utf-8"))
 

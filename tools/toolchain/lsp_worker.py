@@ -8,6 +8,7 @@ from pathlib import Path
 
 from toolchain import MAX_SOURCE_BYTES, VelaError, inspect_source, translate
 from toolchain.authoring import format_source
+from toolchain.completion import recover
 from toolchain.concrete import parts
 from toolchain.protocol_json import MAX_BODY_BYTES
 
@@ -22,6 +23,17 @@ def worker_command(*args: str) -> list[str]:
 
 def main() -> int:
     source = sys.stdin.buffer.read(MAX_SOURCE_BYTES + 1)
+    if len(sys.argv) == 3 and sys.argv[1] == "--complete-at":
+        try:
+            result = recover(source, int(sys.argv[2]))
+        except (ValueError, VelaError):
+            return 2
+        result["source_sha256"] = hashlib.sha256(source).hexdigest()
+        encoded = json.dumps(result, ensure_ascii=True)
+        if len(encoded.encode("utf-8")) > MAX_BODY_BYTES:
+            return 1
+        print(encoded, end="")
+        return 0
     if sys.argv[1:] == ["--format"]:
         result: dict[str, object] = {"source_sha256": hashlib.sha256(source).hexdigest()}
         try:

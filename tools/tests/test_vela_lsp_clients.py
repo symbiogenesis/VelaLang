@@ -828,6 +828,62 @@ def _callable_discovery_wire_controls() -> None:
     _refuses(lambda: verify(omitted), "missing value completion traffic")
 
 
+def _recovery_completion_wire_controls() -> None:
+    _, observation, transcript = _synthetic_session(incremental=True)
+    expected: dict[str, object] = {"isIncomplete": True, "items": [{
+        "label": "amount", "kind": 6, "detail": "amount: Nat", "textEdit": {"range": {
+            "start": {"line": 2, "character": 30}, "end": {"line": 2, "character": 35}},
+            "newText": "amount"}}]}
+    frames = cast("list[dict[str, object]]", transcript["frames"])
+    close = next(index for index, frame in enumerate(frames)
+                 if cast("dict[str, object]", frame["message"]).get("method") == "textDocument/didClose")
+    injected: list[dict[str, object]] = []
+    for direction, message in (
+            ("client_to_server", {"method": "textDocument/didChange", "params": {
+                "textDocument": {"uri": _URI, "version": 8},
+                "contentChanges": [{"text": lsp_clients.RECOVERY_COMPLETION_SOURCE}]}}),
+            ("server_to_client", {"method": "textDocument/publishDiagnostics", "params": {
+                "uri": _URI, "diagnostics": [{"code": "name", "data": {
+                    "unqualified": True, "snapshot": "recovery", "generation": 8}}]}}),
+            ("client_to_server", {"id": 9001, "method": "textDocument/completion", "params": {
+                "textDocument": {"uri": _URI}, "position": {"line": 2, "character": 32}}}),
+            ("server_to_client", {"id": 9001, "result": expected})):
+        injected.append({"direction": direction, "message": {"jsonrpc": "2.0", **message}})
+    frames[close:close] = injected
+    for index, frame in enumerate(frames):
+        frame["index"] = index
+    def verify(value: dict[str, object], recovered: object = expected) -> dict[str, object]:
+        return lsp_clients.verify_wire_transcript(value, require_ranged_change=True,
+            discovery_observation=observation["stage1"], recovery_observation=recovered)
+    ensure(verify(transcript)["recovery_completion_responses"] == 1,
+           "wire consumer omitted the incomplete-source completion response")
+    for mutation in ("cursor", "response", "source", "diagnostic", "missing"):
+        corrupted = copy.deepcopy(transcript)
+        changed_frames = cast("list[dict[str, object]]", corrupted["frames"])
+        for frame in changed_frames:
+            message = cast("dict[str, object]", frame["message"])
+            if mutation == "cursor" and message.get("method") == "textDocument/completion" and message.get("id") == 9001:
+                cast("dict[str, object]", message["params"])["position"] = {"line": 2, "character": 31}
+            elif mutation == "response" and message.get("id") == 9001 and "result" in message:
+                message["result"] = {"isIncomplete": False, "items": []}
+            elif mutation == "source" and message.get("method") == "textDocument/didChange":
+                params = cast("dict[str, object]", message["params"])
+                if cast("dict[str, object]", params["textDocument"]).get("version") == 8:
+                    params["contentChanges"] = [{"text": lsp_clients.RECOVERY_COMPLETION_SOURCE.replace("amzzz", "changed")}]
+            elif mutation == "diagnostic" and message.get("method") == "textDocument/publishDiagnostics":
+                params = cast("dict[str, object]", message["params"])
+                for diagnostic in cast("list[dict[str, object]]", params["diagnostics"]):
+                    if diagnostic.get("code") == "name":
+                        diagnostic["code"] = "type"
+        if mutation == "missing":
+            corrupted["frames"] = [frame for frame in changed_frames
+                if cast("dict[str, object]", frame["message"]).get("id") != 9001]
+            for index, frame in enumerate(corrupted["frames"]):
+                frame["index"] = index
+        _refuses(lambda c=corrupted: verify(c), f"corrupt recovery completion {mutation}")
+    _refuses(lambda: verify(transcript, {}), "recovery observation detached from wire result")
+
+
 def cases() -> list[Case]:
     return [
         Case("archive-and-license-authentication", _archive_and_license_authentication),

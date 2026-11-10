@@ -51,7 +51,8 @@ for resolved identifiers and standard document formatting. A formatting request
 offers the compiler's canonical layout as an edit for the client to apply.
 The [discovery providers](#callable-discovery) offer explicit callable and value
 completion edits and argument-sensitive signature help in completely checked
-pure source.
+pure source. [Single-expression recovery](#single-expression-recovery-completion)
+also supplies bounded value proposals for selected unfinished pure expressions.
 
 ## Interface and bounds
 
@@ -373,7 +374,9 @@ The pure development increment advertises `textDocument/completion` and
 Both reuse the validated compiler inspection and its existing source, dependency,
 configuration and producer invalidation. Unopened documents and malformed
 positions refuse; unavailable source returns an empty incomplete completion list
-or null signature help. Worker failures return RequestFailed. Complete response
+unless the [bounded recovery producer](#single-expression-recovery-completion)
+supplies a unique scalar repair. Signature help remains null for unavailable
+source. Worker failures return RequestFailed. Complete response
 byte bounds and the final current-source/current-producer check apply before
 publication, including when a request ID leaves little reply space.
 
@@ -386,8 +389,8 @@ site. The conservative list has `isIncomplete: true`; it supplies no exhaustive
 scope claim. Items carry the compiler signature, plain-text documentation when
 present, function kind 3 and a single `textEdit` replacing the complete selected
 identifier. The server leaves the overlay untouched. Declarations,
-punctuation and unsupported contexts yield no candidates. Empty insertion sites,
-incomplete-input and cross-package completion retain their producer prerequisites.
+punctuation and unsupported contexts yield no candidates. Wider incomplete-input
+and cross-package completion retain their producer prerequisites.
 No completion resolver, snippets or additional edits are advertised.
 
 At a resolved value-expression identifier, the pure resolver supplies its visible
@@ -454,9 +457,55 @@ The [literal completion controls](../../tools/tests/test_vela_lsp_literal_comple
 cover full separator-containing edits, Boolean types, sibling scopes,
 self-initializers, shadowed constants, nested static arguments, malformed facts,
 shared budgets and cache invalidation. A real stdio session verifies exact edits
-before and after an unsaved supplementary-comment/CRLF update. Empty insertion
-sites, unfinished source and wider-language completion retain their producer
-prerequisites; literal completion adds no advertised semantic acceptance claim.
+before and after an unsaved supplementary-comment/CRLF update. Wider-language
+completion retains its producer prerequisites; literal completion adds no
+advertised semantic acceptance claim.
+
+### Single-expression recovery completion
+
+When ordinary inspection is unavailable, completion can repair one empty or
+unfinished value expression in otherwise checkable pure source. The compiler's
+[bounded repair producer](../../tools/toolchain/completion.py) selects a complete
+identifier under the cursor or an empty insertion boundary using the existing
+token producer. Comments, interiors of other tokens and invalid Unicode/CRLF
+boundaries refuse. It checks at most two modified sources, inserting `0` and
+`false`, through the existing checked parser and pure resolver. Exactly one
+successful scalar repair must record that literal's completion context. Zero or
+two successful repairs supply no proposals: unconstrained initializer types,
+unrelated unresolved names, missing delimiters and wider syntax remain unsupported.
+
+The repair's existing resolver facts determine visible values, lexical scope,
+shadowing, source order, scalar types and static-input restrictions. The editor
+adapter validates the complete repaired facts against the exact reconstructed
+source, then projects only the selected literal's value alternatives onto the
+original snapshot. An unfinished identifier uses its prefix before the cursor
+and replaces the whole original identifier; an empty expression receives a
+zero-width insertion. Every proposal remains an explicit single `textEdit` with
+`isIncomplete: true`. The original overlay and diagnostics stay unchanged, and
+repaired facts supply no hover, navigation, token, formatting or acceptance result
+for the original source.
+
+One isolated worker has five seconds for both repairs. Source, concrete-piece,
+inspection, choice and complete-response limits apply to the entire operation;
+timeouts and malformed or stale source bindings return RequestFailed. The final
+publication check binds the original snapshot, completion producer, inspector
+and configuration generation; a concurrent replacement invalidates the reply.
+Injected inspection producers require an explicitly paired completion producer,
+so a test or alternate producer cannot silently fall back to another compiler.
+
+The [independent recovery controls](../../tools/tests/test_vela_lsp_recovery.py)
+cover typed numeric and Boolean insertions, full identifier edits, prefix filters,
+branch scopes, required-static arguments, ambiguity and unrelated-error refusals,
+malformed repair facts and producer invalidation. A real stdio session verifies
+the original diagnostics and exact completion edits before and after an unsaved
+supplementary-comment/CRLF update. Pinned Neovim and Vim full/incremental sessions
+exercise an unfinished identifier in an unsaved Unicode/CRLF source. Independent
+wire checks join the source, cursor, expected edit and client observation while
+requiring the original name-error diagnostic. Missing traffic, changed edits,
+different source/cursor and detached observations refuse qualification. Wider
+incomplete-source behavior retains its producer prerequisites.
+
+### Signature help
 
 Signature help selects the innermost checked call whose argument list contains
 the cursor, through the closing parenthesis's start. The existing compiler token

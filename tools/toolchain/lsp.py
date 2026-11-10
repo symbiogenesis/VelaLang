@@ -10,6 +10,7 @@ from typing import BinaryIO, Never, cast
 
 from toolchain import lsp_discovery
 from toolchain.lsp_format import Formatter, format_document, formatting_edits
+from toolchain.lsp_recovery import Completer, inspect_recovery, project_recovery
 from toolchain.lsp_rename import prepare, rename, valid_name
 from toolchain.lsp_services import (
     METHODS,
@@ -137,9 +138,10 @@ def _error(request_id: object, code: int, message: str) -> dict[str, object]:
 
 class Server:
     def __init__(self, checker: Checker | None = None, inspector: Inspector | None = None,
-                 formatter: Formatter | None = None) -> None:
+                 formatter: Formatter | None = None, completer: Completer | None = None) -> None:
         self.checker = diagnose if checker is None else checker
         self.inspector = inspect_completions if inspector is None else inspector
+        self.completer = inspect_recovery if completer is None and inspector is None else completer
         self.formatter = format_document if formatter is None else formatter
         self.documents: dict[str, SourceSnapshot] = {}
         self.desynchronized: set[str] = set()
@@ -266,6 +268,7 @@ class Server:
             return _error(request_id, -32801, "Document is out of synchronization")
         snapshot = self.documents[uri]
         inspector, generation = self.inspector, self._inspection_generation
+        completer = self.completer
         position: tuple[int, int] | None = None
         requested_range: QueryRange | None = None
         include_declaration = False
@@ -318,12 +321,19 @@ class Server:
             elif method == "textDocument/rename":
                 result = rename(snapshot, self._inspection(snapshot), position, new_name, inspector)
             elif method in lsp_discovery.METHODS:
-                result = lsp_discovery.project(snapshot, self._inspection(snapshot), method, position)
+                facts = self._inspection(snapshot)
+                if (method == "textDocument/completion" and facts is None
+                        and completer is not None and position is not None):
+                    cursor = snapshot.position_byte_offset(*position)
+                    result = project_recovery(snapshot, position, completer(snapshot.source, cursor))
+                else:
+                    result = lsp_discovery.project(snapshot, facts, method, position)
             else:
                 result = project_inspection(snapshot, self._inspection(snapshot), method,
                                             position, include_declaration, requested_range)
             if (self.documents.get(uri) is not snapshot or uri in self.desynchronized
-                    or self.inspector is not inspector or self._inspection_generation != generation):
+                    or self.inspector is not inspector or self.completer is not completer
+                    or self._inspection_generation != generation):
                 _modified()
             reply: dict[str, object] = {"jsonrpc": "2.0", "id": request_id, "result": result}
             encode_message(reply)
