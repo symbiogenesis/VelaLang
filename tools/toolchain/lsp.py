@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import BinaryIO, Never, cast
 
+from toolchain import lsp_discovery
 from toolchain.lsp_format import Formatter, format_document, formatting_edits
 from toolchain.lsp_rename import prepare, rename, valid_name
 from toolchain.lsp_services import (
@@ -316,6 +317,8 @@ class Server:
                 result = prepare(snapshot, self._inspection(snapshot), position)
             elif method == "textDocument/rename":
                 result = rename(snapshot, self._inspection(snapshot), position, new_name, inspector)
+            elif method in lsp_discovery.METHODS:
+                result = lsp_discovery.project(snapshot, self._inspection(snapshot), method, position)
             else:
                 result = project_inspection(snapshot, self._inspection(snapshot), method,
                                             position, include_declaration, requested_range)
@@ -383,6 +386,9 @@ class Server:
                     "capabilities": {"positionEncoding": "utf-16", "hoverProvider": True,
                         "definitionProvider": True, "referencesProvider": True, "documentSymbolProvider": True,
                         "inlayHintProvider": True,
+                        "completionProvider": {"resolveProvider": False},
+                        "signatureHelpProvider": {"triggerCharacters": ["(", ","],
+                                                  "retriggerCharacters": [","]},
                         "documentFormattingProvider": True,
                         "semanticTokensProvider": {
                             "legend": {"tokenTypes": list(SEMANTIC_TOKEN_TYPES),
@@ -410,7 +416,8 @@ class Server:
                 self.received_versions.clear()
                 return [{"jsonrpc": "2.0", "id": request_id, "result": None}]
             if request:
-                if method in METHODS or method in {"textDocument/formatting", _SEMANTIC_DELTA} | _RENAME_METHODS:
+                if method in METHODS or method in ({"textDocument/formatting", _SEMANTIC_DELTA}
+                                                   | _RENAME_METHODS | lsp_discovery.METHODS):
                     return [self._navigation(request_id, method, params)]
                 return [_error(request_id, -32601, "Method not found")]
             if method == "initialized":

@@ -271,6 +271,10 @@ def _synthetic_session(
             "textDocument/hover",
             {"textDocument": {"uri": _URI}, "position": {"line": pos[0], "character": pos[1]}},
         )
+    send_req("textDocument/completion", {
+        "textDocument": {"uri": _URI}, "position": {"line": 6, "character": 22}})
+    send_req("textDocument/signatureHelp", {
+        "textDocument": {"uri": _URI}, "position": {"line": 6, "character": 27}})
     for pos in ((6, 20), (11, 11), (14, 11)):
         send_req(
             "textDocument/definition",
@@ -740,7 +744,7 @@ def _live_two_client_qualification() -> None:
         lsp_clients.verify_wire_transcript(json.loads(transcript_raw),
             require_ranged_change=name != "vim_full_sync", require_token_deltas=True,
             delta_observation=observation["delta"], require_local_rename=True,
-            rename_observation=observation["stage1"])
+            rename_observation=observation["stage1"], discovery_observation=observation["stage1"])
 
 
 def _rename_wire_evidence_controls() -> None:
@@ -772,6 +776,38 @@ def _rename_wire_evidence_controls() -> None:
         "rename observation not joined to wire evidence")
 
 
+def _callable_discovery_wire_controls() -> None:
+    _, observation, transcript = _synthetic_session(incremental=True)
+    observed = cast("dict[str, object]", observation["stage1"])
+
+    def verify(value: dict[str, object]) -> dict[str, object]:
+        return lsp_clients.verify_wire_transcript(value, require_ranged_change=True,
+                                                discovery_observation=observed)
+
+    ensure(verify(transcript)["callable_discovery_responses"] == 2,
+           "wire evidence omitted a callable discovery response")
+    for method in ("textDocument/completion", "textDocument/signatureHelp"):
+        corrupted = copy.deepcopy(transcript)
+        requested: set[object] = set()
+        for frame in cast("list[dict[str, object]]", corrupted["frames"]):
+            message = cast("dict[str, object]", frame["message"])
+            if frame["direction"] == "client_to_server" and message.get("method") == method:
+                requested.add(message["id"])
+            elif frame["direction"] == "server_to_client" and message.get("id") in requested:
+                message["result"] = {}
+        _refuses(lambda c=corrupted: verify(c), "changed callable discovery wire response")
+        misplaced = copy.deepcopy(transcript)
+        for frame in cast("list[dict[str, object]]", misplaced["frames"]):
+            message = cast("dict[str, object]", frame["message"])
+            if message.get("method") == method:
+                cast("dict[str, object]", message["params"])["position"] = {"line": 6, "character": 0}
+        _refuses(lambda c=misplaced: verify(c), "callable discovery joined to a different source cursor")
+    wrong_observation = copy.deepcopy(observed)
+    wrong_observation["signature_square_call"] = None
+    _refuses(lambda: lsp_clients.verify_wire_transcript(transcript, require_ranged_change=True,
+        discovery_observation=wrong_observation), "callable discovery observation disagrees with wire")
+
+
 def cases() -> list[Case]:
     return [
         Case("archive-and-license-authentication", _archive_and_license_authentication),
@@ -781,5 +817,6 @@ def cases() -> list[Case]:
         Case("delta-consumer-controls", _delta_consumer_controls),
         Case("delta-wire-evidence-controls", _delta_wire_evidence_controls),
         Case("rename-wire-evidence-controls", _rename_wire_evidence_controls),
+        Case("callable-discovery-wire-evidence-controls", _callable_discovery_wire_controls),
         Case("live-two-client-qualification", _live_two_client_qualification, slow=True),
     ]

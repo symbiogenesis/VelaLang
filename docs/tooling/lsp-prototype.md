@@ -49,6 +49,9 @@ Editors with standard inlay-hint support can also show inferred local `Nat` and
 The [pure editor operations](#pure-editor-operations) supply full semantic tokens
 for resolved identifiers and standard document formatting. A formatting request
 offers the compiler's canonical layout as an edit for the client to apply.
+The [callable discovery providers](#callable-discovery) offer explicit name
+completion edits and argument-sensitive signature help in completely checked
+pure source.
 
 ## Interface and bounds
 
@@ -363,6 +366,55 @@ dispatch. Independent review covers projection and formatting isolation. Two
 pinned editor clients and retained transcripts remain required for final
 interoperability qualification; this increment stays open without them.
 
+## Callable discovery
+
+The pure development increment advertises `textDocument/completion` and
+`textDocument/signatureHelp` over synchronized, completely checked overlays.
+Both reuse the validated compiler inspection and its existing source, dependency,
+configuration and producer invalidation. Unopened documents and malformed
+positions refuse; unavailable source returns an empty incomplete completion list
+or null signature help. Worker failures return RequestFailed. Complete response
+byte bounds and the final current-source/current-producer check apply before
+publication, including when a request ID leaves little reply space.
+
+Completion selects an existing resolved callable identifier, including its end
+position, and matches the prefix before the cursor. It supplies the selected
+function and compatible functions declared before it: matching structured
+callable types, static qualifiers and parameter labels preserve the existing
+call's argument interface. Every candidate is already callable at this source
+site. The conservative list has `isIncomplete: true`; it supplies no exhaustive
+scope claim. Items carry the compiler signature, plain-text documentation when
+present, function kind 3 and a single `textEdit` replacing the complete selected
+identifier. The server leaves the overlay untouched. Values, declarations,
+punctuation and unsupported contexts yield no candidates. General scope-wide,
+incomplete-input and cross-package completion retain their producer prerequisites.
+No completion resolver, snippets or additional edits are advertised.
+
+Signature help selects the innermost checked call whose argument list contains
+the cursor, through the closing parenthesis's start. The existing compiler token
+producer supplies bounded punctuation and trivia boundaries; resolved function
+occurrences supply callable identities. A single balanced-delimiter pass counts
+only commas belonging to each call, so nested calls, grouped expressions, named
+arguments and comments containing punctuation retain the correct active parameter.
+The 16,384-piece concrete-token limit applies; exhaustion refuses the complete
+request. Signatures preserve declaration parameter names and `const` modes, with
+plain-text documentation. Zero-argument calls omit `activeParameter`; a trailing
+comma selects the final actual parameter. No context after the closing delimiter
+or inside a declaration supplies a signature. Triggers are `(` and `,`, with `,`
+as a retrigger. The adapter adds no name resolution or type inference.
+
+Independent controls cover prefix filtering, exact edits, distinct function/value
+namespaces, incompatible and forward candidates, nested and named arguments,
+zero/static/trailing parameters, supplementary comments and mixed newlines,
+refused source, incremental edits, lifecycle and producer invalidation. A real
+stdio session checks both providers before and after an unsaved Unicode/CRLF
+edit. Pinned Neovim and Vim sessions request both operations explicitly; their
+observations and exact wire responses join to the expected source and cursor.
+Missing traffic, changed suggestions/signatures, mismatched observations and
+stale source positions refuse qualification. This qualifies the bounded pure
+increment; the wider [editor contract](tooling-protocols.md#language-server-protocol)
+and second successful versioned-rename client remain open.
+
 ## Local rename previews
 
 The pure development increment supports `textDocument/prepareRename` and
@@ -449,7 +501,8 @@ The schema-2 qualification report embeds each session's exact observation and
 transcript JSON text alongside its SHA-256 digest and traffic summary, preserving
 reviewable evidence after temporary editor staging is removed. Use `--output FILE`
 to retain the report. This qualifies the existing pure token-delta transport;
-Q25ci's wider producer and editor-operation prerequisites remain open.
+Q25ci's wider producer and editor-operation prerequisites remain open. The same
+retained sessions also qualify the bounded callable discovery providers above.
 User-managed Host CI and Guest CI verdicts remain separate from local client
 qualification for Q25n, Q25o, and Q25u. Broader asynchronous services require
 explicit cancellation and deliberately late-result controls before advertising
